@@ -209,7 +209,7 @@ paths:
                       type: string
                     ip:
                       description: IP address of the client that initiated the change
-                      example: 44.44.44.44
+                      example: 44.44.44.43
                       type: string
                     itemId:
                       description: Unique ID of the item that was changed
