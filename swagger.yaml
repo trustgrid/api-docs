@@ -4453,7 +4453,7 @@ paths:
         - VPN Network
   /v2/domain/{domainName}/network:
     get:
-      summary: List domain networks
+      summary: List virtual networks
       description: Requires `virtual-networks::read` permission.
       responses:
         '200':
@@ -4465,7 +4465,8 @@ paths:
                   $ref: '#/components/schemas/VirtualNetwork'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
     parameters:
       - description: Domain name
         in: path
@@ -4474,7 +4475,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Create a domain network
+      summary: Create a virtual network network
       description: Requires `virtual-networks::modify` permission.
       requestBody:
         content:
@@ -4498,18 +4499,20 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
   /v2/domain/{domainName}/network/{networkName}:
     delete:
       summary: >-
-        Delete a domain network - this change is not staged and will immediately
+        Delete a virtual network - this change is not staged and will immediately
         affect the domain
       description: Requires `virtual-networks::modify` permission.
       responses:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
     parameters:
       - description: Network name
         in: path
@@ -4525,7 +4528,7 @@ paths:
           type: string
   /v2/domain/{domainName}/network/{networkName}/access-policy:
     get:
-      summary: List a network's access policies
+      summary: List a virtual network's access policies
       description: Requires `virtual-networks::read` permission.
       responses:
         '200':
@@ -4537,7 +4540,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkAccessPolicy'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
     parameters:
       - description: Network name
         in: path
@@ -4571,7 +4576,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
   /v2/domain/{domainName}/network/{networkName}/access-policy/{accessPolicyID}:
     delete:
       summary: Delete a network access policy
@@ -4591,7 +4598,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
     parameters:
       - description: Unique ID of access policy
         in: path
@@ -4631,7 +4640,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
   /v2/domain/{domainName}/network/{networkName}/auth-group:
     get:
       summary: List a network's auth groups
@@ -4646,7 +4657,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkAuthorizationGroup'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     parameters:
       - description: Network name
         in: path
@@ -4680,7 +4693,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
   /v2/domain/{domainName}/network/{networkName}/auth-group/{groupName}:
     delete:
       summary: Delete a network auth group
@@ -4704,7 +4719,9 @@ paths:
                     #/components/schemas/DomainNetworkAuthorizationGroupMembership
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     parameters:
       - description: Network auth group name
         in: path
@@ -4744,7 +4761,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     put:
       summary: Update a network auth group
       description: Requires `virtual-networks::modify` permission.
@@ -4765,7 +4784,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
   /v2/domain/{domainName}/network/{networkName}/auth-group/{groupName}/{memberID}:
     delete:
       summary: Remove a network auth group member
@@ -4774,7 +4795,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     parameters:
       - description: Group member ID
         in: path
@@ -4820,7 +4843,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
   /v2/domain/{domainName}/network/{networkName}/change:
     get:
       summary: List staged changes
@@ -4833,7 +4858,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/DomainNetworkInventory'
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
     parameters:
       - description: Network name
         in: path
@@ -4892,7 +4919,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
   /v2/domain/{domainName}/network/{networkName}/change/validate:
     get:
       summary: List validation errors for staged changes
@@ -4922,7 +4951,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
     parameters:
       - description: Network name
         in: path
@@ -4946,7 +4977,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
     parameters:
       - description: Change ID
         in: path
@@ -4980,7 +5013,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkDNSConfiguration'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS
     parameters:
       - description: Network name
         in: path
@@ -5019,7 +5054,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS
   /v2/domain/{domainName}/network/{networkName}/dns-zone:
     get:
       summary: List a network's DNS zones
@@ -5034,7 +5071,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkDNSZone'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
     parameters:
       - description: Network name
         in: path
@@ -5068,7 +5107,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}:
     delete:
       summary: Delete a DNS zone
@@ -5077,7 +5118,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
     parameters:
       - description: DNS zone name
         in: path
@@ -5117,7 +5160,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}/dns-record:
     get:
       summary: List a network zone's DNS records
@@ -5132,7 +5177,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkDNSRecord'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
     parameters:
       - description: DNS zone name
         in: path
@@ -5172,7 +5219,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}/dns-record/{recordName}/{recordType}:
     delete:
       summary: Delete a DNS record
@@ -5181,7 +5230,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
     parameters:
       - description: DNS record type
         in: path
@@ -5233,7 +5284,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
   /v2/domain/{domainName}/network/{networkName}/network-group:
     get:
       summary: List a network's groups
@@ -5248,7 +5301,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkGroup'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     parameters:
       - description: Network name
         in: path
@@ -5282,7 +5337,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-group/{groupName}:
     delete:
       summary: Delete a network group
@@ -5291,7 +5348,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     get:
       summary: List a network's group memberships
       description: Requires `virtual-networks::read` permission.
@@ -5305,7 +5364,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkGroupMembership'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     parameters:
       - description: Network group name
         in: path
@@ -5345,7 +5406,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-group/{groupName}/{objectName}:
     delete:
       summary: Remove a network object from a network group
@@ -5354,7 +5417,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     parameters:
       - description: Network object name
         in: path
@@ -5389,7 +5454,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-object:
     get:
       summary: List a network's objects
@@ -5404,7 +5471,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkObject'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
     parameters:
       - description: Network name
         in: path
@@ -5438,7 +5507,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
   /v2/domain/{domainName}/network/{networkName}/network-object/{objectName}:
     delete:
       summary: Delete a network object
@@ -5447,7 +5518,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
     parameters:
       - description: Network object name
         in: path
@@ -5487,7 +5560,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
   /v2/domain/{domainName}/network/{networkName}/port-forwarding:
     get:
       summary: List a network's port forwardings
@@ -5502,7 +5577,9 @@ paths:
                   $ref: '#/components/schemas/PortForwarding'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
     parameters:
       - description: Network name
         in: path
@@ -5536,7 +5613,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
   /v2/domain/{domainName}/network/{networkName}/port-forwarding/{portForwardingID}:
     delete:
       summary: Get a port forwarding
@@ -5549,7 +5628,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PortForwarding'
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
     parameters:
       - description: Port forwarding ID
         in: path
@@ -5589,7 +5670,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
   /v2/domain/{domainName}/network/{networkName}/route:
     get:
       summary: List a network's routes
@@ -5604,7 +5687,9 @@ paths:
                   $ref: '#/components/schemas/DomainNetworkRoute'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
     parameters:
       - description: Network name
         in: path
@@ -5638,7 +5723,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
   /v2/domain/{domainName}/network/{networkName}/route/{routeID}:
     delete:
       summary: Delete a network route
@@ -5646,8 +5733,12 @@ paths:
       responses:
         '200':
           description: OK
+        '404':
+          description: Not Found
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
     parameters:
       - description: Route ID
         in: path
@@ -5687,10 +5778,13 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
   /v2/event:
     get:
-      description: Get all events
+      description: Get all events, most recent first
+      summary: Get all events
       responses:
         '200':
           description: OK
@@ -5704,7 +5798,8 @@ paths:
         - Alarms
   /v2/event/{nodeId}:
     get:
-      description: Get all events for node
+      summary: Get a node's events
+      description: Get all events for node, most recent first
       responses:
         '200':
           description: OK
@@ -5714,6 +5809,8 @@ paths:
                 items:
                   $ref: '#/components/schemas/EventModel'
                 type: array
+        '404':
+          description: Not Found
       tags:
         - Alarms
     parameters:
