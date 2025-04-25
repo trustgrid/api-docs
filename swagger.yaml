@@ -4537,7 +4537,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkAccessPolicy'
+                  $ref: '#/components/schemas/VirtualNetworkAccessPolicy'
                 type: array
       tags:
         - Domain
@@ -4560,7 +4560,7 @@ paths:
       summary: Create a network access policy
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAccessPolicy'
+        $ref: '#/components/requestBodies/VirtualNetworkAccessPolicy'
       responses:
         '200':
           description: OK
@@ -4624,7 +4624,7 @@ paths:
       summary: Update a network access policy
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAccessPolicy'
+        $ref: '#/components/requestBodies/VirtualNetworkAccessPolicy'
       responses:
         '200':
           description: OK
@@ -4654,7 +4654,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkAuthorizationGroup'
+                  $ref: '#/components/schemas/VirtualNetworkAuthorizationGroup'
                 type: array
       tags:
         - Domain
@@ -4677,7 +4677,7 @@ paths:
       summary: Create a network auth group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroup'
       responses:
         '200':
           description: OK
@@ -4704,7 +4704,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     get:
       summary: List a network auth group's members
       description: Requires `virtual-networks::read` permission.
@@ -4716,7 +4718,7 @@ paths:
               schema:
                 items:
                   $ref: >-
-                    #/components/schemas/DomainNetworkAuthorizationGroupMembership
+                    #/components/schemas/VirtualNetworkAuthorizationGroupMembership
                 type: array
       tags:
         - Domain
@@ -4745,7 +4747,7 @@ paths:
       summary: Add a network auth group member
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroupMembership'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroupMembership'
       responses:
         '200':
           description: OK
@@ -4768,7 +4770,7 @@ paths:
       summary: Update a network auth group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroup'
       responses:
         '200':
           description: OK
@@ -4827,7 +4829,7 @@ paths:
       summary: Update a membership
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroupMembership'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroupMembership'
       responses:
         '200':
           description: OK
@@ -4856,7 +4858,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DomainNetworkInventory'
+                $ref: '#/components/schemas/VirtualNetworkInventory'
       tags:
         - Domain
         - Virtual Network
@@ -5010,7 +5012,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkDNSConfiguration'
+                  $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
                 type: array
       tags:
         - Domain
@@ -5036,7 +5038,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DomainNetworkDNSConfiguration'
+              $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
         description: DNS configuration
         required: true
       responses:
@@ -5068,7 +5070,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkDNSZone'
+                  $ref: '#/components/schemas/VirtualNetworkDNSZone'
                 type: array
       tags:
         - Domain
@@ -5091,7 +5093,7 @@ paths:
       summary: Create a DNS zone
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSZone'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSZone'
       responses:
         '200':
           description: OK
@@ -5144,7 +5146,7 @@ paths:
       summary: Update a DNS zone
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSZone'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSZone'
       responses:
         '200':
           description: OK
@@ -5174,7 +5176,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkDNSRecord'
+                  $ref: '#/components/schemas/VirtualNetworkDNSRecord'
                 type: array
       tags:
         - Domain
@@ -5203,7 +5205,7 @@ paths:
       summary: Create a DNS record
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSRecord'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSRecord'
       responses:
         '200':
           description: OK
@@ -5268,7 +5270,7 @@ paths:
       summary: Update a DNS record
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSRecord'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSRecord'
       responses:
         '200':
           description: OK
@@ -5298,7 +5300,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkGroup'
+                  $ref: '#/components/schemas/VirtualNetworkGroup'
                 type: array
       tags:
         - Domain
@@ -5321,7 +5323,7 @@ paths:
       summary: Create a network group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkGroup'
       responses:
         '200':
           description: OK
@@ -5361,7 +5363,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkGroupMembership'
+                  $ref: '#/components/schemas/VirtualNetworkGroupMembership'
                 type: array
       tags:
         - Domain
@@ -5390,7 +5392,7 @@ paths:
       summary: Update a network group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkGroup'
       responses:
         '200':
           description: OK
@@ -5468,7 +5470,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkObject'
+                  $ref: '#/components/schemas/VirtualNetworkObject'
                 type: array
       tags:
         - Domain
@@ -5491,7 +5493,7 @@ paths:
       summary: Create a network object
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkObject'
+        $ref: '#/components/requestBodies/VirtualNetworkObject'
       responses:
         '200':
           description: OK
@@ -5544,7 +5546,7 @@ paths:
       summary: Update a network object
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkObject'
+        $ref: '#/components/requestBodies/VirtualNetworkObject'
       responses:
         '200':
           description: OK
@@ -5684,7 +5686,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkRoute'
+                  $ref: '#/components/schemas/VirtualNetworkRoute'
                 type: array
       tags:
         - Domain
@@ -5707,7 +5709,7 @@ paths:
       summary: Create a network route
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkRoute'
+        $ref: '#/components/requestBodies/VirtualNetworkRoute'
       responses:
         '200':
           description: OK
@@ -5762,7 +5764,7 @@ paths:
       summary: Update a network route
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkRoute'
+        $ref: '#/components/requestBodies/VirtualNetworkRoute'
       responses:
         '200':
           description: OK
@@ -8113,11 +8115,11 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/VpnNetworkUpdateModel'
-    DomainNetworkDNSRecord:
+    VirtualNetworkDNSRecord:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkDNSRecord'
+            $ref: '#/components/schemas/VirtualNetworkDNSRecord'
       description: DNS record configuration
       required: true
     VpnWireguardUpdateModel:
@@ -8125,11 +8127,11 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/VpnWireguardUpdateModel'
-    DomainNetworkAuthorizationGroupMembership:
+    VirtualNetworkAuthorizationGroupMembership:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkAuthorizationGroupMembership'
+            $ref: '#/components/schemas/VirtualNetworkAuthorizationGroupMembership'
       description: Network auth group member
       required: true
     OrderModel:
@@ -8210,11 +8212,11 @@ components:
           schema:
             $ref: '#/components/schemas/TagValueModel'
       required: true
-    DomainNetworkRoute:
+    VirtualNetworkRoute:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkRoute'
+            $ref: '#/components/schemas/VirtualNetworkRoute'
       description: Route configuration
       required: true
     Container:
@@ -8235,11 +8237,11 @@ components:
             $ref: '#/components/schemas/ServiceConfig'
       description: Config body
       required: true
-    DomainNetworkAccessPolicy:
+    VirtualNetworkAccessPolicy:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkAccessPolicy'
+            $ref: '#/components/schemas/VirtualNetworkAccessPolicy'
       description: Access policy configuration
       required: true
     ConnectorConfig:
@@ -8867,32 +8869,32 @@ components:
           schema:
             $ref: '#/components/schemas/VpnNetworkUpdateModel'
       required: true
-    DomainNetworkAuthorizationGroup:
+    VirtualNetworkAuthorizationGroup:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkAuthorizationGroup'
+            $ref: '#/components/schemas/VirtualNetworkAuthorizationGroup'
       description: Network auth group configuration
       required: true
-    DomainNetworkDNSZone:
+    VirtualNetworkDNSZone:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkDNSZone'
+            $ref: '#/components/schemas/VirtualNetworkDNSZone'
       description: DNS zone configuration
       required: true
-    DomainNetworkGroup:
+    VirtualNetworkGroup:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkGroup'
+            $ref: '#/components/schemas/VirtualNetworkGroup'
       description: Network group configuration
       required: true
-    DomainNetworkObject:
+    VirtualNetworkObject:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkObject'
+            $ref: '#/components/schemas/VirtualNetworkObject'
       description: Network object configuration
       required: true
     PortForwarding:
@@ -9758,8 +9760,8 @@ components:
           type: string
       title: DataStoreTask
       type: object
-    DomainNetworkAccessPolicy:
-      description: Domain Network Access Policy
+    VirtualNetworkAccessPolicy:
+      description: Virtual Network Access Policy
       properties:
         description:
           type: string
@@ -9785,20 +9787,20 @@ components:
         - protocol
         - source
         - dest
-      title: Domain Network Access Policy
+      title: Virtual Network Access Policy
       type: object
-    DomainNetworkAuthorizationGroup:
-      description: Domain Network Authorization Group
+    VirtualNetworkAuthorizationGroup:
+      description: Virtual Network Authorization Group
       properties:
         description:
           type: string
         name:
           description: Group name
           type: string
-      title: Domain Network Authorization Group
+      title: Virtual Network Authorization Group
       type: object
-    DomainNetworkAuthorizationGroupMembership:
-      description: Domain Network Authorization Group Membership
+    VirtualNetworkAuthorizationGroupMembership:
+      description: Virtual Network Authorization Group Membership
       properties:
         description:
           type: string
@@ -9810,19 +9812,19 @@ components:
           type: string
         uid:
           type: string
-      title: Domain Network Authorization Group Membership
+      title: Virtual Network Authorization Group Membership
       type: object
-    DomainNetworkDNSConfiguration:
-      description: Domain Network DNS Configuration
+    VirtualNetworkDNSConfiguration:
+      description: Virtual Network DNS Configuration
       properties:
         enabled:
           type: boolean
         server:
           type: string
-      title: Domain Network DNS Configuration
+      title: Virtual Network DNS Configuration
       type: object
-    DomainNetworkDNSRecord:
-      description: Domain Network DNS Record
+    VirtualNetworkDNSRecord:
+      description: Virtual Network DNS Record
       properties:
         name:
           type: string
@@ -9832,10 +9834,10 @@ components:
           type: number
         value:
           type: string
-      title: Domain Network DNS Record
+      title: Virtual Network DNS Record
       type: object
-    DomainNetworkDNSZone:
-      description: Domain Network DNS Zone
+    VirtualNetworkDNSZone:
+      description: Virtual Network DNS Zone
       properties:
         description:
           type: string
@@ -9843,66 +9845,66 @@ components:
           type: string
         resolver:
           type: string
-      title: Domain Network DNS Zone
+      title: Virtual Network DNS Zone
       type: object
-    DomainNetworkGroup:
-      description: Domain Network Group
+    VirtualNetworkGroup:
+      description: Virtual Network Group
       properties:
         description:
           type: string
         name:
           description: Name
           type: string
-      title: Domain Network Group
+      title: Virtual Network Group
       type: object
-    DomainNetworkGroupMembership:
-      description: Domain Network Group Membership
+    VirtualNetworkGroupMembership:
+      description: Virtual Network Group Membership
       properties:
         groupName:
           type: string
         objectName:
           type: string
-      title: Domain Network Group Membership
+      title: Virtual Network Group Membership
       type: object
-    DomainNetworkInventory:
-      description: Domain Network Inventory
+    VirtualNetworkInventory:
+      description: Virtual Network Inventory
       properties:
         accessPolicies:
           items:
-            $ref: '#/components/schemas/DomainNetworkAccessPolicy'
+            $ref: '#/components/schemas/VirtualNetworkAccessPolicy'
           type: array
         dnsConfig:
           items:
-            $ref: '#/components/schemas/DomainNetworkDNSConfiguration'
+            $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
           type: array
         dnsRecords:
           items:
-            $ref: '#/components/schemas/DomainNetworkDNSRecord'
+            $ref: '#/components/schemas/VirtualNetworkDNSRecord'
           type: array
         dnsZones:
           items:
-            $ref: '#/components/schemas/DomainNetworkDNSZone'
+            $ref: '#/components/schemas/VirtualNetworkDNSZone'
           type: array
         networkGroupMemberships:
           items:
-            $ref: '#/components/schemas/DomainNetworkGroupMembership'
+            $ref: '#/components/schemas/VirtualNetworkGroupMembership'
           type: array
         networkGroups:
           items:
-            $ref: '#/components/schemas/DomainNetworkGroup'
+            $ref: '#/components/schemas/VirtualNetworkGroup'
           type: array
         networkObjects:
           items:
-            $ref: '#/components/schemas/DomainNetworkObject'
+            $ref: '#/components/schemas/VirtualNetworkObject'
           type: array
         routes:
           items:
-            $ref: '#/components/schemas/DomainNetworkRoute'
+            $ref: '#/components/schemas/VirtualNetworkRoute'
           type: array
-      title: Domain Network Inventory
+      title: Virtual Network Inventory
       type: object
-    DomainNetworkObject:
-      description: Domain Network Object
+    VirtualNetworkObject:
+      description: Virtual Network Object
       properties:
         cidr:
           type: string
@@ -9910,10 +9912,10 @@ components:
           type: string
         name:
           type: string
-      title: Domain Network Object
+      title: Virtual Network Object
       type: object
-    DomainNetworkRoute:
-      description: DomainNetworkRoute
+    VirtualNetworkRoute:
+      description: VirtualNetworkRoute
       properties:
         description:
           type: string
@@ -9929,7 +9931,7 @@ components:
           type: string
         uid:
           type: string
-      title: DomainNetworkRoute
+      title: VirtualNetworkRoute
       type: object
     EventModel:
       properties:
