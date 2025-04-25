@@ -9832,6 +9832,30 @@ components:
           type: string
         uid:
           type: string
+        monitors:
+          items:
+            properties:
+              enabled:
+                type: boolean
+              name:
+                type: string
+              protocol:
+                type: string
+                enum:
+                  - tcp
+                  - icmp
+              dest:
+                type: string
+              port:
+                type: number
+              interval:
+                type: number
+              count:
+                type: number
+              maxLatency:
+                type: number
+            type: object
+          type: array
       title: DomainNetworkRoute
       type: object
     EventModel:
@@ -11059,6 +11083,30 @@ components:
           type: string
         path:
           type: string
+        monitors:
+          items:
+            properties:
+              enabled:
+                type: boolean
+              name:
+                type: string
+              protocol:
+                type: string
+                enum:
+                  - tcp
+                  - icmp
+              dest:
+                type: string
+              port:
+                type: number
+              interval:
+                type: number
+              count:
+                type: number
+              maxLatency:
+                type: number
+            type: object
+          type: array
       type: object
     VpnServiceUpdateModel:
       properties:
