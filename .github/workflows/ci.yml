@@ -4,7 +4,7 @@ on:
   pull_request:
 
 jobs:
-  go-swagger:
+  go-openapi:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -16,10 +16,9 @@ jobs:
         with:
           go-version: "1.24"
 
-      - name: Validate Swagger
+      - name: Validate OpenAPI
         run: |
-          go install github.com/go-swagger/go-swagger/cmd/swagger@latest
-          swagger validate swagger.yaml
+          go run github.com/getkin/kin-openapi/cmd/validate@latest --defaults -- swagger.yaml
 
   redocly-lint:
     runs-on: ubuntu-22.04
