@@ -4,10 +4,10 @@ on:
   pull_request:
 
 jobs:
-  deploy:
+  go-swagger:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true 
           fetch-depth: 0
@@ -19,4 +19,21 @@ jobs:
       - name: Validate Swagger
         run: |
           go install github.com/go-swagger/go-swagger/cmd/swagger@latest
-          swagger validate static/swagger.yml
+          swagger validate swagger.yaml
+
+  redocly-lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true 
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+
+      - name: Install Redocly CLI
+        run: npm install -g @redocly/cli
+
+      - name: Lint OpenAPI Specification
+        run: redocly lint swagger.yaml --format=github-actions
