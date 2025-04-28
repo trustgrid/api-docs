@@ -25,9 +25,9 @@ tags:
   - name: Group
     description: |
       [Groups](https://docs.trustgrid.io/docs/user-management/groups/) allow exposing ZTNA applications to users.
-  - name: Node
+  - name: Appliance
     description: |
-      [Nodes](https://docs.trustgrid.io/docs/nodes/appliances/) are Trustgrid appliances
+      [Appliances](https://docs.trustgrid.io/docs/nodes/appliances/) are Trustgrid nodes deployed either physically or as a virtual machine.
   - name: Agent
     description: |
       [Agents](https://docs.trustgrid.io/docs/nodes/agents/) run on consumer devices and have a subset of appliance functionality
