@@ -2,6 +2,84 @@ openapi: 3.0.0
 info:
   version: 1.0.0
   title: Trustgrid Management API
+  
+tags:
+  - name: Alert
+    description: Alerts are broadcast through channels
+  - name: Audit
+    description: Audits are logged to keep track of user and system changes
+  - name: Cluster
+    description: Clusters allow shared config and HA
+  - name: Domain
+    description: All devices subscribe to the domain's network config
+  - name: User
+    description: All API interactions require a user
+  - name: Group
+    description: Groups allow simpler user permission management
+  - name: Node
+    description: Typically refers to an appliance-type node
+  - name: Agent
+    description: Agents run on consumer devices and have a subset of appliance functionality
+  - name: Org
+    description: Organization settings
+  - name: Order
+    description: Provision management
+  - name: Repository
+    description: Container repository
+  - name: Tag
+    description: Nodes and Clusters allow tags for grouping and management
+  - name: Upgrade Manager
+    description: Bulk appliance upgrades
+  - name: Alarm
+    description: Configuration for managing what events generate alerts
+  - name: Application
+    description: ZTNA applications
+  - name: Certificate
+    description: TLS certificates
+  - name: Compute
+    description: Edge compute configuration
+  - name: Virtual Network
+    description: Network configuration
+  - name: IDP
+    description: Identity provider configuration
+  - name: KVM
+    description: Virtual machines
+  - name: Permissions
+    description: Permissions management
+  - name: ServiceUser
+    description: Users who only have API access
+  
+x-tagGroups:
+  - name: Alerts
+    tags:
+      - Alert
+      - Alarm
+  - name: Node
+    tags: 
+      -  Cluster
+      - Domain
+      - Node
+      - Agent
+      - Certificate
+      - Upgrade Manager
+      - Tag
+      - Virtual Network
+  - name: Compute
+    tags: 
+      -  Repository
+      - Compute
+      - KVM
+  - name: Management
+    tags: 
+      -  Audit
+      - Org
+      - Order
+      - IDP
+      - Permissions
+      - User
+      - Group
+      - ServiceUser
+
 paths:
   /alert:
     get:
