@@ -79,10 +79,10 @@ x-tagGroups:
   - name: Node
     tags: 
       - Agent
+      - Appliance
       - Certificate
       - Cluster
       - Domain
-      - Appliance
       - Tag
       - Upgrade Manager
       - Virtual Network
