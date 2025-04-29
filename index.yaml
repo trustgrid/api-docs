@@ -2,6 +2,106 @@ openapi: 3.0.0
 info:
   version: 1.0.0
   title: Trustgrid Management API
+  license:
+    name: unlicensed
+    url: https://trustgrid.io
+  
+tags:
+  - name: Alerting
+    description: |
+      [Alerts](https://docs.trustgrid.io/docs/alarms/) are broadcast through channels
+  - name: Audit
+    description: |
+      Audits are logged to keep track of user and system changes. Trustgrid exposes [authentication audits](https://docs.trustgrid.io/docs/operations/authentication/), [configuration changes](https://docs.trustgrid.io/docs/operations/changes/), and [flow logs](https://docs.trustgrid.io/docs/operations/flow-logs/)      
+  - name: Cluster
+    description: |
+      [Clusters](https://docs.trustgrid.io/docs/clusters/) allow shared config and HA
+  - name: Domain
+    description: |
+      A [domain](https://docs.trustgrid.io/docs/domain/) provides a logical grouping of nodes inside an organization. 
+  - name: User
+    description: |
+      All interactions with the Trustgrid API require a [user](https://docs.trustgrid.io/docs/user-management/).
+  - name: Group
+    description: |
+      [Groups](https://docs.trustgrid.io/docs/user-management/groups/) allow exposing ZTNA applications to users.
+  - name: Appliance
+    description: |
+      [Appliances](https://docs.trustgrid.io/docs/nodes/appliances/) are Trustgrid nodes deployed either physically or as a virtual machine.
+  - name: Agent
+    description: |
+      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) run on consumer devices and have a subset of appliance functionality
+  - name: Org
+    description: |
+      Org-related APIs expose [support requests](https://docs.trustgrid.io/docs/support/), support settings, and [shared documents](https://docs.trustgrid.io/docs/support/documents/).
+  - name: Order
+    description: |
+      Provision process management
+  - name: Repository
+    description: Container repository
+  - name: Tag
+    description: |
+      [Tags](https://docs.trustgrid.io/docs/nodes/shared/tags/) allow grouping clusters and nodes for permissions and reporting.
+  - name: Upgrade Manager
+    description: |
+      Nodes can be upgraded in bulk using the [upgrade manager](https://docs.trustgrid.io/docs/upgrade-manager/).
+  - name: Alarm
+    description: |
+      [Alarm filters](https://docs.trustgrid.io/docs/alarms/alarm-filters/) manage criteria and thresholds for what events generate alerts.
+  - name: Application
+    description: |
+      [ZTNA applications](https://docs.trustgrid.io/docs/applications/)
+  - name: Certificate
+    description: |
+      [TLS certificates](https://docs.trustgrid.io/docs/certificates/)
+  - name: Compute
+    description: |
+      [Edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
+  - name: Virtual Network
+    description: |
+      [Virtual network configuration](https://docs.trustgrid.io/docs/domain/virtual-networks/)
+  - name: IDP
+    description: |
+      [Identity provider configuration](https://docs.trustgrid.io/docs/idps/)
+  - name: KVM
+    description: Virtual machines
+  - name: Permissions
+    description: |
+      [Permissions management](https://docs.trustgrid.io/docs/user-management/policies/)
+  - name: ServiceUser
+    description: Users who only have API access
+  
+x-tagGroups:
+  - name: Alerts
+    tags:
+      - Alarm
+      - Alert
+  - name: Node
+    tags: 
+      - Agent
+      - Appliance
+      - Certificate
+      - Cluster
+      - Domain
+      - Tag
+      - Upgrade Manager
+      - Virtual Network
+  - name: Compute
+    tags: 
+      - Compute
+      - KVM
+      - Repository
+  - name: Management
+    tags: 
+      - Audit
+      - Group
+      - IDP
+      - Org
+      - Order
+      - Permissions
+      - ServiceUser
+      - User
+
 paths:
   /alert:
     get:
@@ -34,7 +134,7 @@ paths:
                   $ref: '#/components/schemas/Alert'
                 type: array
       tags:
-        - Alerts
+        - Alert
   /alert/{nodeID}:
     get:
       summary: List events for a node
@@ -54,7 +154,7 @@ paths:
                   $ref: '#/components/schemas/Alert'
                 type: array
       tags:
-        - Alerts
+        - Alert
     parameters:
       - description: Node ID
         in: path
@@ -510,7 +610,7 @@ paths:
       tags:
         - Cluster
     post:
-      description: |
+      summary: |
         Create a cluster
       requestBody:
         content:
@@ -530,7 +630,7 @@ paths:
         - Cluster
   /cluster/{clusterFQDN}:
     delete:
-      description: Delete a cluster
+      summary: Delete a cluster
       responses:
         '200':
           description: OK
@@ -558,7 +658,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
     put:
-      description: Update a cluster
+      summary: Update a cluster
       requestBody:
         content:
           application/json:
@@ -581,7 +681,7 @@ paths:
       - $ref: '#/components/parameters/clusterFQDN'
       - $ref: '#/components/parameters/nodeID'
     put:
-      description: |
+      summary: |
         Designate the specified node as the active cluster member
       responses:
         '200':
@@ -845,7 +945,7 @@ paths:
         - Cluster
   /cluster/{clusterFQDN}/tag/{tagName}:
     delete:
-      description: Delete a tag from a cluster
+      summary: Delete a tag from a cluster
       responses:
         '200':
           description: OK
@@ -860,7 +960,7 @@ paths:
         schema:
           type: string
     put:
-      description: Set a tag on a cluster
+      summary: Set a tag on a cluster
       requestBody:
         $ref: '#/components/requestBodies/TagValueModel'
       responses:
@@ -1174,7 +1274,7 @@ paths:
                   $ref: '#/components/schemas/Node'
                 type: array
       tags:
-        - Node
+        - Appliance
         - Agent
   /node/license:
     get:
@@ -1193,7 +1293,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
     parameters:
       - description: node name
         in: query
@@ -1216,7 +1316,7 @@ paths:
         '404':
           description: Not Found
       tags:
-        - Node
+        - Appliance
         - Agent
     get:
       summary: Get a node
@@ -1236,7 +1336,7 @@ paths:
         '404':
           description: Not Found
       tags:
-        - Node
+        - Appliance
         - Agent
     parameters:
       - description: Node ID
@@ -1278,7 +1378,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
   /node/{nodeID}/config/alert:
     parameters:
@@ -1294,7 +1394,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /node/{nodeID}/config/cluster:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -1309,7 +1409,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /node/{nodeID}/config/connectors:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -1322,16 +1422,16 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
     delete:
-      description: |
+      summary: |
         Delete a node's connector config
       responses:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
   /v2/node/{nodeID}/config/connectors:
     parameters:
@@ -1354,7 +1454,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - Agent
   /v2/node/{nodeID}/config/connectors/upgrade:
     parameters:
@@ -1374,7 +1474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - Agent
   /v2/node/{nodeID}/config/connectors/{connectorID}:
     parameters:
@@ -1404,7 +1504,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - Agent
     delete:
       summary: |
@@ -1422,7 +1522,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
   /node/{nodeID}/config/network:
     parameters:
@@ -1441,7 +1541,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /node/{nodeID}/config/services:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -1459,7 +1559,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
   /v2/node/{nodeID}/config/services:
     parameters:
@@ -1481,7 +1581,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - Agent
   /v2/node/{nodeID}/config/services/upgrade:
     parameters:
@@ -1501,7 +1601,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - Agent
   /v2/node/{nodeID}/config/services/{serviceID}:
     parameters:
@@ -1532,7 +1632,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - Agent
     delete:
       summary: Delete a node service
@@ -1546,7 +1646,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
   /node/{nodeID}/config/ztnagw:
     parameters:
@@ -1611,7 +1711,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
     delete:
       summary: Delete a node's ZTNA gateway config
       description: |
@@ -1624,7 +1724,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /node/{nodeID}/config/gateway:
     parameters:
       - description: Node ID
@@ -1724,7 +1824,7 @@ paths:
                 type: array
       tags:
         - Agent
-        - Node
+        - Appliance
   /node/{nodeID}/lock:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -1810,17 +1910,17 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Node
         - Agent
+        - Appliance
   /node/{nodeID}/tag/{tagName}:
     delete:
-      description: Delete a tag from a node (appliance or agent)
+      summary: Delete a tag from a node (appliance or agent)
       responses:
         '200':
           description: OK
       tags:
-        - Node
         - Agent
+        - Appliance
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Tag name
@@ -1830,14 +1930,14 @@ paths:
         schema:
           type: string
     put:
-      description: Set a tag on a node (appliance or agent)
+      summary: Set a tag on a node (appliance or agent)
       requestBody:
         $ref: '#/components/requestBodies/TagValueModel'
       responses:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
   /node/{nodeID}/trigger/{event}:
     parameters:
@@ -1860,11 +1960,11 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - Agent
   /org/mine:
     get:
-      description: Get your current Org
+      summary: Get your current Org
       responses:
         '200':
           description: OK
@@ -1892,9 +1992,9 @@ paths:
                   $ref: '#/components/schemas/OrderModel'
                 type: array
       tags:
-        - Orders
+        - Order
     post:
-      description: Create an order. Omitted fields are not written.
+      summary: Create an order. Omitted fields are not written.
       requestBody:
         $ref: '#/components/requestBodies/OrderModel'
       responses:
@@ -1907,10 +2007,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Orders
+        - Order
   /provisioning/api/v1/orders/{uid}:
     get:
-      description: Get an order
+      summary: Get an order
       responses:
         '200':
           description: OK
@@ -1919,7 +2019,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderModel'
       tags:
-        - Orders
+        - Order
     parameters:
       - in: path
         name: uid
@@ -1927,7 +2027,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update an order. Omitted fields are not updated.
+      summary: Update an order. Omitted fields are not updated.
       requestBody:
         $ref: '#/components/requestBodies/OrderModel'
       responses:
@@ -1940,7 +2040,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Orders
+        - Order
   /provisioning/api/v1/orders/{uid}/comment:
     parameters:
       - in: path
@@ -1949,7 +2049,7 @@ paths:
         schema:
           type: string
     post:
-      description: Add a comment to an order
+      summary: Add a comment to an order
       requestBody:
         content:
           application/json:
@@ -1962,15 +2062,15 @@ paths:
         '200':
           description: OK
       tags:
-        - Orders
+        - Order
   /provisioning/api/v1/orders/{uid}/flag:
     delete:
-      description: Unflag an order
+      summary: Unflag an order
       responses:
         '200':
           description: OK
       tags:
-        - Orders
+        - Order
     parameters:
       - in: path
         name: uid
@@ -1978,15 +2078,15 @@ paths:
         schema:
           type: string
     put:
-      description: Flag an order
+      summary: Flag an order
       responses:
         '200':
           description: OK
       tags:
-        - Orders
+        - Order
   /repositories:
     get:
-      description: Get all repositories
+      summary: Get all repositories
       responses:
         '200':
           description: OK
@@ -1997,15 +2097,15 @@ paths:
                   $ref: '#/components/schemas/RepositoryModel'
                 type: array
       tags:
-        - Repositories
+        - Repository
   /repositories/{reponame}:
     delete:
-      description: Delete a repository
+      summary: Delete a repository
       responses:
         '200':
           description: OK
       tags:
-        - Repositories
+        - Repository
     get:
       summary: Get a repository
       responses:
@@ -2018,7 +2118,7 @@ paths:
                   $ref: '#/components/schemas/RepositoryTagModel'
                 type: array
       tags:
-        - Repositories
+        - Repository
     parameters:
       - in: path
         name: reponame
@@ -2027,12 +2127,12 @@ paths:
           type: string
   /repositories/{reponame}/{tag}:
     delete:
-      description: Delete a repository tag
+      summary: Delete a repository tag
       responses:
         '200':
           description: OK
       tags:
-        - Repositories
+        - Repository
     parameters:
       - in: path
         name: reponame
@@ -2110,10 +2210,10 @@ paths:
                 type: array
       summary: Retrieve usage data for nodes
       tags:
-        - Node
+        - Appliance
   /tags:
     get:
-      description: List tags
+      summary: List tags
       responses:
         '200':
           description: OK
@@ -2124,10 +2224,10 @@ paths:
                   $ref: '#/components/schemas/Tag'
                 type: array
       tags:
-        - Tags
+        - Tag
   /tags/{tagName}:
     get:
-      description: Get a tag by name
+      summary: Get a tag by name
       responses:
         '200':
           description: OK
@@ -2138,7 +2238,7 @@ paths:
         '404':
           description: Tag not found
       tags:
-        - Tags
+        - Tag
     parameters:
       - description: Tag name
         in: path
@@ -2531,7 +2631,7 @@ paths:
         - User
   /user/{email}:
     delete:
-      description: Delete a user
+      summary: Delete a user
       responses:
         '200':
           description: OK
@@ -2575,6 +2675,7 @@ paths:
   /v2/alarm:
     get:
       summary: Get alarms
+      description: Requires `alarms::read` permission.
       responses:
         '200':
           description: OK
@@ -2585,9 +2686,10 @@ paths:
                   $ref: '#/components/schemas/AlarmModel'
                 type: array
       tags:
-        - Alarms
+        - Alarm
     post:
-      description: Create an alarm
+      summary: Create an alarm
+      description: Requires `alarms::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/AlarmModel'
       responses:
@@ -2600,7 +2702,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Alarms
+        - Alarm
   /v2/alarm-channel:
     get:
       summary: Returns available alarm channels
@@ -2614,9 +2716,9 @@ paths:
                   $ref: '#/components/schemas/AlarmChannelModel'
                 type: array
       tags:
-        - Alarms
+        - Alarm
     post:
-      description: Create an alarm channel
+      summary: Create an alarm channel
       requestBody:
         $ref: '#/components/requestBodies/AlarmChannelModel'
       responses:
@@ -2629,17 +2731,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Alarms
+        - Alarm
   /v2/alarm-channel/{uid}:
     delete:
-      description: Update an alarm channel
+      summary: Update an alarm channel
       responses:
         '200':
           description: OK
       tags:
-        - Alarms
+        - Alarm
     get:
-      description: Get an alarm channel
+      summary: Get an alarm channel
       responses:
         '200':
           description: OK
@@ -2648,7 +2750,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlarmChannelModel'
       tags:
-        - Alarms
+        - Alarm
     parameters:
       - in: path
         name: uid
@@ -2656,7 +2758,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update an alarm channel
+      summary: Update an alarm channel
       requestBody:
         $ref: '#/components/requestBodies/AlarmChannelModel'
       responses:
@@ -2669,17 +2771,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Alarms
+        - Alarm
   /v2/alarm/suppression:
     delete:
-      description: Cancel or end alert suppression window
+      summary: Cancel or end alert suppression window
       responses:
         '200':
           description: OK
       tags:
-        - Alarms
+        - Alarm
     get:
-      description: Get scheduled alert suppression window
+      summary: Get scheduled alert suppression window
       responses:
         '200':
           description: OK
@@ -2688,9 +2790,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlertSuppressionModel'
       tags:
-        - Alarms
+        - Alarm
     post:
-      description: Create an alert suppression window
+      summary: Create an alert suppression window
       requestBody:
         content:
           application/json:
@@ -2708,17 +2810,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Alarms
+        - Alarm
   /v2/alarm/{uid}:
     delete:
-      description: Delete alarm
+      summary: Delete alarm
       responses:
         '200':
           description: OK
       tags:
-        - Alarms
+        - Alarm
     get:
-      description: Get alarm
+      summary: Get alarm
       responses:
         '200':
           description: OK
@@ -2727,7 +2829,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlarmModel'
       tags:
-        - Alarms
+        - Alarm
     parameters:
       - in: path
         name: uid
@@ -2735,7 +2837,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update alarm
+      summary: Update alarm
       requestBody:
         $ref: '#/components/requestBodies/AlarmModel'
       responses:
@@ -2748,7 +2850,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Alarms
+        - Alarm
   /v2/alert:
     get:
       summary: List alerts, newest first
@@ -2763,7 +2865,7 @@ paths:
                   $ref: '#/components/schemas/AlertV2'
                 type: array
       tags:
-        - Alerts
+        - Alert
   /v2/alert/{nodeID}:
     get:
       summary: List alerts for a node (appliance or agent), newest first
@@ -2778,7 +2880,7 @@ paths:
                   $ref: '#/components/schemas/AlertV2'
                 type: array
       tags:
-        - Alerts
+        - Alert
     parameters:
       - description: Node ID
         in: path
@@ -2794,7 +2896,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Alerts
+        - Alert
     parameters:
       - description: Alert type, eg Node Disconnect
         in: path
@@ -2821,7 +2923,7 @@ paths:
                   $ref: '#/components/schemas/Application'
                 type: array
       tags:
-        - Applications
+        - Application
     post:
       summary: Create an application
       description: Requires `applications::modify` permission.
@@ -2842,7 +2944,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Applications
+        - Application
   /v2/application/all:
     get:
       summary: List applications
@@ -2857,7 +2959,7 @@ paths:
                   $ref: '#/components/schemas/Application'
                 type: array
       tags:
-        - Applications
+        - Application
   /v2/application/{applicationID}:
     delete:
       summary: Delete an application
@@ -2868,7 +2970,7 @@ paths:
         '404':
           description: Not found
       tags:
-        - Applications
+        - Application
     get:
       summary: Get an application
       description: Requires `applications::read` permission.
@@ -2882,7 +2984,7 @@ paths:
         '404':
           description: Not found
       tags:
-        - Applications
+        - Application
     parameters:
       - description: Unique ID of application
         in: path
@@ -2910,7 +3012,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Applications
+        - Application
   /v2/application/{applicationID}/access-policy:
     get:
       summary: List access rules
@@ -2925,7 +3027,7 @@ paths:
                   $ref: '#/components/schemas/ApplicationAccessRule'
                 type: array
       tags:
-        - Applications
+        - Application
     parameters:
       - description: Unique ID of application
         in: path
@@ -2942,7 +3044,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Applications
+        - Application
   /v2/application/{applicationID}/access-policy/{ruleID}:
     delete:
       summary: Delete an access rule
@@ -2951,7 +3053,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Applications
+        - Application
     parameters:
       - description: Unique ID of access rule
         in: path
@@ -2974,7 +3076,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Applications
+        - Application
   /v2/application/{applicationID}/access-policy/{ruleID}/{index}:
     parameters:
       - description: Desired index of rule
@@ -3002,7 +3104,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Applications
+        - Application
   /v2/application/{applicationID}/access-logs:
     parameters:
       - description: Unique ID of application
@@ -3059,7 +3161,7 @@ paths:
                   type: object
                 type: array
       tags:
-        - Applications
+        - Application
   /v2/application/{applicationID}/session-logs:
     parameters:
       - description: Unique ID of application
@@ -3123,7 +3225,7 @@ paths:
                   type: object
                 type: array
       tags:
-        - Applications
+        - Application
   /v2/audit/flow-logs:
     get:
       summary: List recent flow logs
@@ -3350,7 +3452,7 @@ paths:
                   $ref: '#/components/schemas/Certificate'
                 type: array
       tags:
-        - Certificates
+        - Certificate
     post:
       summary: Create a certificate
       description: Requires `certificates::modify` permission.
@@ -3371,7 +3473,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Certificates
+        - Certificate
   /v2/certificates/{fqdn}:
     delete:
       summary: Delete a certificate
@@ -3380,7 +3482,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Certificates
+        - Certificate
     parameters:
       - description: FQDN of certificate
         in: path
@@ -3408,7 +3510,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Certificates
+        - Certificate
   /v2/cluster/{clusterFQDN}/exec/container:
     get:
       summary: List containers
@@ -3918,11 +4020,11 @@ paths:
                   $ref: '#/components/schemas/VpnClusterNetworkModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
     post:
-      description: Attach a VPN network
+      summary: Attach a VPN network
       requestBody:
         $ref: '#/components/requestBodies/VpnNetworkUpdateModel2'
       responses:
@@ -3939,17 +4041,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}:
     delete:
-      description: Delete a VPN network
+      summary: Delete a VPN network
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     get:
-      description: Returns information about a VPN network
+      summary: Returns information about a VPN network
       responses:
         '200':
           description: OK
@@ -3958,7 +4060,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnClusterNetworkInventoryModel'
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3968,7 +4070,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN network
+      summary: Update a VPN network
       requestBody:
         $ref: '#/components/requestBodies/VpnNetworkUpdateModel'
       responses:
@@ -3981,17 +4083,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dns:
     delete:
-      description: Delete a VPN DNS configuration
+      summary: Delete a VPN DNS configuration
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     get:
-      description: Get a VPN DNS configuration
+      summary: Get a VPN DNS configuration
       responses:
         '200':
           description: OK
@@ -4000,7 +4102,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnClusterDnsModel'
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4010,7 +4112,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN DNS configuration
+      summary: Create a VPN DNS configuration
       requestBody:
         $ref: '#/components/requestBodies/VpnDnsUpdateModel'
       responses:
@@ -4023,9 +4125,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
     put:
-      description: Update a VPN DNS configuration
+      summary: Update a VPN DNS configuration
       requestBody:
         $ref: '#/components/requestBodies/VpnDnsUpdateModel'
       responses:
@@ -4038,10 +4140,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/export-route:
     get:
-      description: Get a VPN's dynamic export routes
+      summary: Get a VPN's dynamic export routes
       responses:
         '200':
           description: OK
@@ -4052,7 +4154,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterRouteModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4062,7 +4164,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN export route
+      summary: Create a VPN export route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -4075,15 +4177,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/export-route/{uid}:
     delete:
-      description: Delete a VPN export route
+      summary: Delete a VPN export route
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4099,7 +4201,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN export route
+      summary: Update a VPN export route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -4112,10 +4214,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/import-route:
     get:
-      description: Get a VPN's dynamic import routes
+      summary: Get a VPN's dynamic import routes
       responses:
         '200':
           description: OK
@@ -4126,7 +4228,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterRouteModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4136,7 +4238,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN import route
+      summary: Create a VPN import route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -4149,15 +4251,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/import-route/{uid}:
     delete:
-      description: Delete a VPN import route
+      summary: Delete a VPN import route
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4173,7 +4275,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN import route
+      summary: Update a VPN import route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -4186,10 +4288,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/interface:
     get:
-      description: Get a VPN's interfaces
+      summary: Get a VPN's interfaces
       responses:
         '200':
           description: OK
@@ -4200,7 +4302,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterInterfaceModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4210,7 +4312,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN interface
+      summary: Create a VPN interface
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -4223,15 +4325,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/interface/{interfaceName}:
     delete:
-      description: Delete a VPN interface
+      summary: Delete a VPN interface
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4247,7 +4349,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN interface
+      summary: Update a VPN interface
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -4260,10 +4362,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/route:
     get:
-      description: Get a VPN's routes
+      summary: Get a VPN's routes
       responses:
         '200':
           description: OK
@@ -4274,7 +4376,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterRouteModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4284,7 +4386,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN route
+      summary: Create a VPN route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -4297,15 +4399,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/route/{uid}:
     delete:
-      description: Delete a VPN route
+      summary: Delete a VPN route
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4321,7 +4423,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN route
+      summary: Update a VPN route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -4334,10 +4436,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/service:
     get:
-      description: Get a VPN's services
+      summary: Get a VPN's services
       responses:
         '200':
           description: OK
@@ -4348,7 +4450,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterServiceModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4358,7 +4460,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN Service
+      summary: Create a VPN Service
       requestBody:
         $ref: '#/components/requestBodies/VpnServiceUpdateModel'
       responses:
@@ -4371,15 +4473,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/service/{uid}:
     delete:
-      description: Delete a Service
+      summary: Delete a Service
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4395,7 +4497,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a Service
+      summary: Update a Service
       requestBody:
         $ref: '#/components/requestBodies/VpnServiceUpdateModel'
       responses:
@@ -4408,17 +4510,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/wireguard:
     delete:
-      description: Delete a VPN WireGuard configuration
+      summary: Delete a VPN WireGuard configuration
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     get:
-      description: Get a VPN's WireGuard configuration
+      summary: Get a VPN's WireGuard configuration
       responses:
         '200':
           description: OK
@@ -4427,7 +4529,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnClusterWireguardModel'
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4437,7 +4539,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update the VPN WireGuard configuration
+      summary: Update the VPN WireGuard configuration
       requestBody:
         $ref: '#/components/requestBodies/VpnWireguardUpdateModel'
       responses:
@@ -4450,10 +4552,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/domain/{domainName}/network:
     get:
-      summary: List domain networks
+      summary: List virtual networks
       description: Requires `virtual-networks::read` permission.
       responses:
         '200':
@@ -4465,7 +4567,8 @@ paths:
                   $ref: '#/components/schemas/VirtualNetwork'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
     parameters:
       - description: Domain name
         in: path
@@ -4474,7 +4577,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Create a domain network
+      summary: Create a virtual network network
       description: Requires `virtual-networks::modify` permission.
       requestBody:
         content:
@@ -4498,18 +4601,20 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
   /v2/domain/{domainName}/network/{networkName}:
     delete:
       summary: >-
-        Delete a domain network - this change is not staged and will immediately
+        Delete a virtual network - this change is not staged and will immediately
         affect the domain
       description: Requires `virtual-networks::modify` permission.
       responses:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
     parameters:
       - description: Network name
         in: path
@@ -4525,7 +4630,7 @@ paths:
           type: string
   /v2/domain/{domainName}/network/{networkName}/access-policy:
     get:
-      summary: List a network's access policies
+      summary: List a virtual network's access policies
       description: Requires `virtual-networks::read` permission.
       responses:
         '200':
@@ -4534,10 +4639,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkAccessPolicy'
+                  $ref: '#/components/schemas/VirtualNetworkAccessPolicy'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
     parameters:
       - description: Network name
         in: path
@@ -4555,7 +4662,7 @@ paths:
       summary: Create a network access policy
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAccessPolicy'
+        $ref: '#/components/requestBodies/VirtualNetworkAccessPolicy'
       responses:
         '200':
           description: OK
@@ -4571,7 +4678,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
   /v2/domain/{domainName}/network/{networkName}/access-policy/{accessPolicyID}:
     delete:
       summary: Delete a network access policy
@@ -4591,7 +4700,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
     parameters:
       - description: Unique ID of access policy
         in: path
@@ -4615,7 +4726,7 @@ paths:
       summary: Update a network access policy
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAccessPolicy'
+        $ref: '#/components/requestBodies/VirtualNetworkAccessPolicy'
       responses:
         '200':
           description: OK
@@ -4631,7 +4742,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Access Policy
   /v2/domain/{domainName}/network/{networkName}/auth-group:
     get:
       summary: List a network's auth groups
@@ -4643,10 +4756,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkAuthorizationGroup'
+                  $ref: '#/components/schemas/VirtualNetworkAuthorizationGroup'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     parameters:
       - description: Network name
         in: path
@@ -4664,7 +4779,7 @@ paths:
       summary: Create a network auth group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroup'
       responses:
         '200':
           description: OK
@@ -4680,7 +4795,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
   /v2/domain/{domainName}/network/{networkName}/auth-group/{groupName}:
     delete:
       summary: Delete a network auth group
@@ -4689,7 +4806,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     get:
       summary: List a network auth group's members
       description: Requires `virtual-networks::read` permission.
@@ -4701,10 +4820,12 @@ paths:
               schema:
                 items:
                   $ref: >-
-                    #/components/schemas/DomainNetworkAuthorizationGroupMembership
+                    #/components/schemas/VirtualNetworkAuthorizationGroupMembership
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     parameters:
       - description: Network auth group name
         in: path
@@ -4728,7 +4849,7 @@ paths:
       summary: Add a network auth group member
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroupMembership'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroupMembership'
       responses:
         '200':
           description: OK
@@ -4744,12 +4865,14 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     put:
       summary: Update a network auth group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroup'
       responses:
         '200':
           description: OK
@@ -4765,7 +4888,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
   /v2/domain/{domainName}/network/{networkName}/auth-group/{groupName}/{memberID}:
     delete:
       summary: Remove a network auth group member
@@ -4774,7 +4899,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
     parameters:
       - description: Group member ID
         in: path
@@ -4804,7 +4931,7 @@ paths:
       summary: Update a membership
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkAuthorizationGroupMembership'
+        $ref: '#/components/requestBodies/VirtualNetworkAuthorizationGroupMembership'
       responses:
         '200':
           description: OK
@@ -4820,7 +4947,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Auth Group
   /v2/domain/{domainName}/network/{networkName}/change:
     get:
       summary: List staged changes
@@ -4831,9 +4960,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DomainNetworkInventory'
+                $ref: '#/components/schemas/VirtualNetworkInventory'
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
     parameters:
       - description: Network name
         in: path
@@ -4892,7 +5023,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
   /v2/domain/{domainName}/network/{networkName}/change/validate:
     get:
       summary: List validation errors for staged changes
@@ -4922,7 +5055,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
     parameters:
       - description: Network name
         in: path
@@ -4946,7 +5081,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Change Management
     parameters:
       - description: Change ID
         in: path
@@ -4977,10 +5114,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkDNSConfiguration'
+                  $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS
     parameters:
       - description: Network name
         in: path
@@ -5001,7 +5140,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DomainNetworkDNSConfiguration'
+              $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
         description: DNS configuration
         required: true
       responses:
@@ -5019,7 +5158,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS
   /v2/domain/{domainName}/network/{networkName}/dns-zone:
     get:
       summary: List a network's DNS zones
@@ -5031,10 +5172,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkDNSZone'
+                  $ref: '#/components/schemas/VirtualNetworkDNSZone'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
     parameters:
       - description: Network name
         in: path
@@ -5052,7 +5195,7 @@ paths:
       summary: Create a DNS zone
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSZone'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSZone'
       responses:
         '200':
           description: OK
@@ -5068,7 +5211,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}:
     delete:
       summary: Delete a DNS zone
@@ -5077,7 +5222,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
     parameters:
       - description: DNS zone name
         in: path
@@ -5101,7 +5248,7 @@ paths:
       summary: Update a DNS zone
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSZone'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSZone'
       responses:
         '200':
           description: OK
@@ -5117,7 +5264,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Zone
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}/dns-record:
     get:
       summary: List a network zone's DNS records
@@ -5129,10 +5278,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkDNSRecord'
+                  $ref: '#/components/schemas/VirtualNetworkDNSRecord'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
     parameters:
       - description: DNS zone name
         in: path
@@ -5156,7 +5307,7 @@ paths:
       summary: Create a DNS record
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSRecord'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSRecord'
       responses:
         '200':
           description: OK
@@ -5172,7 +5323,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}/dns-record/{recordName}/{recordType}:
     delete:
       summary: Delete a DNS record
@@ -5181,7 +5334,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
     parameters:
       - description: DNS record type
         in: path
@@ -5217,7 +5372,7 @@ paths:
       summary: Update a DNS record
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkDNSRecord'
+        $ref: '#/components/requestBodies/VirtualNetworkDNSRecord'
       responses:
         '200':
           description: OK
@@ -5233,7 +5388,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - DNS Record
   /v2/domain/{domainName}/network/{networkName}/network-group:
     get:
       summary: List a network's groups
@@ -5245,10 +5402,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkGroup'
+                  $ref: '#/components/schemas/VirtualNetworkGroup'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     parameters:
       - description: Network name
         in: path
@@ -5266,7 +5425,7 @@ paths:
       summary: Create a network group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkGroup'
       responses:
         '200':
           description: OK
@@ -5282,7 +5441,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-group/{groupName}:
     delete:
       summary: Delete a network group
@@ -5291,7 +5452,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     get:
       summary: List a network's group memberships
       description: Requires `virtual-networks::read` permission.
@@ -5302,10 +5465,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkGroupMembership'
+                  $ref: '#/components/schemas/VirtualNetworkGroupMembership'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     parameters:
       - description: Network group name
         in: path
@@ -5329,7 +5494,7 @@ paths:
       summary: Update a network group
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkGroup'
+        $ref: '#/components/requestBodies/VirtualNetworkGroup'
       responses:
         '200':
           description: OK
@@ -5345,7 +5510,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-group/{groupName}/{objectName}:
     delete:
       summary: Remove a network object from a network group
@@ -5354,7 +5521,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
     parameters:
       - description: Network object name
         in: path
@@ -5389,7 +5558,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-object:
     get:
       summary: List a network's objects
@@ -5401,10 +5572,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkObject'
+                  $ref: '#/components/schemas/VirtualNetworkObject'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
     parameters:
       - description: Network name
         in: path
@@ -5422,7 +5595,7 @@ paths:
       summary: Create a network object
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkObject'
+        $ref: '#/components/requestBodies/VirtualNetworkObject'
       responses:
         '200':
           description: OK
@@ -5438,7 +5611,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
   /v2/domain/{domainName}/network/{networkName}/network-object/{objectName}:
     delete:
       summary: Delete a network object
@@ -5447,7 +5622,9 @@ paths:
         '200':
           description: OK
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
     parameters:
       - description: Network object name
         in: path
@@ -5471,7 +5648,7 @@ paths:
       summary: Update a network object
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkObject'
+        $ref: '#/components/requestBodies/VirtualNetworkObject'
       responses:
         '200':
           description: OK
@@ -5487,7 +5664,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Network Object
   /v2/domain/{domainName}/network/{networkName}/port-forwarding:
     get:
       summary: List a network's port forwardings
@@ -5502,7 +5681,9 @@ paths:
                   $ref: '#/components/schemas/PortForwarding'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
     parameters:
       - description: Network name
         in: path
@@ -5536,7 +5717,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
   /v2/domain/{domainName}/network/{networkName}/port-forwarding/{portForwardingID}:
     delete:
       summary: Get a port forwarding
@@ -5549,7 +5732,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PortForwarding'
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
     parameters:
       - description: Port forwarding ID
         in: path
@@ -5589,7 +5774,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Port Forwarding
   /v2/domain/{domainName}/network/{networkName}/route:
     get:
       summary: List a network's routes
@@ -5601,10 +5788,12 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/DomainNetworkRoute'
+                  $ref: '#/components/schemas/VirtualNetworkRoute'
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
     parameters:
       - description: Network name
         in: path
@@ -5622,7 +5811,7 @@ paths:
       summary: Create a network route
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkRoute'
+        $ref: '#/components/requestBodies/VirtualNetworkRoute'
       responses:
         '200':
           description: OK
@@ -5638,7 +5827,9 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
   /v2/domain/{domainName}/network/{networkName}/route/{routeID}:
     delete:
       summary: Delete a network route
@@ -5646,8 +5837,12 @@ paths:
       responses:
         '200':
           description: OK
+        '404':
+          description: Not Found
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
     parameters:
       - description: Route ID
         in: path
@@ -5671,7 +5866,7 @@ paths:
       summary: Update a network route
       description: Requires `virtual-networks::modify` permission.
       requestBody:
-        $ref: '#/components/requestBodies/DomainNetworkRoute'
+        $ref: '#/components/requestBodies/VirtualNetworkRoute'
       responses:
         '200':
           description: OK
@@ -5687,10 +5882,13 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Domain Network
+        - Domain
+        - Virtual Network
+        - Route
   /v2/event:
     get:
-      description: Get all events
+      description: Get all events, most recent first
+      summary: Get all events
       responses:
         '200':
           description: OK
@@ -5704,7 +5902,8 @@ paths:
         - Alarms
   /v2/event/{nodeId}:
     get:
-      description: Get all events for node
+      summary: Get a node's events
+      description: Get all events for node, most recent first
       responses:
         '200':
           description: OK
@@ -5714,6 +5913,8 @@ paths:
                 items:
                   $ref: '#/components/schemas/EventModel'
                 type: array
+        '404':
+          description: Not Found
       tags:
         - Alarms
     parameters:
@@ -5735,7 +5936,7 @@ paths:
         schema:
           type: string
     post:
-      description: Test an event against alarms
+      summary: Test an event against alarms
       responses:
         '200':
           description: OK
@@ -5743,7 +5944,7 @@ paths:
         - Alarms
   /v2/idp:
     get:
-      description: Get all Identity Providers
+      summary: Get all Identity Providers
       responses:
         '200':
           description: OK
@@ -5756,7 +5957,7 @@ paths:
       tags:
         - IDP
     post:
-      description: Create an identity provider
+      summary: Create an identity provider
       requestBody:
         $ref: '#/components/requestBodies/IdentityProviderUpdateModel'
       responses:
@@ -5838,14 +6039,14 @@ paths:
         - IDP
   /v2/idp/{uid}:
     delete:
-      description: Delete an identity provider
+      summary: Delete an identity provider
       responses:
         '200':
           description: OK
       tags:
         - IDP
     get:
-      description: Get an Identity Provider
+      summary: Get an Identity Provider
       responses:
         '200':
           description: OK
@@ -5863,7 +6064,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update an identity provider
+      summary: Update an identity provider
       requestBody:
         $ref: '#/components/requestBodies/IdentityProviderUpdateModel'
       responses:
@@ -5898,7 +6099,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
     parameters:
       - description: Node ID
         in: path
@@ -5949,7 +6150,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /v2/node/{nodeID}/data-store/http-upload:
     parameters:
       - description: Node ID
@@ -5985,7 +6186,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /v2/node/{nodeID}/data-store/list:
     get:
       summary: List the data store contents
@@ -6004,7 +6205,7 @@ paths:
                     type: array
                 type: object
       tags:
-        - Node
+        - Appliance
     parameters:
       - description: Node ID
         in: path
@@ -6040,7 +6241,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /v2/node/{nodeID}/data-store/s3-download:
     parameters:
       - description: Node ID
@@ -6072,7 +6273,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /v2/node/{nodeID}/data-store/s3-upload:
     parameters:
       - description: Node ID
@@ -6104,7 +6305,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
   /v2/node/{nodeID}/data-store/tasks:
     get:
       summary: List recent data store activity
@@ -6123,7 +6324,7 @@ paths:
                     type: array
                 type: object
       tags:
-        - Node
+        - Appliance
     parameters:
       - description: Node ID
         in: path
@@ -6643,7 +6844,7 @@ paths:
                   $ref: '#/components/schemas/KVMImage'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6664,7 +6865,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - KVM
   /v2/node/{nodeID}/kvm/image/{id}:
     delete:
@@ -6676,7 +6877,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - KVM
     get:
       summary: |
@@ -6691,7 +6892,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/KVMImage'
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6722,7 +6923,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - KVM
   /v2/node/{nodeID}/kvm/machine:
     get:
@@ -6740,7 +6941,7 @@ paths:
                   $ref: '#/components/schemas/KVMMachine'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6761,7 +6962,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - KVM
   /v2/node/{nodeID}/kvm/machine/{id}:
     delete:
@@ -6773,7 +6974,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - KVM
     get:
       summary: |
@@ -6788,7 +6989,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/KVMMachine'
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6815,7 +7016,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - KVM
   /v2/node/{nodeID}/kvm/machine/{id}/cloud-init:
     get:
@@ -6833,7 +7034,7 @@ paths:
                   $ref: '#/components/schemas/KVMCloudInit'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6873,7 +7074,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - KVM
   /v2/node/{nodeID}/kvm/machine/{id}/cpu:
     get:
@@ -6891,7 +7092,7 @@ paths:
                   $ref: '#/components/schemas/KVMCPUConfig'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6917,7 +7118,7 @@ paths:
                   $ref: '#/components/schemas/KVMInterface'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6943,7 +7144,7 @@ paths:
                   $ref: '#/components/schemas/KVMMemoryConfig'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6969,7 +7170,7 @@ paths:
                   $ref: '#/components/schemas/KVMPortMapping'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -6995,7 +7196,7 @@ paths:
                   $ref: '#/components/schemas/KVMVirtualNetwork'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -7021,7 +7222,7 @@ paths:
                   $ref: '#/components/schemas/KVMVolumeConfig'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -7045,7 +7246,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/KVMVRF'
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -7071,7 +7272,7 @@ paths:
                   $ref: '#/components/schemas/KVMVolume'
                 type: array
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -7096,7 +7297,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Node
+        - Appliance
         - KVM
   /v2/node/{nodeID}/kvm/volume/{name}:
     delete:
@@ -7108,7 +7309,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Node
+        - Appliance
         - KVM
     get:
       summary: |
@@ -7123,7 +7324,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/KVMVolume'
       tags:
-        - Node
+        - Appliance
         - KVM
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -7190,7 +7391,7 @@ paths:
             type: object
           type: array
       tags:
-        - Node
+        - Appliance
       responses:
         default:
           description: Default response
@@ -7212,18 +7413,21 @@ paths:
     get:
       summary: Returns all the VPN networks
       responses:
-        description: OK
-        schema:
-          items:
-            $ref: '#/components/schemas/VpnNodeNetworkModel'
-          type: array
-          description: ''
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/VpnNodeNetworkModel'
+                type: array
+                description: ''
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
     post:
-      description: Attach a VPN network
+      summary: Attach a VPN network
       requestBody:
         $ref: '#/components/requestBodies/VpnNetworkUpdateModel2'
       responses:
@@ -7240,17 +7444,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}:
     delete:
-      description: Delete a VPN network
+      summary: Delete a VPN network
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     get:
-      description: Get a VPN network
+      summary: Get a VPN network
       responses:
         '200':
           description: OK
@@ -7259,7 +7463,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnNodeNetworkInventoryModel'
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7269,7 +7473,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN network
+      summary: Update a VPN network
       requestBody:
         $ref: '#/components/requestBodies/VpnNetworkUpdateModel'
       responses:
@@ -7282,17 +7486,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/dns:
     delete:
-      description: Delete a VPN DNS configuration
+      summary: Delete a VPN DNS configuration
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     get:
-      description: Get a VPN's DNS configuration
+      summary: Get a VPN's DNS configuration
       responses:
         '200':
           description: OK
@@ -7301,7 +7505,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnNodeDnsModel'
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7311,7 +7515,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN DNS configuration
+      summary: Create a VPN DNS configuration
       requestBody:
         $ref: '#/components/requestBodies/VpnDnsUpdateModel'
       responses:
@@ -7324,9 +7528,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
     put:
-      description: Update a VPN DNS configuration
+      summary: Update a VPN DNS configuration
       requestBody:
         $ref: '#/components/requestBodies/VpnDnsUpdateModel'
       responses:
@@ -7339,10 +7543,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/export-route:
     get:
-      description: Get a VPN's dynamic export routes
+      summary: Get a VPN's dynamic export routes
       responses:
         '200':
           description: OK
@@ -7353,7 +7557,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeRouteModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7363,7 +7567,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN export route
+      summary: Create a VPN export route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -7376,15 +7580,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/export-route/{uid}:
     delete:
-      description: Delete a VPN export route
+      summary: Delete a VPN export route
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7400,7 +7604,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN export route
+      summary: Update a VPN export route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -7413,10 +7617,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/import-route:
     get:
-      description: Get a VPN's dynamic import routes
+      summary: Get a VPN's dynamic import routes
       responses:
         '200':
           description: OK
@@ -7427,7 +7631,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeRouteModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7437,7 +7641,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN import route
+      summary: Create a VPN import route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -7450,15 +7654,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/import-route/{uid}:
     delete:
-      description: Delete a VPN import route
+      summary: Delete a VPN import route
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7474,7 +7678,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN import route
+      summary: Update a VPN import route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -7487,10 +7691,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/interface:
     get:
-      description: Get a VPN's interfaces
+      summary: Get a VPN's interfaces
       responses:
         '200':
           description: OK
@@ -7501,7 +7705,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeInterfaceModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7511,7 +7715,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN interface
+      summary: Create a VPN interface
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7524,15 +7728,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/interface/{interfaceName}:
     delete:
-      description: Delete a VPN interface
+      summary: Delete a VPN interface
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7548,7 +7752,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN interface
+      summary: Update a VPN interface
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7561,10 +7765,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/route:
     get:
-      description: Get a VPN's routes
+      summary: Get a VPN's routes
       responses:
         '200':
           description: OK
@@ -7575,7 +7779,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeRouteModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7585,7 +7789,7 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN route
+      summary: Create a VPN route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -7598,15 +7802,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/route/{uid}:
     delete:
-      description: Delete a VPN route
+      summary: Delete a VPN route
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7622,7 +7826,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a VPN route
+      summary: Update a VPN route
       requestBody:
         $ref: '#/components/requestBodies/VpnRouteUpdateModel'
       responses:
@@ -7635,10 +7839,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/service:
     get:
-      description: Get a VPN's services
+      summary: Get a VPN's services
+      description: Requires `node-vpn::read` permission.
       responses:
         '200':
           description: OK
@@ -7649,7 +7854,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeServiceModel'
                 type: array
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7659,7 +7864,8 @@ paths:
         schema:
           type: string
     post:
-      description: Create a VPN Service
+      summary: Create a VPN Service
+      description: Requires `node-vpn::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/VpnServiceUpdateModel'
       responses:
@@ -7672,15 +7878,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/service/{uid}:
     delete:
-      description: Delete a Service
+      summary: Delete a VPN Service
+      description: Requires `node-vpn::modify` permission.
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7696,7 +7903,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update a Service
+      summary: Update a Service
       requestBody:
         $ref: '#/components/requestBodies/VpnServiceUpdateModel'
       responses:
@@ -7709,17 +7916,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/wireguard:
     delete:
-      description: Delete a VPN WireGuard configuration
+      summary: Delete a VPN WireGuard configuration
       responses:
         '200':
           description: OK
       tags:
-        - VPN Network
+        - Virtual Network
     get:
-      description: Get a VPN WireGuard configuration
+      summary: Get a VPN WireGuard configuration
       responses:
         '200':
           description: OK
@@ -7728,7 +7935,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnNodeWireguardModel'
       tags:
-        - VPN Network
+        - Virtual Network
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7738,7 +7945,7 @@ paths:
         schema:
           type: string
     put:
-      description: Update the VPN WireGuard configuration
+      summary: Update the VPN WireGuard configuration
       requestBody:
         $ref: '#/components/requestBodies/VpnWireguardUpdateModel'
       responses:
@@ -7751,7 +7958,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - VPN Network
+        - Virtual Network
   /v2/policy:
     get:
       summary: List policies
@@ -7852,7 +8059,7 @@ paths:
         schema:
           type: string
     post:
-      description: Add group to a user
+      summary: Add group to a user
       requestBody:
         content:
           application/json:
@@ -7871,7 +8078,7 @@ paths:
         - User
   /v2/user/{email}/groups/{group}:
     delete:
-      description: Delete a group from a user
+      summary: Delete a group from a user
       responses:
         '200':
           description: OK
@@ -7909,8 +8116,6 @@ paths:
                 $ref: '#/components/schemas/ServiceUser'
         '404':
           description: Service user not found
-      security:
-        - bearerAuth: []
       tags:
         - ServiceUser
   /v2/service-user/{name}/token:
@@ -7937,8 +8142,6 @@ paths:
                     type: string
         '404':
           description: Service user not found
-      security:
-        - bearerAuth: []
       tags:
         - ServiceUser
   /v2/service-user:
@@ -7953,8 +8156,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ServiceUser'
-      security:
-        - bearerAuth: []
       tags:
         - ServiceUser
     post:
@@ -7981,8 +8182,6 @@ paths:
                 $ref: '#/components/schemas/ServiceUser'
         '400':
           description: Invalid input
-      security:
-        - bearerAuth: []
       tags:
         - ServiceUser
 security:
@@ -8016,11 +8215,11 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/VpnNetworkUpdateModel'
-    DomainNetworkDNSRecord:
+    VirtualNetworkDNSRecord:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkDNSRecord'
+            $ref: '#/components/schemas/VirtualNetworkDNSRecord'
       description: DNS record configuration
       required: true
     VpnWireguardUpdateModel:
@@ -8028,11 +8227,11 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/VpnWireguardUpdateModel'
-    DomainNetworkAuthorizationGroupMembership:
+    VirtualNetworkAuthorizationGroupMembership:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkAuthorizationGroupMembership'
+            $ref: '#/components/schemas/VirtualNetworkAuthorizationGroupMembership'
       description: Network auth group member
       required: true
     OrderModel:
@@ -8113,11 +8312,11 @@ components:
           schema:
             $ref: '#/components/schemas/TagValueModel'
       required: true
-    DomainNetworkRoute:
+    VirtualNetworkRoute:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkRoute'
+            $ref: '#/components/schemas/VirtualNetworkRoute'
       description: Route configuration
       required: true
     Container:
@@ -8138,11 +8337,11 @@ components:
             $ref: '#/components/schemas/ServiceConfig'
       description: Config body
       required: true
-    DomainNetworkAccessPolicy:
+    VirtualNetworkAccessPolicy:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkAccessPolicy'
+            $ref: '#/components/schemas/VirtualNetworkAccessPolicy'
       description: Access policy configuration
       required: true
     ConnectorConfig:
@@ -8770,32 +8969,32 @@ components:
           schema:
             $ref: '#/components/schemas/VpnNetworkUpdateModel'
       required: true
-    DomainNetworkAuthorizationGroup:
+    VirtualNetworkAuthorizationGroup:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkAuthorizationGroup'
+            $ref: '#/components/schemas/VirtualNetworkAuthorizationGroup'
       description: Network auth group configuration
       required: true
-    DomainNetworkDNSZone:
+    VirtualNetworkDNSZone:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkDNSZone'
+            $ref: '#/components/schemas/VirtualNetworkDNSZone'
       description: DNS zone configuration
       required: true
-    DomainNetworkGroup:
+    VirtualNetworkGroup:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkGroup'
+            $ref: '#/components/schemas/VirtualNetworkGroup'
       description: Network group configuration
       required: true
-    DomainNetworkObject:
+    VirtualNetworkObject:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/DomainNetworkObject'
+            $ref: '#/components/schemas/VirtualNetworkObject'
       description: Network object configuration
       required: true
     PortForwarding:
@@ -9661,8 +9860,8 @@ components:
           type: string
       title: DataStoreTask
       type: object
-    DomainNetworkAccessPolicy:
-      description: Domain Network Access Policy
+    VirtualNetworkAccessPolicy:
+      description: Virtual Network Access Policy
       properties:
         description:
           type: string
@@ -9688,20 +9887,20 @@ components:
         - protocol
         - source
         - dest
-      title: Domain Network Access Policy
+      title: Virtual Network Access Policy
       type: object
-    DomainNetworkAuthorizationGroup:
-      description: Domain Network Authorization Group
+    VirtualNetworkAuthorizationGroup:
+      description: Virtual Network Authorization Group
       properties:
         description:
           type: string
         name:
           description: Group name
           type: string
-      title: Domain Network Authorization Group
+      title: Virtual Network Authorization Group
       type: object
-    DomainNetworkAuthorizationGroupMembership:
-      description: Domain Network Authorization Group Membership
+    VirtualNetworkAuthorizationGroupMembership:
+      description: Virtual Network Authorization Group Membership
       properties:
         description:
           type: string
@@ -9713,19 +9912,19 @@ components:
           type: string
         uid:
           type: string
-      title: Domain Network Authorization Group Membership
+      title: Virtual Network Authorization Group Membership
       type: object
-    DomainNetworkDNSConfiguration:
-      description: Domain Network DNS Configuration
+    VirtualNetworkDNSConfiguration:
+      description: Virtual Network DNS Configuration
       properties:
         enabled:
           type: boolean
         server:
           type: string
-      title: Domain Network DNS Configuration
+      title: Virtual Network DNS Configuration
       type: object
-    DomainNetworkDNSRecord:
-      description: Domain Network DNS Record
+    VirtualNetworkDNSRecord:
+      description: Virtual Network DNS Record
       properties:
         name:
           type: string
@@ -9735,10 +9934,10 @@ components:
           type: number
         value:
           type: string
-      title: Domain Network DNS Record
+      title: Virtual Network DNS Record
       type: object
-    DomainNetworkDNSZone:
-      description: Domain Network DNS Zone
+    VirtualNetworkDNSZone:
+      description: Virtual Network DNS Zone
       properties:
         description:
           type: string
@@ -9746,66 +9945,66 @@ components:
           type: string
         resolver:
           type: string
-      title: Domain Network DNS Zone
+      title: Virtual Network DNS Zone
       type: object
-    DomainNetworkGroup:
-      description: Domain Network Group
+    VirtualNetworkGroup:
+      description: Virtual Network Group
       properties:
         description:
           type: string
         name:
           description: Name
           type: string
-      title: Domain Network Group
+      title: Virtual Network Group
       type: object
-    DomainNetworkGroupMembership:
-      description: Domain Network Group Membership
+    VirtualNetworkGroupMembership:
+      description: Virtual Network Group Membership
       properties:
         groupName:
           type: string
         objectName:
           type: string
-      title: Domain Network Group Membership
+      title: Virtual Network Group Membership
       type: object
-    DomainNetworkInventory:
-      description: Domain Network Inventory
+    VirtualNetworkInventory:
+      description: Virtual Network Inventory
       properties:
         accessPolicies:
           items:
-            $ref: '#/components/schemas/DomainNetworkAccessPolicy'
+            $ref: '#/components/schemas/VirtualNetworkAccessPolicy'
           type: array
         dnsConfig:
           items:
-            $ref: '#/components/schemas/DomainNetworkDNSConfiguration'
+            $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
           type: array
         dnsRecords:
           items:
-            $ref: '#/components/schemas/DomainNetworkDNSRecord'
+            $ref: '#/components/schemas/VirtualNetworkDNSRecord'
           type: array
         dnsZones:
           items:
-            $ref: '#/components/schemas/DomainNetworkDNSZone'
+            $ref: '#/components/schemas/VirtualNetworkDNSZone'
           type: array
         networkGroupMemberships:
           items:
-            $ref: '#/components/schemas/DomainNetworkGroupMembership'
+            $ref: '#/components/schemas/VirtualNetworkGroupMembership'
           type: array
         networkGroups:
           items:
-            $ref: '#/components/schemas/DomainNetworkGroup'
+            $ref: '#/components/schemas/VirtualNetworkGroup'
           type: array
         networkObjects:
           items:
-            $ref: '#/components/schemas/DomainNetworkObject'
+            $ref: '#/components/schemas/VirtualNetworkObject'
           type: array
         routes:
           items:
-            $ref: '#/components/schemas/DomainNetworkRoute'
+            $ref: '#/components/schemas/VirtualNetworkRoute'
           type: array
-      title: Domain Network Inventory
+      title: Virtual Network Inventory
       type: object
-    DomainNetworkObject:
-      description: Domain Network Object
+    VirtualNetworkObject:
+      description: Virtual Network Object
       properties:
         cidr:
           type: string
@@ -9813,10 +10012,10 @@ components:
           type: string
         name:
           type: string
-      title: Domain Network Object
+      title: Virtual Network Object
       type: object
-    DomainNetworkRoute:
-      description: DomainNetworkRoute
+    VirtualNetworkRoute:
+      description: VirtualNetworkRoute
       properties:
         description:
           type: string
@@ -9832,7 +10031,7 @@ components:
           type: string
         uid:
           type: string
-      title: DomainNetworkRoute
+      title: VirtualNetworkRoute
       type: object
     EventModel:
       properties:
@@ -10190,7 +10389,7 @@ components:
           description: Device type
           enum:
             - Agent
-            - Node
+            - Appliance
           type: string
         uid:
           description: Node ID
