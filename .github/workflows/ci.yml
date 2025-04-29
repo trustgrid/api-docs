@@ -18,7 +18,7 @@ jobs:
 
       - name: Validate OpenAPI
         run: |
-          go run github.com/getkin/kin-openapi/cmd/validate@latest --defaults -- swagger.yaml
+          go run github.com/getkin/kin-openapi/cmd/validate@latest --defaults -- index.yaml
 
   redocly-lint:
     runs-on: ubuntu-22.04
@@ -35,4 +35,4 @@ jobs:
         run: npm install -g @redocly/cli
 
       - name: Lint OpenAPI Specification
-        run: redocly lint swagger.yaml --format=github-actions
+        run: redocly lint index.yaml --format=github-actions
