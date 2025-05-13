@@ -10014,6 +10014,29 @@ components:
           type: string
       title: Virtual Network Object
       type: object
+    VirtualNetworkRouteMonitor:
+      description: VirtualNetworkRouteMonitor
+      properties:
+        enabled:
+          type: boolean
+        name:
+          type: string
+        protocol:
+          type: string
+          enum:
+            - tcp
+            - icmp
+        dest:
+          type: string
+        port:
+          type: number
+        interval:
+          type: number
+        count:
+          type: number
+        maxLatency:
+          type: number
+      type: object
     VirtualNetworkRoute:
       description: VirtualNetworkRoute
       properties:
@@ -10031,6 +10054,10 @@ components:
           type: string
         uid:
           type: string
+        monitors:
+          items:
+            $ref: '#/components/schemas/VirtualNetworkRouteMonitor'
+          type: array
       title: VirtualNetworkRoute
       type: object
     EventModel:
@@ -11258,6 +11285,10 @@ components:
           type: string
         path:
           type: string
+        monitors:
+          items:
+            $ref: '#/components/schemas/VirtualNetworkRouteMonitor'
+          type: array
       type: object
     VpnServiceUpdateModel:
       properties:
