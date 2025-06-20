@@ -10986,6 +10986,17 @@ components:
         email:
           description: User's email
           type: string
+        policyIds:
+          items:
+            description: User's policy IDs
+            type: string
+          type: array
+        status:
+          description: User's status
+          enum:
+            - active
+            - inactive
+          type: string
       title: UserModel
       type: object
     ValidationFailed:
