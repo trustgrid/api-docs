@@ -1239,6 +1239,13 @@ paths:
         Requires `nodes::read` permission.
       parameters:
         - description: >-
+            When provided, limit the nodes to members of the cluster.
+            Should be the full cluster FQDN, e.g., `mycluster.trustgrid.io`.
+          in: query
+          name: cluster
+          schema:
+            type: string
+        - description: >-
             Comma-separated key:value pairs for tag filtering, e.g.,
             `location:Austin,device:Trustgrid`.
           in: query
