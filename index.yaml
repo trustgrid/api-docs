@@ -8191,6 +8191,225 @@ paths:
           description: Invalid input
       tags:
         - ServiceUser
+
+  /v2/observability-exporter:
+    get:
+      summary: Get all observability exporters for an organization
+      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      responses:
+        '200':
+          description: A list of observability exporters
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ObservabilityExporter'
+      tags:
+        - ObservabilityExporter
+    post:
+      summary: Create a new observability exporter
+      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      requestBody:
+        $ref: '#/components/requestBodies/ObservabilityExporter'
+      responses:
+        '200':
+          description: Observability exporter created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:
+                    type: string
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                description: ValidationFailed
+                items:
+                  description: Validation failure
+                  type: string
+                title: ValidationFailed
+                type: array
+      tags:
+        - ObservabilityExporter
+  /v2/observability-exporter/{id}:
+    get:
+      summary: Get an observability exporter by id
+      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the observability exporter
+          schema:
+            type: string
+      responses:
+        '200':
+          description: An observability exporter
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ObservabilityExporter'
+        '404':
+          description: Observability exporter not found
+      tags:
+        - ObservabilityExporter
+    put:
+      summary: Update an observability exporter
+      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the observability exporter
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/ObservabilityExporter'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                description: ValidationFailed
+                items:
+                  description: Validation failure
+                  type: string
+                title: ValidationFailed
+                type: array
+        '404':
+          description: Observability exporter not found
+      tags:
+        - ObservabilityExporter
+    delete:
+      summary: Delete an observability exporter
+      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the observability exporter
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+      tags:
+        - ObservabilityExporter
+  /v2/observability-exporter/splunk/{id}:
+    get:
+      summary: Get an observability exporter of type `splunk` by id
+      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the observability exporter
+          schema:
+            type: string
+      responses:
+        '200':
+          description: An observability exporter
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/SplunkExporter'
+        '404':
+          description: Observability exporter not found
+      tags:
+        - ObservabilityExporter
+        - SplunkExporter
+    put:
+      summary: Update an observability exporter of type `splunk`
+      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the observability exporter
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/SplunkExporter'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                description: ValidationFailed
+                items:
+                  description: Validation failure
+                  type: string
+                title: ValidationFailed
+                type: array
+        '404':
+          description: Observability exporter not found
+      tags:
+        - ObservabilityExporter
+        - SplunkExporter
+  /v2/observability-exporter/http/{id}:
+    get:
+      summary: Get an observability exporter of type `http` by id
+      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the observability exporter
+          schema:
+            type: string
+      responses:
+        '200':
+          description: An observability exporter
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/HTTPExporter'
+        '404':
+          description: Observability exporter not found
+      tags:
+        - ObservabilityExporter
+        - HTTPExporter
+    put:
+      summary: Update an observability exporter of type `http`
+      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the observability exporter
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/HTTPExporter'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                description: ValidationFailed
+                items:
+                  description: Validation failure
+                  type: string
+                title: ValidationFailed
+                type: array
+        '404':
+          description: Observability exporter not found
+      tags:
+        - ObservabilityExporter
+        - HTTPExporter
 security:
   - JWTAuthorizer: []
 servers:
@@ -9011,6 +9230,24 @@ components:
             $ref: '#/components/schemas/PortForwarding'
       description: Port forwarding configuration
       required: true
+    ObservabilityExporter:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityExporter'
+      description: Observability Exporter
+    SplunkExporter:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SplunkExporter'
+      description: Splunk Exporter
+    HTTPExporter:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPExporter'
+      description: HTTP Exporter
   securitySchemes:
     JWTAuthorizer:
       description: >-
@@ -11382,4 +11619,93 @@ components:
           type: boolean
         port:
           type: number
+      type: object
+    ObservabilityExporter:
+      properties:
+        uid:
+          type: string
+        name:
+          type: string
+        enabled:
+          type: boolean
+        exporterType:
+          type: string
+          enum:
+            - splunk
+            - http
+        collectionTypes:
+          items:
+            type: string
+            enum:
+              - metrics
+              - node_audits
+              - node_events
+              - changes
+          type: array
+        description:
+          type: string
+      required:
+        - name
+        - enabled
+        - exporterType
+      title: ObservabilityExporter
+      type: object
+    SplunkExporter:
+      properties:
+        uid:
+          type: string
+        token:
+          type: string
+        endpoint:
+          type: string
+        source:
+          type: string
+        sourcetype:
+          type: string
+        index:
+          type: string
+        cacert:
+          type: string
+        enableLogData:
+          type: boolean
+        insecureTLS:
+          type: boolean
+      required:
+        - token
+        - endpoint
+      title: SplunkExporter
+      type: object
+    HTTPExporter:
+      properties:
+        uid:
+          type: string
+        endpoint:
+          type: string
+        metricsEndpoint:
+          type: string
+        logsEndpoint:
+          type: string
+        encoding:
+          type: string
+          enum:
+            - json
+            - proto
+        compression:
+          type: string
+          enum:
+            - gzip
+            - zstd
+            - zlib
+            - none
+        timeout:
+          type: number
+        readBufferSize:
+          type: number
+        writeBufferSize:
+          type: number
+        cacert:
+          type: string
+        insecureTLS:
+          type: boolean
+      title: HTTPExporter
       type: object
