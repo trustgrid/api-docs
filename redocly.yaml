@@ -7,4 +7,5 @@ rules:
 
 reunite:
   ignoreLint:
-    "'Legacy Swagger'/**": true
+    "**/swagger-2.0.yml": true
+    "swagger-2.0.yml": true
