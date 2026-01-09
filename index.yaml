@@ -100,7 +100,7 @@ paths:
   /alert:
     get:
       deprecated: true
-      summary: List events, newest first.
+      summary: List all security and operational events across the organization
       description: |-
         This is deprecated; use `/v2/event` instead.
 
@@ -131,7 +131,7 @@ paths:
         - Alert
   /alert/{nodeID}:
     get:
-      summary: List events for a node
+      summary: Retrieve security and operational events for a specific node
       description: |-
         List events for a node (appliance or agent), newest first
 
@@ -158,7 +158,7 @@ paths:
           type: string
   /audit/download/config:
     get:
-      summary: Download configuration change audits
+      summary: Export configuration change audit logs as a downloadable file
       description: Requires `audits::read:config` permission.
       parameters:
         - description: ID for the item to audit. If specified, must include itemType.
@@ -210,7 +210,7 @@ paths:
         - Audit
   /audit/download/node:
     get:
-      summary: Download node (appliance or agent) audits
+      summary: Export node activity and operational audit logs as a downloadable file
       description: Requires `audits::read:node` permission.
       parameters:
         - description: Start time (unix timestamp) to query from
@@ -230,7 +230,7 @@ paths:
         - Audit
   /audit/download/user:
     get:
-      summary: Download authentication audits
+      summary: Export user authentication and access audit logs as a downloadable file
       description: Requires `audits::read:user` permission.
       responses:
         '200':
@@ -239,7 +239,7 @@ paths:
         - Audit
   /audit/tail/config:
     get:
-      summary: List configuration change audits
+      summary: Retrieve real-time configuration change audit logs with filtering options
       description: Requires `audits::read:config` permission.
       parameters:
         - description: ID for the item to audit. If specified, must include itemType.
@@ -336,7 +336,7 @@ paths:
   /audit/tail/flow_logs:
     get:
       deprecated: true
-      summary: 'List recent flow logs. '
+      summary: 'Retrieve network traffic flow logs with advanced filtering and pagination'
       description: |-
         This is deprecated; use `/v2/audit/flow-logs` instead.
 
@@ -540,7 +540,7 @@ paths:
         - Audit
   /audit/tail/node:
     get:
-      summary: List node audits
+      summary: Retrieve real-time node operational and security audit logs
       description: |-
         List node (appliance or agent) audits
 
@@ -565,7 +565,7 @@ paths:
         - Audit
   /audit/tail/user:
     get:
-      summary: List authentication audits
+      summary: Retrieve real-time user authentication and session audit logs
       description: Requires `audits::read:user` permission.
       responses:
         '200':
@@ -574,7 +574,7 @@ paths:
         - Audit
   /cluster:
     get:
-      summary: Get all clusters
+      summary: Retrieve all high-availability node clusters in the organization
       parameters:
         - description: >-
             If specified, the nodes will return with their associated
@@ -596,8 +596,7 @@ paths:
       tags:
         - Cluster
     post:
-      summary: |
-        Create a cluster
+      summary: Create a new high-availability cluster for grouping nodes
       requestBody:
         content:
           application/json:
@@ -616,7 +615,7 @@ paths:
         - Cluster
   /cluster/{clusterFQDN}:
     delete:
-      summary: Delete a cluster
+      summary: Permanently remove a cluster and all its configurations
       responses:
         '200':
           description: OK
@@ -629,7 +628,7 @@ paths:
       tags:
         - Cluster
     get:
-      summary: Get a cluster
+      summary: Retrieve detailed configuration and status of a specific cluster
       responses:
         '200':
           description: OK
@@ -644,7 +643,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
     put:
-      summary: Update a cluster
+      summary: Modify cluster configuration and failover settings
       requestBody:
         content:
           application/json:
@@ -667,8 +666,7 @@ paths:
       - $ref: '#/components/parameters/clusterFQDN'
       - $ref: '#/components/parameters/nodeID'
     put:
-      summary: |
-        Designate the specified node as the active cluster member
+      summary: Manually promote a specific node to be the active member in an HA cluster
       responses:
         '200':
           description: OK
@@ -956,7 +954,7 @@ paths:
         - Cluster
   /domain/{domainName}:
     get:
-      summary: Get domain details
+      summary: Retrieve domain configuration including security and network settings
       description: Requires `domains::read` permission.
       responses:
         '200':
@@ -990,7 +988,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update alert configuration
+      summary: Configure domain-wide alert thresholds and notification settings
       description: Requires `domains::configure:thresholds` permission.
       requestBody:
         content:
@@ -1025,7 +1023,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update API GW configuration
+      summary: Configure domain-level API gateway settings and access policies
       description: Requires `domains::configure:gateway` permission.
       requestBody:
         content:
@@ -1053,7 +1051,7 @@ paths:
         - Domain
   /group:
     get:
-      summary: List all groups
+      summary: Retrieve all user groups and their access permissions
       description: Requires `groups::read` permissions
       responses:
         '200':
@@ -1068,7 +1066,7 @@ paths:
         - User
         - Group
     post:
-      summary: Create a group
+      summary: Create a new user group with specified access permissions
       description: Requires `groups::modify` permissions
       requestBody:
         content:
@@ -1085,6 +1083,7 @@ paths:
         - Group
   /group/{groupId}/members/{email}:
     delete:
+      summary: Remove a user from a group and revoke associated permissions
       description: Requires `groups::modify` permissions
       parameters:
         - description: ID of the group to remove a member from
@@ -1102,12 +1101,12 @@ paths:
       responses:
         '200':
           description: Member successfully removed from the group
-      summary: Remove a member from a group
       tags:
         - User
         - Group
   /group/{uid}:
     delete:
+      summary: Permanently delete a group and remove all member associations
       description: Requires `groups::modify` permissions
       parameters:
         - description: ID of the group to delete
@@ -1119,11 +1118,11 @@ paths:
       responses:
         '200':
           description: Group successfully deleted
-      summary: Delete a group by UID
       tags:
         - User
         - Group
     get:
+      summary: Retrieve detailed information about a specific group
       description: Requires `groups::read` permissions
       parameters:
         - description: UID of the group to retrieve
@@ -1141,12 +1140,12 @@ paths:
                 $ref: '#/components/schemas/Group'
         '404':
           description: Group does not exist
-      summary: Retrieve a group by UID
       tags:
         - User
         - Group
   /group/{uid}/idps:
     get:
+      summary: List all identity providers associated with a group
       description: Requires `groups::read` permissions
       parameters:
         - description: UID of the group
@@ -1164,12 +1163,12 @@ paths:
                 items:
                   $ref: '#/components/schemas/IdpGroup'
                 type: array
-      summary: List all Identity Providers for a group
       tags:
         - User
         - Group
   /group/{uid}/members:
     get:
+      summary: Retrieve all users that belong to a specific group
       description: Requires `groups::read` permissions
       parameters:
         - description: UID of the group
@@ -1187,11 +1186,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/GroupMember'
                 type: array
-      summary: List all members of a group
       tags:
         - User
         - Group
     post:
+      summary: Add a new user to a group and grant associated permissions
       description: Requires `groups::modify` permissions
       parameters:
         - description: ID of the group to add a member to
@@ -1210,13 +1209,12 @@ paths:
       responses:
         '200':
           description: Member successfully added to the group
-      summary: Add a member to a group
       tags:
         - User
         - Group
   /node:
     get:
-      summary: List nodes
+      summary: Retrieve all network nodes including appliances and agents with filtering options
       description: |-
         List both appliances and agents.
 
@@ -1271,7 +1269,7 @@ paths:
         - Agent
   /node/license:
     get:
-      summary: Get a license to register a node
+      summary: Generate a license key for registering a new node to the organization
       responses:
         '200':
           description: License body
@@ -1296,7 +1294,7 @@ paths:
           type: string
   /node/{nodeID}:
     delete:
-      summary: Delete a node
+      summary: Permanently remove a node from the organization and revoke access
       description: |-
         Delete a node (appliance or agent)
 
@@ -1312,7 +1310,7 @@ paths:
         - Appliance
         - Agent
     get:
-      summary: Get a node
+      summary: Retrieve detailed configuration and status information for a specific node
       description: |-
         Get a node (appliance or agent)
 
@@ -1339,7 +1337,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update a node
+      summary: Modify node settings including cluster assignment and operational state
       description: |-
         Update a node (appliance or agent)
 
@@ -1377,8 +1375,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     put:
-      summary: |
-        Update a node's alert config
+      summary: Configure alert thresholds and notification settings for a specific appliance
       description: |
         Applicable to appliances only.
       requestBody:
@@ -1392,8 +1389,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     put:
-      summary: |
-        Update a node's cluster config
+      summary: Configure high-availability cluster settings for a specific appliance
       description: |
         Applicable to appliances only.
       requestBody:
@@ -1407,8 +1403,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     put:
-      summary: |
-        Update a node's connector config
+      summary: Configure inbound network connectors for external access to node services
       requestBody:
         $ref: '#/components/requestBodies/ConnectorConfig'
       responses:
@@ -1418,8 +1413,7 @@ paths:
         - Appliance
         - Agent
     delete:
-      summary: |
-        Delete a node's connector config
+      summary: Remove all connector configurations from a node
       responses:
         '200':
           description: OK
@@ -1430,9 +1424,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     post:
-      summary: >
-        Add a connector to a node (appliance or agent). Requires V2 connector
-        config.
+      summary: Create a new inbound connector to expose services running on the node
       description: |
         Requires `node::configure::connectors` permissions
       requestBody:
@@ -1453,8 +1445,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     post:
-      summary: |
-        Upgrade a node's (appliance or agent) connector config to V2.
+      summary: Migrate a node's connector configuration to the latest V2 format
       description: |
         Requires `node::configure::connectors` permissions
       responses:
@@ -1479,8 +1470,7 @@ paths:
         schema:
           type: string
     put:
-      summary: |
-        Update a node connector
+      summary: Modify settings for an existing connector on a node
       description: |-
         Applies to appliances and agents. Requires V2 connector config.
         ---
@@ -1500,8 +1490,7 @@ paths:
         - Appliance
         - Agent
     delete:
-      summary: |
-        Delete a node connector
+      summary: Remove a specific connector configuration from a node
       description: >
         Delete a connector from a node (appliance or agent). Requires V2
         connector config.
@@ -1521,7 +1510,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     put:
-      summary: Update a node's network config
+      summary: Configure network interfaces, routing, and firewall rules for an appliance
       description: |
         Update network configuration for a node (appliance)
 
@@ -1539,7 +1528,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     put:
-      summary: Update a node's services config
+      summary: Configure outbound services for external connections from the node
       description: |
         Update services configuration for a node (appliance or agent)
 
@@ -1558,8 +1547,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     post:
-      summary: |
-        Add a service to a node. Requires V2 services config.
+      summary: Create a new outbound service connection for external resource access
       description: |
         Requires `node::configure::services` permissions
       requestBody:
@@ -1580,8 +1568,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     post:
-      summary: |
-        Upgrade a node's services config to V2.
+      summary: Migrate a node's service configuration to the latest V2 format
       description: |
         Requires `node::configure::services` permissions
       responses:
@@ -1606,7 +1593,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update a node service
+      summary: Modify settings for an existing service connection on a node
       description: |
         Update a service on a node. Requires V2 services config.
 
@@ -1628,7 +1615,7 @@ paths:
         - Appliance
         - Agent
     delete:
-      summary: Delete a node service
+      summary: Remove a specific service configuration from a node
       description: |
         Delete a service from a node. Requires V2 services config.
 
@@ -1645,7 +1632,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/nodeID'
     put:
-      summary: Update a node's ZTNA gateway config
+      summary: Configure Zero Trust Network Access gateway settings for secure remote access
       description: >
         Update ZTNA gateway configuration for a node (appliance)
 
@@ -1706,7 +1693,7 @@ paths:
       tags:
         - Appliance
     delete:
-      summary: Delete a node's ZTNA gateway config
+      summary: Remove ZTNA gateway configuration and disable secure remote access
       description: |
         Delete the ZTNA gateway configuration for a node (appliance)
 
@@ -1727,7 +1714,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update a node's gateway config
+      summary: Configure node as a network gateway for routing traffic between networks
       description: |-
         Update gateway configuration
 
@@ -1830,7 +1817,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update a node's SNMP config
+      summary: Configure SNMP monitoring settings for network management integration
       description: |-
         Update SNMP configuration
 
@@ -1907,7 +1894,7 @@ paths:
         - Appliance
   /node/{nodeID}/tag/{tagName}:
     delete:
-      summary: Delete a tag from a node (appliance or agent)
+      summary: Remove a metadata tag from a node for organizational categorization
       responses:
         '200':
           description: OK
@@ -1923,7 +1910,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Set a tag on a node (appliance or agent)
+      summary: Add or update a metadata tag on a node for organizational categorization
       requestBody:
         $ref: '#/components/requestBodies/TagValueModel'
       responses:
@@ -1941,7 +1928,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Trigger an event on a node
+      summary: Execute a remote operation or command on a specific node
       parameters:
         - description: If present, the request will return the node's event output
           in: query
@@ -1957,7 +1944,7 @@ paths:
         - Agent
   /org/mine:
     get:
-      summary: Get your current Org
+      summary: Retrieve organization details and configuration settings
       responses:
         '200':
           description: OK
@@ -1971,7 +1958,7 @@ paths:
         - Org
   /provisioning/api/v1/orders:
     get:
-      summary: Get all orders
+      summary: Retrieve all hardware provisioning orders and their current status
       description: >-
         The responses for orders from this API request are not fully hydrated
         (eg, no nodes).
@@ -1987,7 +1974,7 @@ paths:
       tags:
         - Order
     post:
-      summary: Create an order. Omitted fields are not written.
+      summary: Submit a new hardware provisioning order for appliances or agents
       requestBody:
         $ref: '#/components/requestBodies/OrderModel'
       responses:
@@ -2003,7 +1990,7 @@ paths:
         - Order
   /provisioning/api/v1/orders/{uid}:
     get:
-      summary: Get an order
+      summary: Retrieve detailed information about a specific provisioning order
       responses:
         '200':
           description: OK
@@ -2020,7 +2007,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update an order. Omitted fields are not updated.
+      summary: Modify the details and requirements of an existing provisioning order
       requestBody:
         $ref: '#/components/requestBodies/OrderModel'
       responses:
@@ -2042,7 +2029,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Add a comment to an order
+      summary: Add a note or comment to track order progress and communication
       requestBody:
         content:
           application/json:
@@ -2058,7 +2045,7 @@ paths:
         - Order
   /provisioning/api/v1/orders/{uid}/flag:
     delete:
-      summary: Unflag an order
+      summary: Remove priority flag from an order to normalize processing
       responses:
         '200':
           description: OK
@@ -2071,7 +2058,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Flag an order
+      summary: Mark an order as high priority or requiring special attention
       responses:
         '200':
           description: OK
@@ -2079,7 +2066,7 @@ paths:
         - Order
   /repositories:
     get:
-      summary: Get all repositories
+      summary: Retrieve all container repositories available for edge computing
       responses:
         '200':
           description: OK
@@ -2093,14 +2080,14 @@ paths:
         - Repository
   /repositories/{reponame}:
     delete:
-      summary: Delete a repository
+      summary: Permanently remove a container repository and all its images
       responses:
         '200':
           description: OK
       tags:
         - Repository
     get:
-      summary: Get a repository
+      summary: Retrieve available image tags and metadata for a specific repository
       responses:
         '200':
           description: OK
@@ -2120,7 +2107,7 @@ paths:
           type: string
   /repositories/{reponame}/{tag}:
     delete:
-      summary: Delete a repository tag
+      summary: Remove a specific image tag from a container repository
       responses:
         '200':
           description: OK
@@ -2139,6 +2126,7 @@ paths:
           type: string
   /stats/realtime/usage:
     get:
+      summary: Retrieve real-time network usage statistics and bandwidth metrics for nodes
       description: >-
         Returns an array of usage data buckets for specified nodes within the
         specified time range and interval.
@@ -2201,12 +2189,11 @@ paths:
                       type: integer
                   type: object
                 type: array
-      summary: Retrieve usage data for nodes
       tags:
         - Appliance
   /tags:
     get:
-      summary: List tags
+      summary: Retrieve all available metadata tags used for node and cluster organization
       responses:
         '200':
           description: OK
@@ -2220,7 +2207,7 @@ paths:
         - Tag
   /tags/{tagName}:
     get:
-      summary: Get a tag by name
+      summary: Retrieve details and usage information for a specific tag
       responses:
         '200':
           description: OK
@@ -2241,7 +2228,7 @@ paths:
           type: string
   /upgrade-manager/api/v1/upgrades:
     get:
-      summary: List upgrades
+      summary: Retrieve all firmware upgrade campaigns and their execution status
       description: Requires `upgrade-manager::read` permission.
       responses:
         '200':
@@ -2255,7 +2242,7 @@ paths:
       tags:
         - Upgrade Manager
     post:
-      summary: Create a new upgrade
+      summary: Create a new firmware upgrade campaign for multiple nodes
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2275,7 +2262,7 @@ paths:
         - Upgrade Manager
   /upgrade-manager/api/v1/upgrades/active:
     get:
-      summary: Get the active upgrade
+      summary: Retrieve the currently running firmware upgrade campaign
       description: Requires `upgrade-manager::read` permission.
       responses:
         '200':
@@ -2290,7 +2277,7 @@ paths:
         - Upgrade Manager
   /upgrade-manager/api/v1/upgrades/{upgradeID}:
     delete:
-      summary: Delete an upgrade
+      summary: Cancel and permanently remove an upgrade campaign
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2300,7 +2287,7 @@ paths:
       tags:
         - Upgrade Manager
     get:
-      summary: Get an upgrade
+      summary: Retrieve detailed status and progress of a specific upgrade campaign
       description: Requires `upgrade-manager::read` permission.
       responses:
         '200':
@@ -2321,7 +2308,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update an upgrade
+      summary: Modify upgrade campaign settings and target selection criteria
       description: Requires `upgrade-manager::modify` permission.
       requestBody:
         content:
@@ -2361,7 +2348,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Approve an upgrade to failover clusters
+      summary: Authorize automatic failover of HA clusters during upgrade process
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2379,7 +2366,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Mark an upgrade complete
+      summary: Manually mark an upgrade campaign as finished and finalize the process
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2403,7 +2390,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Dismiss a workflow
+      summary: Acknowledge and dismiss a failed or problematic upgrade workflow
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2421,9 +2408,7 @@ paths:
         schema:
           type: string
     post:
-      summary: >-
-        Dry run an upgrade. This will clone the upgrade and start the cloned
-        copy and return the copy's UID
+      summary: Test an upgrade campaign by creating and executing a non-destructive simulation
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2445,7 +2430,7 @@ paths:
         - Upgrade Manager
   /upgrade-manager/api/v1/upgrades/{upgradeID}/logs:
     get:
-      summary: Get logs for an upgrade
+      summary: Retrieve detailed execution logs and error messages for an upgrade campaign
       description: Requires `upgrade-manager::read` permission.
       responses:
         '200':
@@ -2482,7 +2467,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Add a note to a workflow
+      summary: Add administrative notes or comments to an upgrade workflow for tracking
       description: Requires `upgrade-manager::modify` permission.
       requestBody:
         content:
@@ -2514,7 +2499,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Retry a workflow
+      summary: Restart a failed upgrade workflow to attempt the operation again
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2532,7 +2517,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Start an upgrade
+      summary: Begin execution of a configured upgrade campaign across target nodes
       description: Requires `upgrade-manager::modify` permission.
       responses:
         '200':
@@ -2543,8 +2528,7 @@ paths:
         - Upgrade Manager
   /user:
     get:
-      summary: |
-        Get all users
+      summary: Retrieve all users in the organization with their roles and permissions
       description: >
         Changes to users sometimes take a few minutes to appear while being
         indexed
@@ -2560,7 +2544,7 @@ paths:
       tags:
         - User
     post:
-      summary: Invite a user to the Portal
+      summary: Send an invitation email to a new user to join the organization
       description: >
         For organizations using the default Trustgrid authentication provider,
         users must be **invited** and then they should sign up with the invited
@@ -2591,8 +2575,7 @@ paths:
         - User
   /user/add:
     post:
-      summary: |
-        Add a user to the Portal
+      summary: Directly add a user account for organizations with custom identity providers
       description: >
         Add a user. This is only available to organizations with custom IDP
         integrations.
@@ -2624,7 +2607,7 @@ paths:
         - User
   /user/{email}:
     delete:
-      summary: Delete a user
+      summary: Permanently remove a user from the organization and revoke all access
       responses:
         '200':
           description: OK
@@ -2645,8 +2628,7 @@ paths:
           type: string
   /user/{email}/groups:
     get:
-      summary: |
-        Get all user groups
+      summary: Retrieve all groups that a specific user belongs to
       responses:
         '200':
           description: OK
@@ -2667,7 +2649,7 @@ paths:
           type: string
   /v2/alarm:
     get:
-      summary: Get alarms
+      summary: Retrieve all configured alarm filters and their trigger conditions
       description: Requires `alarms::read` permission.
       responses:
         '200':
@@ -2681,7 +2663,7 @@ paths:
       tags:
         - Alarm
     post:
-      summary: Create an alarm
+      summary: Create a new alarm filter to monitor events and trigger notifications
       description: Requires `alarms::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/AlarmModel'
@@ -2698,7 +2680,7 @@ paths:
         - Alarm
   /v2/alarm-channel:
     get:
-      summary: Returns available alarm channels
+      summary: Retrieve all configured notification channels for alarm delivery
       responses:
         '200':
           description: OK
@@ -2711,7 +2693,7 @@ paths:
       tags:
         - Alarm
     post:
-      summary: Create an alarm channel
+      summary: Configure a new notification channel for alarm delivery (email, Slack, etc.)
       requestBody:
         $ref: '#/components/requestBodies/AlarmChannelModel'
       responses:
@@ -2727,14 +2709,14 @@ paths:
         - Alarm
   /v2/alarm-channel/{uid}:
     delete:
-      summary: Update an alarm channel
+      summary: Permanently remove a notification channel configuration
       responses:
         '200':
           description: OK
       tags:
         - Alarm
     get:
-      summary: Get an alarm channel
+      summary: Retrieve configuration details for a specific notification channel
       responses:
         '200':
           description: OK
@@ -2751,7 +2733,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update an alarm channel
+      summary: Modify settings for an existing notification channel
       requestBody:
         $ref: '#/components/requestBodies/AlarmChannelModel'
       responses:
@@ -2767,14 +2749,14 @@ paths:
         - Alarm
   /v2/alarm/suppression:
     delete:
-      summary: Cancel or end alert suppression window
+      summary: Cancel an active alert suppression window and resume normal notifications
       responses:
         '200':
           description: OK
       tags:
         - Alarm
     get:
-      summary: Get scheduled alert suppression window
+      summary: Retrieve current or upcoming alert suppression schedule details
       responses:
         '200':
           description: OK
@@ -2785,7 +2767,7 @@ paths:
       tags:
         - Alarm
     post:
-      summary: Create an alert suppression window
+      summary: Schedule a time period to temporarily disable alarm notifications
       requestBody:
         content:
           application/json:
@@ -2806,14 +2788,14 @@ paths:
         - Alarm
   /v2/alarm/{uid}:
     delete:
-      summary: Delete alarm
+      summary: Permanently remove an alarm filter and stop monitoring conditions
       responses:
         '200':
           description: OK
       tags:
         - Alarm
     get:
-      summary: Get alarm
+      summary: Retrieve detailed configuration of a specific alarm filter
       responses:
         '200':
           description: OK
@@ -2830,7 +2812,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update alarm
+      summary: Modify trigger conditions and settings for an existing alarm filter
       requestBody:
         $ref: '#/components/requestBodies/AlarmModel'
       responses:
@@ -2846,7 +2828,7 @@ paths:
         - Alarm
   /v2/alert:
     get:
-      summary: List alerts, newest first
+      summary: Retrieve all recent security and operational alerts across the organization
       description: Requires `alerts::read` permission.
       responses:
         '200':
@@ -2861,7 +2843,7 @@ paths:
         - Alert
   /v2/alert/{nodeID}:
     get:
-      summary: List alerts for a node (appliance or agent), newest first
+      summary: Retrieve security and operational alerts specific to a single node
       description: Requires `alerts::read` permission.
       responses:
         '200':
@@ -2883,7 +2865,7 @@ paths:
           type: string
   /v2/alert/{nodeID}/{alertType}:
     delete:
-      summary: Resolve an alert
+      summary: Manually resolve and dismiss a specific alert type for a node
       description: Requires `alerts::read` permission.
       responses:
         '200':
@@ -2905,7 +2887,7 @@ paths:
           type: string
   /v2/audit/flow-logs:
     get:
-      summary: List recent flow logs
+      summary: Retrieve network traffic flow logs with advanced filtering and pagination
       description: Requires `audits::read:flows` permission.
       parameters:
         - description: Unix timestamp for the start of the log window
@@ -3109,7 +3091,7 @@ paths:
         - Audit
   /v2/certificates:
     get:
-      summary: List certificates
+      summary: Retrieve all TLS certificates and their expiration status
       description: Requires `certificates::read` permission.
       responses:
         '200':
@@ -3123,7 +3105,7 @@ paths:
       tags:
         - Certificate
     post:
-      summary: Create a certificate
+      summary: Upload and install a new TLS certificate for secure communications
       description: Requires `certificates::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/CertificateParts'
@@ -3145,7 +3127,7 @@ paths:
         - Certificate
   /v2/certificates/{fqdn}:
     delete:
-      summary: Delete a certificate
+      summary: Remove a TLS certificate and disable secure communications for the domain
       description: Requires `certificates::modify` permission.
       responses:
         '200':
@@ -3160,7 +3142,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update a certificate
+      summary: Replace an existing TLS certificate with an updated version
       description: Requires `certificates::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/CertificateParts'
@@ -3182,7 +3164,7 @@ paths:
         - Certificate
   /v2/cluster/{clusterFQDN}/exec/container:
     get:
-      summary: List containers
+      summary: Retrieve all edge computing containers running on a cluster
       description: Requires `node-exec::read` permission.
       responses:
         '200':
@@ -3203,7 +3185,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Create a container
+      summary: Deploy a new containerized application to run on the cluster
       description: Requires `node-exec::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/Container'
@@ -3225,7 +3207,7 @@ paths:
         - Compute
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}:
     delete:
-      summary: Delete a container
+      summary: Remove a containerized application from the cluster and stop execution
       description: Requires `node-exec::modify` permission.
       responses:
         '200':
@@ -3280,7 +3262,7 @@ paths:
         - Compute
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/capability:
     get:
-      summary: Get container capabilities
+      summary: Retrieve security capabilities and permissions for a container
       description: Requires `node-exec::read` permission.
       responses:
         '200':
@@ -5514,8 +5496,8 @@ paths:
         - Route
   /v2/event:
     get:
+      summary: Retrieve all security and operational events across the organization
       description: Get all events, most recent first
-      summary: Get all events
       responses:
         '200':
           description: OK
@@ -5529,7 +5511,7 @@ paths:
         - Alarms
   /v2/event/{nodeId}:
     get:
-      summary: Get a node's events
+      summary: Retrieve security and operational events for a specific node
       description: Get all events for node, most recent first
       responses:
         '200':
@@ -5563,7 +5545,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Test an event against alarms
+      summary: Validate if a specific event would trigger configured alarm filters
       responses:
         '200':
           description: OK
@@ -5571,7 +5553,7 @@ paths:
         - Alarms
   /v2/idp:
     get:
-      summary: Get all Identity Providers
+      summary: Retrieve all configured identity providers for user authentication
       responses:
         '200':
           description: OK
@@ -5584,7 +5566,7 @@ paths:
       tags:
         - IDP
     post:
-      summary: Create an identity provider
+      summary: Configure a new identity provider for external user authentication
       requestBody:
         $ref: '#/components/requestBodies/IdentityProviderUpdateModel'
       responses:
@@ -5607,7 +5589,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Set OpenID settings for an IDP
+      summary: Configure OpenID Connect authentication settings for an identity provider
       description: Requires `identity-providers::modify` permission.
       requestBody:
         content:
@@ -5640,7 +5622,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Set SAML settings for an IDP
+      summary: Configure SAML 2.0 authentication settings for an identity provider
       description: Requires `identity-providers::modify` permission.
       requestBody:
         content:
@@ -5666,14 +5648,14 @@ paths:
         - IDP
   /v2/idp/{uid}:
     delete:
-      summary: Delete an identity provider
+      summary: Remove an identity provider and disable external authentication
       responses:
         '200':
           description: OK
       tags:
         - IDP
     get:
-      summary: Get an Identity Provider
+      summary: Retrieve configuration details for a specific identity provider
       responses:
         '200':
           description: OK
@@ -5691,7 +5673,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update an identity provider
+      summary: Modify authentication settings for an existing identity provider
       requestBody:
         $ref: '#/components/requestBodies/IdentityProviderUpdateModel'
       responses:
@@ -7040,7 +7022,7 @@ paths:
         - Virtual Network
   /v2/policy:
     get:
-      summary: List policies
+      summary: Retrieve all access control policies and their permission rules
       description: Requires `permissions::read` permission.
       responses:
         '200':
@@ -7054,7 +7036,7 @@ paths:
       tags:
         - Permissions
     post:
-      summary: Create a policy
+      summary: Create a new access control policy with specified permissions and conditions
       description: Requires `permissions::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
@@ -7076,7 +7058,7 @@ paths:
         - Permissions
   /v2/policy/{name}:
     delete:
-      summary: Delete a policy
+      summary: Remove an access control policy and revoke associated permissions
       description: Requires `permissions::modify` permission.
       responses:
         '200':
@@ -7086,7 +7068,7 @@ paths:
       tags:
         - Permissions
     get:
-      summary: Get a policy
+      summary: Retrieve detailed configuration of a specific access control policy
       description: Requires `permissions::read` permission.
       responses:
         '200':
@@ -7107,7 +7089,7 @@ paths:
         schema:
           type: string
     put:
-      summary: Update a policy
+      summary: Modify permissions and conditions for an existing access control policy
       description: Requires `permissions::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
@@ -7138,7 +7120,7 @@ paths:
         schema:
           type: string
     post:
-      summary: Add group to a user
+      summary: Add a user to a group and grant associated permissions
       requestBody:
         content:
           application/json:
@@ -7157,7 +7139,7 @@ paths:
         - User
   /v2/user/{email}/groups/{group}:
     delete:
-      summary: Delete a group from a user
+      summary: Remove a user from a group and revoke associated permissions
       responses:
         '200':
           description: OK
@@ -7178,7 +7160,7 @@ paths:
           type: string
   /v2/service-user/{name}:
     get:
-      summary: Get a service user by name
+      summary: Retrieve configuration details for a specific service account
       parameters:
         - name: name
           in: path
@@ -7199,7 +7181,7 @@ paths:
         - ServiceUser
   /v2/service-user/{name}/token:
     post:
-      summary: Generate server user credentials
+      summary: Generate new API credentials (client ID and secret) for a service account
       parameters:
         - name: name
           in: path
@@ -7225,7 +7207,7 @@ paths:
         - ServiceUser
   /v2/service-user:
     get:
-      summary: Get all service users for an organization
+      summary: Retrieve all API-only service accounts configured for the organization
       responses:
         '200':
           description: A list of service users
@@ -7238,7 +7220,7 @@ paths:
       tags:
         - ServiceUser
     post:
-      summary: Create a new service user
+      summary: Create a new API-only service account with specified permissions
       requestBody:
         content:
           application/json:
@@ -7266,7 +7248,7 @@ paths:
 
   /v2/observability-exporter:
     get:
-      summary: Get all observability exporters for an organization
+      summary: Retrieve all configured telemetry data exporters for external monitoring systems
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       responses:
         '200':
@@ -7280,7 +7262,7 @@ paths:
       tags:
         - ObservabilityExporter
     post:
-      summary: Create a new observability exporter
+      summary: Configure a new telemetry data exporter for external monitoring integration
       description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       requestBody:
         $ref: '#/components/requestBodies/ObservabilityExporter'
@@ -7309,7 +7291,7 @@ paths:
         - ObservabilityExporter
   /v2/observability-exporter/{id}:
     get:
-      summary: Get an observability exporter by id
+      summary: Retrieve configuration details for a specific telemetry data exporter
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
         - name: id
@@ -7330,7 +7312,7 @@ paths:
       tags:
         - ObservabilityExporter
     put:
-      summary: Update an observability exporter
+      summary: Modify settings for an existing telemetry data exporter
       description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
         - name: id
@@ -7360,7 +7342,7 @@ paths:
       tags:
         - ObservabilityExporter
     delete:
-      summary: Delete an observability exporter
+      summary: Remove a telemetry data exporter and stop external monitoring integration
       description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
         - name: id
@@ -7376,7 +7358,7 @@ paths:
         - ObservabilityExporter
   /v2/observability-exporter/splunk/{id}:
     get:
-      summary: Get an observability exporter of type `splunk` by id
+      summary: Retrieve Splunk-specific configuration for a telemetry data exporter
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
         - name: id
@@ -7398,7 +7380,7 @@ paths:
         - ObservabilityExporter
         - SplunkExporter
     put:
-      summary: Update an observability exporter of type `splunk`
+      summary: Modify Splunk-specific settings for a telemetry data exporter
       description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
         - name: id
@@ -7430,7 +7412,7 @@ paths:
         - SplunkExporter
   /v2/observability-exporter/http/{id}:
     get:
-      summary: Get an observability exporter of type `http` by id
+      summary: Retrieve HTTP-specific configuration for a telemetry data exporter
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
         - name: id
@@ -7452,7 +7434,7 @@ paths:
         - ObservabilityExporter
         - HTTPExporter
     put:
-      summary: Update an observability exporter of type `http`
+      summary: Modify HTTP-specific settings for a telemetry data exporter
       description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
         - name: id
@@ -9002,41 +8984,6 @@ components:
       required:
         - name
       title: CreateClusterModel
-      type: object
-    Criteria:
-      description: Criteria
-      properties:
-        country:
-          items:
-            description: Country codes
-            example: US
-            type: string
-          type: array
-        emails:
-          items:
-            description: Email addresses
-            type: string
-          type: array
-        emailsEndingIn:
-          items:
-            description: Email suffixes
-            example: '@trustgrid.io'
-            type: string
-          type: array
-        everyone:
-          description: Everyone
-          type: boolean
-        idpGroups:
-          items:
-            description: IDP Group IDs
-            type: string
-          type: array
-        ipRanges:
-          items:
-            description: IP Ranges
-            type: string
-          type: array
-      title: Criteria
       type: object
     DataStoreFile:
       description: Data Store File
