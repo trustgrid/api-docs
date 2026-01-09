@@ -1,6 +1,10 @@
 extends:
   - recommended
 
+apis:
+  main:
+    root: index.yaml
+
 rules:
   operation-operationId: off
   operation-4xx-response: off
