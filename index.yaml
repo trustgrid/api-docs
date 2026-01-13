@@ -5494,36 +5494,177 @@ paths:
         - Domain
         - Virtual Network
         - Route
+
   /v2/event:
     get:
-      summary: Retrieve all security and operational events across the organization
-      description: Get all events, most recent first
+      summary: Get all events by time range
+      description: Requires `events::read` permission.
+      parameters:
+        - description: ISO 8601 datetime string for the start of the range (e.g. `2025-01-01T05:00:00.000Z`)
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: ISO 8601 datetime string for the end of the range (e.g. `2025-01-01T05:00:00.000Z`)
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Node IDs to filter events for (optional)
+          in: query
+          name: nodeIDs
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Event type(s) filter (optional) 
+          in: query
+          name: eventTypes
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Event level(s) filter (optional)
+          in: query
+          name: levels
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - INFO
+                - WARNING
+                - ERROR
+                - CRITICAL
+        - description: Item Type(s) filter (optional)
+          in: query
+          name: itemTypes
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - Node
+                - Certificate
+                - Order
+                - Upgrade
+                - AlertSuppression
+        - description: Maximum number of results to return
+          in: query
+          name: limit
+          schema:
+            type: number
+        - description: Page of results to return
+          in: query
+          name: page
+          schema:
+            type: string
+        - description: Sort results, like `level:desc or eventType:asc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Full text search of events
+          in: query
+          name: q
+          schema:
+            type: string
       responses:
         '200':
           description: OK
+          headers:
+            x-total-count:
+              description: Total number of filtered events
+              schema:
+                type: number
           content:
             application/json:
               schema:
+                type: array
                 items:
                   $ref: '#/components/schemas/EventModel'
-                type: array
       tags:
         - Alarms
   /v2/event/{nodeId}:
     get:
-      summary: Retrieve security and operational events for a specific node
-      description: Get all events for node, most recent first
+      summary: Get all events by time range for a Node
+      description: Requires `events::read` permission.
+      parameters:
+        - description: ISO 8601 datetime string for the start of the range (e.g. `2025-01-01T05:00:00.000Z`)
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: ISO 8601 datetime string for the end of the range (e.g. `2025-01-01T05:00:00.000Z`)
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Event type(s) filter (optional) 
+          in: query
+          name: eventTypes
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Event level(s) filter (optional)
+          in: query
+          name: levels
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - INFO
+                - WARNING
+                - ERROR
+                - CRITICAL
+        - description: Maximum number of results to return
+          in: query
+          name: limit
+          schema:
+            type: number
+        - description: Page of results to return
+          in: query
+          name: page
+          schema:
+            type: string
+        - description: Sort results, like `level:desc or eventType:asc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Full text search of events
+          in: query
+          name: q
+          schema:
+            type: string
       responses:
         '200':
           description: OK
+          headers:
+            x-total-count:
+              description: Total number of filtered node events
+              schema:
+                type: number
           content:
             application/json:
               schema:
+                type: array
                 items:
                   $ref: '#/components/schemas/EventModel'
-                type: array
-        '404':
-          description: Not Found
       tags:
         - Alarms
     parameters:
@@ -9241,25 +9382,89 @@ components:
       title: VirtualNetworkRoute
       type: object
     EventModel:
-      properties:
-        eventType:
-          type: string
-        message:
-          type: string
-        nodeId:
-          type: string
-        nodeName:
-          type: string
-        receivedTime:
-          description: Ingest time of the event
-          type: number
-        timestamp:
-          description: Creation time of the event
-          type: number
-        uid:
-          type: string
+      description: Event
       title: Event
       type: object
+      properties:
+        level:
+          description: Event log level
+          example: ERROR
+          type: string
+          enum:
+            - INFO
+            - WARNING
+            - ERROR
+            - CRITICAL
+        message:
+          description: Event message
+          example: "Node Disconnected"
+          type: string
+        timestamp:
+          description: Time when event got generated
+          example: "2025-09-07T19:17:41Z"
+          type: string
+        receivedTime:
+          description: Time when the control plane received the event
+          example: "2025-09-07T19:17:41Z"
+          type: string
+        subject:
+          description: Event item type
+          example: Node
+          type: string
+          enum:
+            - Node
+            - Certificate
+            - Order
+            - Upgrade
+            - AlertSuppression
+        eventType:
+          description: Event type
+          example: "Node Connect"
+          type: string
+        orgId:
+          description: Org ID
+          example: "0000000-0000-0000-0000-000000000001"
+          type: string
+        uid:
+          description: Event ID
+          example: "32Nt3pyfAJisyUADctXZW6bcwJC"
+          type: string
+        nodeId:
+          description: Node ID (if applicable)
+          example: "0000000-0000-0000-0000-000000000002"
+          type: string
+        nodeName:
+          description: Node name (if applicable)
+          example: "test"
+          type: string
+        domain:
+          description: Domain name (if applicable)
+          example: "Domain"
+          type: string
+        fqdn:
+          description: FQDN (if applicable)
+          example: "test.dev.io"
+          type: string
+        orderId:
+          description: Order ID (if applicable)
+          example: "32Nt3pyfAJisyUADctXZW6bcwJD"
+          type: string
+        details:
+          description: Metadata associated to the event (if applicable)
+          example:
+            key: "value"
+            key2: "value2"
+          type: object
+          additionalProperties:
+            type: string
+        state:
+          description: Event state (if applicable)
+          example: EXCEEDED
+          type: string
+          enum:
+            - EXCEEDED
+            - CLEARED
+            - UNKNOWN
     Group:
       properties:
         description:
