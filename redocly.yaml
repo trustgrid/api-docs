@@ -1,6 +1,15 @@
 extends:
   - recommended
 
+apis:
+  main:
+    root: index.yaml
+
 rules:
   operation-operationId: off
   operation-4xx-response: off
+
+reunite:
+  ignoreLint:
+    "**/swagger-2.0.yml": true
+    "swagger-2.0.yml": true
