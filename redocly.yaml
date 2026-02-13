@@ -4,6 +4,12 @@ extends:
 apis:
   main:
     root: index.yaml
+  legacy:
+    root: Legacy Swagger/swagger-2.0.yml
+    rules:
+      operation-summary: off
+      security-defined: off
+      info-license: off
 
 rules:
   operation-operationId: off

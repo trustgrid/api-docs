@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   version: 1.0.0
-  title: Trustgrid Management API
+  title: Trustgrid Management API (Legacy)
   description: This definition of the Trustgrid API is no longer maintained.
 schemes:
   - https
