@@ -7161,6 +7161,29 @@ paths:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Virtual Network
+  /v2/node/{nodeID}/lifecycle-state:
+    get:
+      summary: Retrieve the current lifecycle state of a specific node
+      description: |-
+        Returns the current lifecycle state for a node (appliance or agent), including the operational phase and timestamp of the last state transition.
+
+        ---
+
+        Requires `nodes::read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleState'
+        '404':
+          description: Not Found
+      tags:
+        - Appliance
+        - Agent
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
   /v2/policy:
     get:
       summary: Retrieve all access control policies and their permission rules
@@ -9535,6 +9558,36 @@ components:
           example: latest
           type: string
       title: Image
+      type: object
+    LifecycleState:
+      description: LifecycleState
+      properties:
+        state:
+          description: Current lifecycle state of the node
+          enum:
+            - active
+            - inactive
+            - provisioning
+            - decommissioning
+            - decommissioned
+          example: active
+          type: string
+        phase:
+          description: Current operational phase within the lifecycle state
+          example: running
+          type: string
+        lastTransition:
+          description: Timestamp of the last state transition
+          example: '2024-01-15T10:30:00Z'
+          format: date-time
+          type: string
+        message:
+          description: Human-readable status message
+          example: Node is operating normally
+          type: string
+      required:
+        - state
+      title: LifecycleState
       type: object
     Node:
       description: Node
