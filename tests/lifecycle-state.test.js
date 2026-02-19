@@ -1,6 +1,6 @@
 /**
- * Tests for the lifecycle-state endpoint and LifecycleState schema
- * Validates acceptance criteria for US-001, US-002, US-003
+ * Tests for the lifecycle-state endpoint and LifecycleStateRequest schema
+ * Validates that the spec matches the actual backend implementation
  */
 
 import { describe, it } from 'node:test';
@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const specPath = join(__dirname, '..', 'index.yaml');
 const spec = parse(readFileSync(specPath, 'utf8'));
 
-describe('US-001: Lifecycle State Path Definition', () => {
+describe('Lifecycle State Path Definition', () => {
   const pathKey = '/v2/node/{nodeID}/lifecycle-state';
   const pathDef = spec.paths?.[pathKey];
 
@@ -31,24 +31,29 @@ describe('US-001: Lifecycle State Path Definition', () => {
     assert.ok(nodeIDRef, 'Should reference nodeID parameter');
   });
 
-  it('has GET operation', () => {
+  it('does NOT have GET operation (backend has no GET handler)', () => {
     assert.ok(pathDef, `Path ${pathKey} must exist`);
-    assert.ok(pathDef.get, 'Path should have GET operation');
+    assert.ok(!pathDef.get, 'Path should NOT have GET operation - backend does not implement it');
   });
 
-  it('GET has correct summary', () => {
-    assert.ok(pathDef?.get, `Path ${pathKey} with GET operation must exist`);
+  it('has PUT operation', () => {
+    assert.ok(pathDef, `Path ${pathKey} must exist`);
+    assert.ok(pathDef.put, 'Path should have PUT operation');
+  });
+
+  it('PUT has correct summary', () => {
+    assert.ok(pathDef?.put, `Path ${pathKey} with PUT operation must exist`);
     assert.equal(
-      pathDef.get.summary,
-      'Retrieve the current lifecycle state of a specific node',
-      'GET summary should match expected value'
+      pathDef.put.summary,
+      'Update the lifecycle state of a specific node',
+      'PUT summary should match expected value'
     );
   });
 
-  it('description includes permission documentation with --- separator', () => {
-    assert.ok(pathDef?.get, `Path ${pathKey} with GET operation must exist`);
-    const description = pathDef.get.description;
-    assert.ok(description, 'GET should have description');
+  it('PUT description includes permission documentation with --- separator', () => {
+    assert.ok(pathDef?.put, `Path ${pathKey} with PUT operation must exist`);
+    const description = pathDef.put.description;
+    assert.ok(description, 'PUT should have description');
     assert.ok(
       description.includes('---'),
       'Description should contain --- separator'
@@ -60,9 +65,9 @@ describe('US-001: Lifecycle State Path Definition', () => {
   });
 
   it('has tags: Appliance, Agent', () => {
-    assert.ok(pathDef?.get, `Path ${pathKey} with GET operation must exist`);
-    const tags = pathDef.get.tags;
-    assert.ok(tags, 'GET should have tags');
+    assert.ok(pathDef?.put, `Path ${pathKey} with PUT operation must exist`);
+    const tags = pathDef.put.tags;
+    assert.ok(tags, 'PUT should have tags');
     assert.ok(tags.includes('Appliance'), 'Tags should include Appliance');
     assert.ok(tags.includes('Agent'), 'Tags should include Agent');
   });
@@ -89,117 +94,135 @@ describe('US-001: Lifecycle State Path Definition', () => {
   });
 });
 
-describe('US-002: LifecycleState Schema', () => {
-  const schema = spec.components?.schemas?.LifecycleState;
+describe('LifecycleStateRequest Schema', () => {
+  const schema = spec.components?.schemas?.LifecycleStateRequest;
 
-  it('LifecycleState schema exists in components/schemas', () => {
-    assert.ok(schema, 'LifecycleState schema should exist');
+  it('LifecycleStateRequest schema exists in components/schemas', () => {
+    assert.ok(schema, 'LifecycleStateRequest schema should exist');
   });
 
-  it('state property is string enum with correct values', () => {
-    assert.ok(schema, 'LifecycleState schema must exist');
-    const stateProperty = schema.properties?.state;
-    assert.ok(stateProperty, 'state property should exist');
-    assert.equal(stateProperty.type, 'string', 'state should be type string');
-    assert.ok(stateProperty.enum, 'state should have enum');
+  it('lifecycleState property is string enum with correct values matching backend', () => {
+    assert.ok(schema, 'LifecycleStateRequest schema must exist');
+    const lifecycleStateProperty = schema.properties?.lifecycleState;
+    assert.ok(lifecycleStateProperty, 'lifecycleState property should exist');
+    assert.equal(lifecycleStateProperty.type, 'string', 'lifecycleState should be type string');
+    assert.ok(lifecycleStateProperty.enum, 'lifecycleState should have enum');
     
-    const expectedStates = ['active', 'inactive', 'provisioning', 'decommissioning', 'decommissioned'];
+    // These values match the backend validation in Node.ts updateLifecycleState()
+    const expectedStates = ['pre-production', 'production', 'maintenance', 'decommissioned'];
     assert.deepEqual(
-      stateProperty.enum.sort(),
+      lifecycleStateProperty.enum.sort(),
       expectedStates.sort(),
-      'state enum should have all expected values'
+      'lifecycleState enum should match backend validation values'
     );
   });
 
-  it('phase property is string', () => {
-    assert.ok(schema?.properties, 'LifecycleState schema with properties must exist');
-    const phaseProperty = schema.properties.phase;
-    assert.ok(phaseProperty, 'phase property should exist');
-    assert.equal(phaseProperty.type, 'string', 'phase should be type string');
+  it('does NOT have phase property (not in backend)', () => {
+    assert.ok(schema?.properties, 'LifecycleStateRequest schema with properties must exist');
+    assert.ok(!schema.properties.phase, 'phase property should NOT exist - not in backend');
   });
 
-  it('lastTransition property is string with date-time format', () => {
-    assert.ok(schema?.properties, 'LifecycleState schema with properties must exist');
-    const lastTransitionProperty = schema.properties.lastTransition;
-    assert.ok(lastTransitionProperty, 'lastTransition property should exist');
-    assert.equal(lastTransitionProperty.type, 'string', 'lastTransition should be type string');
-    assert.equal(lastTransitionProperty.format, 'date-time', 'lastTransition should have date-time format');
+  it('does NOT have lastTransition property (not in backend)', () => {
+    assert.ok(schema?.properties, 'LifecycleStateRequest schema with properties must exist');
+    assert.ok(!schema.properties.lastTransition, 'lastTransition property should NOT exist - not in backend');
   });
 
-  it('message property is string (optional)', () => {
-    assert.ok(schema?.properties, 'LifecycleState schema with properties must exist');
-    const messageProperty = schema.properties.message;
-    assert.ok(messageProperty, 'message property should exist');
-    assert.equal(messageProperty.type, 'string', 'message should be type string');
-    
-    // Verify message is NOT in required (it's optional)
-    const required = schema.required || [];
-    assert.ok(
-      !required.includes('message'),
-      'message should NOT be in required array (it is optional)'
-    );
+  it('does NOT have message property (not in backend)', () => {
+    assert.ok(schema?.properties, 'LifecycleStateRequest schema with properties must exist');
+    assert.ok(!schema.properties.message, 'message property should NOT exist - not in backend');
   });
 
-  it('state is required', () => {
-    assert.ok(schema, 'LifecycleState schema must exist');
+  it('lifecycleState is required', () => {
+    assert.ok(schema, 'LifecycleStateRequest schema must exist');
     const required = schema.required;
     assert.ok(required, 'Schema should have required array');
-    assert.ok(required.includes('state'), 'state should be required');
+    assert.ok(required.includes('lifecycleState'), 'lifecycleState should be required');
   });
 
-  it('example values are included', () => {
-    assert.ok(schema?.properties, 'LifecycleState schema with properties must exist');
-    // Check for example values in properties
-    const properties = schema.properties;
-    
-    // At least state should have an example
-    const stateHasExample = properties.state?.example !== undefined;
-    const phaseHasExample = properties.phase?.example !== undefined;
-    const lastTransitionHasExample = properties.lastTransition?.example !== undefined;
-    const messageHasExample = properties.message?.example !== undefined;
-    
-    const hasExamples = stateHasExample || phaseHasExample || lastTransitionHasExample || messageHasExample;
-    assert.ok(hasExamples, 'Schema properties should include example values');
+  it('example value is included', () => {
+    assert.ok(schema?.properties, 'LifecycleStateRequest schema with properties must exist');
+    const lifecycleStateProperty = schema.properties.lifecycleState;
+    assert.ok(lifecycleStateProperty?.example !== undefined, 'lifecycleState should have example value');
   });
 });
 
-describe('US-003: Responses', () => {
+describe('PUT Responses', () => {
   const pathKey = '/v2/node/{nodeID}/lifecycle-state';
-  const responses = spec.paths?.[pathKey]?.get?.responses;
+  const responses = spec.paths?.[pathKey]?.put?.responses;
 
   it('has responses defined', () => {
-    assert.ok(responses, 'GET operation should have responses');
+    assert.ok(responses, 'PUT operation should have responses');
   });
 
-  it('200 OK response exists', () => {
-    assert.ok(responses, 'GET responses must exist');
+  it('200 OK response exists with no body (matches backend OK(res))', () => {
+    assert.ok(responses, 'PUT responses must exist');
     assert.ok(responses['200'], '200 response should exist');
     assert.equal(responses['200'].description, 'OK', '200 response description should be "OK"');
-  });
-
-  it('200 response references LifecycleState schema', () => {
-    assert.ok(responses?.['200'], '200 response must exist');
-    const content = responses['200'].content;
-    assert.ok(content, '200 response should have content');
-    assert.ok(content['application/json'], '200 response should have application/json content type');
-    
-    const schemaRef = content['application/json'].schema?.$ref;
-    assert.equal(
-      schemaRef,
-      '#/components/schemas/LifecycleState',
-      '200 response should reference LifecycleState schema'
-    );
+    // Backend returns OK(res) with no body, so no content should be defined
+    assert.ok(!responses['200'].content, '200 response should NOT have content - backend returns no body');
   });
 
   it('404 Not Found response exists', () => {
-    assert.ok(responses, 'GET responses must exist');
+    assert.ok(responses, 'PUT responses must exist');
     assert.ok(responses['404'], '404 response should exist');
-    // Accept variations like "Not Found" or "Not found"
     const description = responses['404'].description?.toLowerCase();
     assert.ok(description, '404 response should have a description');
     assert.ok(
       description.includes('not found'),
       '404 response description should indicate "not found"'
     );
+  });
+
+  it('422 Validation error response exists (UI handles this)', () => {
+    assert.ok(responses, 'PUT responses must exist');
+    assert.ok(responses['422'], '422 response should exist - UI handles 422 for validation errors');
+    const description = responses['422'].description?.toLowerCase();
+    assert.ok(description, '422 response should have a description');
+    assert.ok(
+      description.includes('validation'),
+      '422 response description should indicate validation error'
+    );
+  });
+
+  it('422 response references ValidationFailed schema', () => {
+    assert.ok(responses?.['422'], '422 response must exist');
+    const content = responses['422'].content;
+    assert.ok(content, '422 response should have content');
+    assert.ok(content['application/json'], '422 response should have application/json content type');
+    
+    const schemaRef = content['application/json'].schema?.$ref;
+    assert.equal(
+      schemaRef,
+      '#/components/schemas/ValidationFailed',
+      '422 response should reference ValidationFailed schema'
+    );
+  });
+});
+
+describe('Request Body', () => {
+  const pathKey = '/v2/node/{nodeID}/lifecycle-state';
+  const requestBody = spec.paths?.[pathKey]?.put?.requestBody;
+
+  it('has requestBody defined', () => {
+    assert.ok(requestBody, 'PUT operation should have requestBody');
+  });
+
+  it('requestBody references LifecycleStateRequest schema', () => {
+    assert.ok(requestBody, 'requestBody must exist');
+    const content = requestBody.content;
+    assert.ok(content, 'requestBody should have content');
+    assert.ok(content['application/json'], 'requestBody should have application/json content type');
+    
+    const schemaRef = content['application/json'].schema?.$ref;
+    assert.equal(
+      schemaRef,
+      '#/components/schemas/LifecycleStateRequest',
+      'requestBody should reference LifecycleStateRequest schema'
+    );
+  });
+
+  it('requestBody is required', () => {
+    assert.ok(requestBody, 'requestBody must exist');
+    assert.equal(requestBody.required, true, 'requestBody should be required');
   });
 });

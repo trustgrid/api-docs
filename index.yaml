@@ -7162,26 +7162,6 @@ paths:
       tags:
         - Virtual Network
   /v2/node/{nodeID}/lifecycle-state:
-    get:
-      summary: Retrieve the current lifecycle state of a specific node
-      description: |-
-        Returns the current lifecycle state for a node (appliance or agent), including the operational phase and timestamp of the last state transition.
-
-        ---
-
-        Requires `nodes::read` permission.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LifecycleState'
-        '404':
-          description: Not Found
-      tags:
-        - Appliance
-        - Agent
     parameters:
       - $ref: '#/components/parameters/nodeID'
     put:
@@ -7196,7 +7176,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LifecycleState'
+              $ref: '#/components/schemas/LifecycleStateRequest'
         description: Lifecycle state update
         required: true
       responses:
@@ -7204,6 +7184,12 @@ paths:
           description: OK
         '404':
           description: Not Found
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Appliance
         - Agent
@@ -9582,35 +9568,21 @@ components:
           type: string
       title: Image
       type: object
-    LifecycleState:
-      description: LifecycleState
+    LifecycleStateRequest:
+      description: Request body for updating a node's lifecycle state
       properties:
-        state:
-          description: Current lifecycle state of the node
+        lifecycleState:
+          description: The lifecycle state to set on the node
           enum:
-            - active
-            - inactive
-            - provisioning
-            - decommissioning
+            - pre-production
+            - production
+            - maintenance
             - decommissioned
-          example: active
-          type: string
-        phase:
-          description: Current operational phase within the lifecycle state
-          example: running
-          type: string
-        lastTransition:
-          description: Timestamp of the last state transition
-          example: '2024-01-15T10:30:00Z'
-          format: date-time
-          type: string
-        message:
-          description: Human-readable status message
-          example: Node is operating normally
+          example: production
           type: string
       required:
-        - state
-      title: LifecycleState
+        - lifecycleState
+      title: LifecycleStateRequest
       type: object
     Node:
       description: Node
