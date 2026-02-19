@@ -7184,6 +7184,29 @@ paths:
         - Agent
     parameters:
       - $ref: '#/components/parameters/nodeID'
+    put:
+      summary: Update the lifecycle state of a specific node
+      description: |-
+        Update the lifecycle state for a node (appliance or agent).
+
+        ---
+
+        Requires `nodes::manage` permission.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleState'
+        description: Lifecycle state update
+        required: true
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not Found
+      tags:
+        - Appliance
+        - Agent
   /v2/policy:
     get:
       summary: Retrieve all access control policies and their permission rules
