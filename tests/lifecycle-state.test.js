@@ -110,9 +110,11 @@ describe('LifecycleStateRequest Schema', () => {
     
     // These values match the backend validation in Node.ts updateLifecycleState()
     const expectedStates = ['pre-production', 'production', 'maintenance', 'decommissioned'];
+    const actualStates = [...lifecycleStateProperty.enum].sort();
+    const sortedExpectedStates = [...expectedStates].sort();
     assert.deepEqual(
-      lifecycleStateProperty.enum.sort(),
-      expectedStates.sort(),
+      actualStates,
+      sortedExpectedStates,
       'lifecycleState enum should match backend validation values'
     );
   });
