@@ -36,3 +36,19 @@ jobs:
 
       - name: Lint OpenAPI Specification
         run: redocly lint index.yaml --format=github-actions
+
+  tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and run tests
+        run: npm ci && npm test

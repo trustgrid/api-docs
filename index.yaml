@@ -7161,6 +7161,38 @@ paths:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Virtual Network
+  /v2/node/{nodeID}/lifecycle-state:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    put:
+      summary: Update the lifecycle state of a specific node
+      description: |-
+        Update the lifecycle state for a node (appliance or agent).
+
+        ---
+
+        Requires `nodes::manage` permission.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleStateRequest'
+        description: Lifecycle state update
+        required: true
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not Found
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+        - Agent
   /v2/policy:
     get:
       summary: Retrieve all access control policies and their permission rules
@@ -9535,6 +9567,22 @@ components:
           example: latest
           type: string
       title: Image
+      type: object
+    LifecycleStateRequest:
+      description: Request body for updating a node's lifecycle state
+      properties:
+        lifecycleState:
+          description: The lifecycle state to set on the node
+          enum:
+            - pre-production
+            - production
+            - maintenance
+            - decommissioned
+          example: production
+          type: string
+      required:
+        - lifecycleState
+      title: LifecycleStateRequest
       type: object
     Node:
       description: Node
