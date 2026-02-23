@@ -55,15 +55,19 @@ tags:
     description: |
       [Virtual network configuration](https://docs.trustgrid.io/docs/domain/virtual-networks/)
   - name: Cluster > VPN
+    x-displayName: VPN
     description: |
       Per-cluster attachment to virtual networks
   - name: Cluster > Compute
+    x-displayName: Compute
     description: |
       [Cluster edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
   - name: Appliance > VPN
+    x-displayName: VPN
     description: |
       Per-appliance attachment to virtual networks
   - name: Appliance > Compute
+    x-displayName: Compute
     description: |
       [Appliance edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
   - name: IDP
