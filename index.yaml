@@ -101,10 +101,8 @@ x-tagGroups:
   - name: Agent
     tags:
       - Agent
-  - name: Node
+  - name: Upgrade Manager
     tags:
-      - Certificate
-      - Tag
       - Upgrade Manager
   - name: Compute
     tags:
@@ -112,12 +110,14 @@ x-tagGroups:
   - name: Management
     tags:
       - Audit
+      - Certificate
       - Group
       - IDP
       - Org
       - Order
       - Permissions
       - ServiceUser
+      - Tag
       - User
 
 paths:
