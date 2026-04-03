@@ -51,12 +51,25 @@ tags:
   - name: Certificate
     description: |
       [TLS certificates](https://docs.trustgrid.io/docs/certificates/)
-  - name: Compute
-    description: |
-      [Edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
-  - name: Virtual Network
+  - name: Virtual Networks
     description: |
       [Virtual network configuration](https://docs.trustgrid.io/docs/domain/virtual-networks/)
+  - name: Cluster > VPN
+    x-displayName: VPN
+    description: |
+      Per-cluster attachment to virtual networks
+  - name: Cluster > Compute
+    x-displayName: Compute
+    description: |
+      [Cluster edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
+  - name: Appliance > VPN
+    x-displayName: VPN
+    description: |
+      Per-appliance attachment to virtual networks
+  - name: Appliance > Compute
+    x-displayName: Compute
+    description: |
+      [Appliance edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
   - name: IDP
     description: |
       [Identity provider configuration](https://docs.trustgrid.io/docs/idps/)
@@ -71,29 +84,40 @@ x-tagGroups:
     tags:
       - Alarm
       - Alert
-  - name: Node
-    tags: 
-      - Agent
-      - Appliance
-      - Certificate
-      - Cluster
+  - name: Domain
+    tags:
       - Domain
-      - Tag
+      - Virtual Networks
+  - name: Cluster
+    tags:
+      - Cluster
+      - Cluster > VPN
+      - Cluster > Compute
+  - name: Appliance
+    tags:
+      - Appliance
+      - Appliance > VPN
+      - Appliance > Compute
+  - name: Agent
+    tags:
+      - Agent
+  - name: Upgrade Manager
+    tags:
       - Upgrade Manager
-      - Virtual Network
   - name: Compute
-    tags: 
-      - Compute
+    tags:
       - Repository
   - name: Management
-    tags: 
+    tags:
       - Audit
+      - Certificate
       - Group
       - IDP
       - Org
       - Order
       - Permissions
       - ServiceUser
+      - Tag
       - User
 
 paths:
@@ -3176,7 +3200,7 @@ paths:
                   $ref: '#/components/schemas/Container'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Node FQDN
         in: path
@@ -3204,7 +3228,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}:
     delete:
       summary: Remove a containerized application from the cluster and stop execution
@@ -3213,7 +3237,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Compute
+        - Cluster > Compute
     get:
       summary: Get a container
       description: Requires `node-exec::read` permission.
@@ -3225,7 +3249,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Container'
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3259,7 +3283,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/capability:
     get:
       summary: Retrieve security capabilities and permissions for a container
@@ -3272,7 +3296,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerCapabilities'
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3320,7 +3344,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/healthcheck:
     get:
       summary: Get container health check
@@ -3333,7 +3357,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerHealthCheck'
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3361,7 +3385,7 @@ paths:
                   $ref: '#/components/schemas/ContainerInterfaces'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3387,7 +3411,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerLimits'
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3413,7 +3437,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerLogging'
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3441,7 +3465,7 @@ paths:
                   $ref: '#/components/schemas/ContainerMount'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3469,7 +3493,7 @@ paths:
                   $ref: '#/components/schemas/ContainerPortMapping'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3497,7 +3521,7 @@ paths:
                   $ref: '#/components/schemas/ContainerVariable'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3525,7 +3549,7 @@ paths:
                   $ref: '#/components/schemas/ContainerVirtualNetwork'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3553,7 +3577,7 @@ paths:
                   $ref: '#/components/schemas/Volume'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3579,7 +3603,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerVRF'
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Container ID
         in: path
@@ -3607,7 +3631,7 @@ paths:
                   $ref: '#/components/schemas/Volume'
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Node FQDN
         in: path
@@ -3635,7 +3659,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Cluster > Compute
   /v2/cluster/{clusterFQDN}/exec/volume/{volumeName}:
     delete:
       summary: Delete a volume
@@ -3644,7 +3668,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Compute
+        - Cluster > Compute
     parameters:
       - description: Volume Name
         in: path
@@ -3671,7 +3695,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterNetworkModel'
                 type: array
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
     post:
@@ -3692,7 +3716,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}:
     delete:
       summary: Delete a VPN network
@@ -3700,7 +3724,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Cluster > VPN
     get:
       summary: Returns information about a VPN network
       responses:
@@ -3711,7 +3735,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnClusterNetworkInventoryModel'
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3734,7 +3758,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dns:
     delete:
       summary: Delete a VPN DNS configuration
@@ -3742,7 +3766,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Cluster > VPN
     get:
       summary: Get a VPN DNS configuration
       responses:
@@ -3753,7 +3777,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnClusterDnsModel'
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3776,7 +3800,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
     put:
       summary: Update a VPN DNS configuration
       requestBody:
@@ -3791,7 +3815,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/export-route:
     get:
       summary: Get a VPN's dynamic export routes
@@ -3805,7 +3829,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterRouteModel'
                 type: array
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3828,7 +3852,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/export-route/{uid}:
     delete:
       summary: Delete a VPN export route
@@ -3836,7 +3860,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3865,7 +3889,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/import-route:
     get:
       summary: Get a VPN's dynamic import routes
@@ -3879,7 +3903,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterRouteModel'
                 type: array
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3902,7 +3926,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/import-route/{uid}:
     delete:
       summary: Delete a VPN import route
@@ -3910,7 +3934,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3939,7 +3963,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/interface:
     get:
       summary: Get a VPN's interfaces
@@ -3953,7 +3977,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterInterfaceModel'
                 type: array
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -3976,7 +4000,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/interface/{interfaceName}:
     delete:
       summary: Delete a VPN interface
@@ -3984,7 +4008,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4013,7 +4037,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/route:
     get:
       summary: Get a VPN's routes
@@ -4027,7 +4051,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterRouteModel'
                 type: array
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4050,7 +4074,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/route/{uid}:
     delete:
       summary: Delete a VPN route
@@ -4058,7 +4082,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4087,7 +4111,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/service:
     get:
       summary: Get a VPN's services
@@ -4101,7 +4125,7 @@ paths:
                   $ref: '#/components/schemas/VpnClusterServiceModel'
                 type: array
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4124,7 +4148,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/service/{uid}:
     delete:
       summary: Delete a Service
@@ -4132,7 +4156,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Cluster > VPN
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
       - description: Network name
@@ -4161,7 +4185,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Cluster > VPN
   /v2/domain/{domainName}/network:
     get:
       summary: List virtual networks
@@ -4177,7 +4201,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
     parameters:
       - description: Domain name
         in: path
@@ -4211,7 +4235,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
   /v2/domain/{domainName}/network/{networkName}:
     delete:
       summary: >-
@@ -4223,7 +4247,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
     parameters:
       - description: Network name
         in: path
@@ -4252,7 +4276,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Access Policy
     parameters:
       - description: Network name
@@ -4288,7 +4312,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Access Policy
   /v2/domain/{domainName}/network/{networkName}/access-policy/{accessPolicyID}:
     delete:
@@ -4310,7 +4334,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Access Policy
     parameters:
       - description: Unique ID of access policy
@@ -4352,7 +4376,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Access Policy
   /v2/domain/{domainName}/network/{networkName}/auth-group:
     get:
@@ -4369,7 +4393,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
     parameters:
       - description: Network name
@@ -4405,7 +4429,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
   /v2/domain/{domainName}/network/{networkName}/auth-group/{groupName}:
     delete:
@@ -4416,7 +4440,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
     get:
       summary: List a network auth group's members
@@ -4433,7 +4457,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
     parameters:
       - description: Network auth group name
@@ -4475,7 +4499,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
     put:
       summary: Update a network auth group
@@ -4498,7 +4522,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
   /v2/domain/{domainName}/network/{networkName}/auth-group/{groupName}/{memberID}:
     delete:
@@ -4509,7 +4533,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
     parameters:
       - description: Group member ID
@@ -4557,7 +4581,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Auth Group
   /v2/domain/{domainName}/network/{networkName}/change:
     get:
@@ -4572,7 +4596,7 @@ paths:
                 $ref: '#/components/schemas/VirtualNetworkInventory'
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Change Management
     parameters:
       - description: Network name
@@ -4633,7 +4657,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Change Management
   /v2/domain/{domainName}/network/{networkName}/change/validate:
     get:
@@ -4665,7 +4689,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Change Management
     parameters:
       - description: Network name
@@ -4691,7 +4715,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Change Management
     parameters:
       - description: Change ID
@@ -4727,7 +4751,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS
     parameters:
       - description: Network name
@@ -4768,7 +4792,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS
   /v2/domain/{domainName}/network/{networkName}/dns-zone:
     get:
@@ -4785,7 +4809,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Zone
     parameters:
       - description: Network name
@@ -4821,7 +4845,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Zone
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}:
     delete:
@@ -4832,7 +4856,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Zone
     parameters:
       - description: DNS zone name
@@ -4874,7 +4898,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Zone
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}/dns-record:
     get:
@@ -4891,7 +4915,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Record
     parameters:
       - description: DNS zone name
@@ -4933,7 +4957,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Record
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}/dns-record/{recordName}/{recordType}:
     delete:
@@ -4944,7 +4968,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Record
     parameters:
       - description: DNS record type
@@ -4998,7 +5022,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - DNS Record
   /v2/domain/{domainName}/network/{networkName}/network-group:
     get:
@@ -5015,7 +5039,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Group
     parameters:
       - description: Network name
@@ -5051,7 +5075,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-group/{groupName}:
     delete:
@@ -5062,7 +5086,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Group
     get:
       summary: List a network's group memberships
@@ -5078,7 +5102,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Group
     parameters:
       - description: Network group name
@@ -5120,7 +5144,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-group/{groupName}/{objectName}:
     delete:
@@ -5131,7 +5155,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Group
     parameters:
       - description: Network object name
@@ -5168,7 +5192,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-object:
     get:
@@ -5185,7 +5209,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Object
     parameters:
       - description: Network name
@@ -5221,7 +5245,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Object
   /v2/domain/{domainName}/network/{networkName}/network-object/{objectName}:
     delete:
@@ -5232,7 +5256,7 @@ paths:
           description: OK
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Object
     parameters:
       - description: Network object name
@@ -5274,7 +5298,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Network Object
   /v2/domain/{domainName}/network/{networkName}/port-forwarding:
     get:
@@ -5291,7 +5315,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Port Forwarding
     parameters:
       - description: Network name
@@ -5327,7 +5351,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Port Forwarding
   /v2/domain/{domainName}/network/{networkName}/port-forwarding/{portForwardingID}:
     delete:
@@ -5342,7 +5366,7 @@ paths:
                 $ref: '#/components/schemas/PortForwarding'
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Port Forwarding
     parameters:
       - description: Port forwarding ID
@@ -5384,7 +5408,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Port Forwarding
   /v2/domain/{domainName}/network/{networkName}/route:
     get:
@@ -5401,7 +5425,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Route
     parameters:
       - description: Network name
@@ -5437,7 +5461,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Route
   /v2/domain/{domainName}/network/{networkName}/route/{routeID}:
     delete:
@@ -5450,7 +5474,7 @@ paths:
           description: Not Found
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Route
     parameters:
       - description: Route ID
@@ -5492,7 +5516,7 @@ paths:
                 type: array
       tags:
         - Domain
-        - Virtual Network
+        - Virtual Networks
         - Route
 
   /v2/event:
@@ -6096,7 +6120,7 @@ paths:
                   $ref: '#/components/schemas/Container'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Node ID
         in: path
@@ -6124,7 +6148,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
   /v2/node/{nodeID}/exec/container/{containerID}:
     delete:
       summary: Delete a container
@@ -6133,7 +6157,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Compute
+        - Appliance > Compute
     get:
       summary: Get a container
       description: Requires `node-exec::read` permission.
@@ -6145,7 +6169,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Container'
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6179,7 +6203,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
   /v2/node/{nodeID}/exec/container/{containerID}/capability:
     get:
       summary: Get container capabilities
@@ -6192,7 +6216,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerCapabilities'
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6240,7 +6264,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
   /v2/node/{nodeID}/exec/container/{containerID}/healthcheck:
     get:
       summary: Get container health check
@@ -6253,7 +6277,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerHealthCheck'
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6281,7 +6305,7 @@ paths:
                   $ref: '#/components/schemas/ContainerInterfaces'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6307,7 +6331,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerLimits'
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6333,7 +6357,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerLogging'
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6361,7 +6385,7 @@ paths:
                   $ref: '#/components/schemas/ContainerMount'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6389,7 +6413,7 @@ paths:
                   $ref: '#/components/schemas/ContainerPortMapping'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6417,7 +6441,7 @@ paths:
                   $ref: '#/components/schemas/ContainerVariable'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6445,7 +6469,7 @@ paths:
                   $ref: '#/components/schemas/ContainerVirtualNetwork'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6473,7 +6497,7 @@ paths:
                   $ref: '#/components/schemas/Volume'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6499,7 +6523,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContainerVRF'
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Container ID
         in: path
@@ -6527,7 +6551,7 @@ paths:
                   $ref: '#/components/schemas/Volume'
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Node ID
         in: path
@@ -6555,7 +6579,7 @@ paths:
                 title: ValidationFailed
                 type: array
       tags:
-        - Compute
+        - Appliance > Compute
   /v2/node/{nodeID}/exec/volume/{volumeName}:
     delete:
       summary: Delete a volume
@@ -6564,7 +6588,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Compute
+        - Appliance > Compute
     parameters:
       - description: Volume Name
         in: path
@@ -6667,7 +6691,7 @@ paths:
                 type: array
                 description: ''
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
     post:
@@ -6688,7 +6712,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}:
     delete:
       summary: Delete a VPN network
@@ -6696,7 +6720,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Appliance > VPN
     get:
       summary: Get a VPN network
       responses:
@@ -6707,7 +6731,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnNodeNetworkInventoryModel'
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -6730,7 +6754,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/dns:
     delete:
       summary: Delete a VPN DNS configuration
@@ -6738,7 +6762,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Appliance > VPN
     get:
       summary: Get a VPN's DNS configuration
       responses:
@@ -6749,7 +6773,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VpnNodeDnsModel'
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -6772,7 +6796,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
     put:
       summary: Update a VPN DNS configuration
       requestBody:
@@ -6787,7 +6811,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/export-route:
     get:
       summary: Get a VPN's dynamic export routes
@@ -6801,7 +6825,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeRouteModel'
                 type: array
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -6824,7 +6848,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/export-route/{uid}:
     delete:
       summary: Delete a VPN export route
@@ -6832,7 +6856,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -6861,7 +6885,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/import-route:
     get:
       summary: Get a VPN's dynamic import routes
@@ -6875,7 +6899,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeRouteModel'
                 type: array
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -6898,7 +6922,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/import-route/{uid}:
     delete:
       summary: Delete a VPN import route
@@ -6906,7 +6930,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -6935,7 +6959,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/interface:
     get:
       summary: Get a VPN's interfaces
@@ -6949,7 +6973,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeInterfaceModel'
                 type: array
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -6972,7 +6996,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/interface/{interfaceName}:
     delete:
       summary: Delete a VPN interface
@@ -6980,7 +7004,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7009,7 +7033,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/route:
     get:
       summary: Get a VPN's routes
@@ -7023,7 +7047,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeRouteModel'
                 type: array
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7046,7 +7070,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/route/{uid}:
     delete:
       summary: Delete a VPN route
@@ -7054,7 +7078,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7083,7 +7107,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/service:
     get:
       summary: Get a VPN's services
@@ -7098,7 +7122,7 @@ paths:
                   $ref: '#/components/schemas/VpnNodeServiceModel'
                 type: array
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7122,7 +7146,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/vpn/{networkName}/service/{uid}:
     delete:
       summary: Delete a VPN Service
@@ -7131,7 +7155,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Virtual Network
+        - Appliance > VPN
     parameters:
       - $ref: '#/components/parameters/nodeID'
       - description: Network name
@@ -7160,7 +7184,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
-        - Virtual Network
+        - Appliance > VPN
   /v2/node/{nodeID}/lifecycle-state:
     parameters:
       - $ref: '#/components/parameters/nodeID'
