@@ -5,6 +5,38 @@ info:
   license:
     name: unlicensed
     url: https://trustgrid.io
+  description: |
+    The Trustgrid Management API provides programmatic access to manage the Trustgrid
+    network infrastructure platform. Trustgrid connects distributed nodes (appliances and
+    agents) into secure overlay networks with centralized management.
+
+    ## Key Concepts
+
+    - **Nodes**: The core compute units — either `Node` (physical/VM appliance) or `Agent`
+      (lightweight software agent on a device). Identified by UUID (`uid`) and FQDN.
+    - **Clusters**: High-availability groups of nodes sharing configuration.
+    - **Domains**: Logical groupings of nodes within an organization.
+    - **Virtual Networks**: Layer-3 overlay networks (`DomainNetwork`) created within a domain,
+      enabling zero-trust connectivity between nodes. Each network has access policies,
+      DNS config, routes, and port forwarding rules.
+    - **Tags**: Key-value metadata attached to nodes and clusters for grouping and permissions.
+    - **Shadow**: Each node has an AWS IoT Device Shadow with `desired` (target config) and
+      `reported` (current state) halves. The `reported` shadow contains telemetry using
+      dot-notation keys (e.g. `nic.eth0.mtu`, `node-core.version`).
+
+    ## Authentication
+
+    All API requests require a JWT Bearer token in the `Authorization` header:
+    ```
+    Authorization: Bearer <token>
+    ```
+    Tokens are obtained via the Trustgrid portal or programmatically via service user
+    credentials. See [API Access docs](https://docs.trustgrid.io/docs/user-management/api-access/).
+
+    ## Permissions
+
+    Most endpoints require specific permissions (noted in each endpoint's description).
+    Permissions follow the pattern `resource::action` (e.g. `nodes::read`, `virtual-networks::modify`).
   
 tags:
   - name: Alerting
@@ -99,6 +131,7 @@ x-tagGroups:
 paths:
   /alert:
     get:
+      operationId: listAlerts
       deprecated: true
       summary: List all security and operational events across the organization
       description: |-
@@ -131,6 +164,7 @@ paths:
         - Alert
   /alert/{nodeID}:
     get:
+      operationId: listNodeAlerts
       summary: Retrieve security and operational events for a specific node
       description: |-
         List events for a node (appliance or agent), newest first
@@ -158,6 +192,7 @@ paths:
           type: string
   /audit/download/config:
     get:
+      operationId: downloadConfigAudit
       summary: Export configuration change audit logs as a downloadable file
       description: Requires `audits::read:config` permission.
       parameters:
@@ -210,6 +245,7 @@ paths:
         - Audit
   /audit/download/node:
     get:
+      operationId: downloadNodeAudit
       summary: Export node activity and operational audit logs as a downloadable file
       description: Requires `audits::read:node` permission.
       parameters:
@@ -230,6 +266,7 @@ paths:
         - Audit
   /audit/download/user:
     get:
+      operationId: downloadUserAudit
       summary: Export user authentication and access audit logs as a downloadable file
       description: Requires `audits::read:user` permission.
       responses:
@@ -239,6 +276,7 @@ paths:
         - Audit
   /audit/tail/config:
     get:
+      operationId: tailConfigAudit
       summary: Retrieve real-time configuration change audit logs with filtering options
       description: Requires `audits::read:config` permission.
       parameters:
@@ -329,12 +367,20 @@ paths:
                       description: User name of the client that initiated the change
                       example: admin@trustgrid.io
                       type: string
+                    org:
+                      description: Organization ID
+                      type: string
+                    type:
+                      description: Object type discriminator
+                      example: AuditLog
+                      type: string
                   type: object
                 type: array
       tags:
         - Audit
   /audit/tail/flow_logs:
     get:
+      operationId: tailFlowLogs
       deprecated: true
       summary: 'Retrieve network traffic flow logs with advanced filtering and pagination'
       description: |-
@@ -470,28 +516,47 @@ paths:
                 items:
                   description: FlowLog
                   properties:
-                    activityID:
-                      description: Threat Intelligence activity ID
-                      example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
+                    nodeId:
+                      description: ID of the node that logged this flow
                       type: string
-                    destBytes:
-                      description: Destination bytes transferred
+                    sourceNode:
+                      description: Source node name
+                      example: mynode
+                      type: string
+                    sourceIP:
+                      description: Source IP address
+                      example: 2.2.2.2
+                      type: string
+                    sourcePort:
+                      description: Source port
+                      example: 1234
+                      type: number
+                    sourceBytes:
+                      description: Source bytes transferred
                       example: 100
                       type: number
-                    destIP:
-                      description: Destination IP address
-                      example: 1.1.1.1
-                      type: string
                     destNode:
                       description: Destination node name
                       example: mynode
+                      type: string
+                    destIP:
+                      description: Destination IP address
+                      example: 1.1.1.1
                       type: string
                     destPort:
                       description: Destination port
                       example: 1234
                       type: number
+                    destBytes:
+                      description: Destination bytes transferred
+                      example: 100
+                      type: number
+                    startTime:
+                      description: Start time of the flow (ISO 8601)
+                      example: '2022-11-01T22:46:01.765Z'
+                      type: string
                     endTime:
-                      description: Start time of the flow
+                      description: End time of the flow (ISO 8601)
                       example: '2022-11-01T22:46:02.730Z'
                       type: string
                     protocol:
@@ -503,43 +568,35 @@ paths:
                         - UNKNOWN
                       example: TCP
                       type: string
-                    sourceBytes:
-                      description: Source bytes transferred
-                      example: 100
-                      type: number
-                    sourceIP:
-                      description: Source IP address
-                      example: 2.2.2.2
-                      type: string
-                    sourceNode:
-                      description: Source node name
-                      example: mynode
-                      type: string
-                    sourcePort:
-                      description: Source port
-                      example: 1234
-                      type: number
-                    startTime:
-                      description: Start time of the flow
-                      example: '2022-11-01T22:46:01.765Z'
-                      type: string
                     tcpFlags:
                       description: |-
-                        TCP Flags encoded in hex:
+                        TCP flags as a decimal string:
                         * 0x01 - FIN
                         * 0x02 - SYN
                         * 0x04 - RST
                         * 0x08 - PSH
                         * 0x10 - ACK
                         * 0x20 - URG
-                      example: '00100001'
+                      example: '2'
                       type: string
+                    flags:
+                      description: Additional flow flags as a decimal string
+                      example: '40019'
+                      type: string
+                    activityID:
+                      description: Threat Intelligence activity ID (if applicable)
+                      example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
+                      type: string
+                    meta:
+                      description: Additional metadata (nullable)
+                      nullable: true
                   type: object
                 type: array
       tags:
         - Audit
   /audit/tail/node:
     get:
+      operationId: tailNodeAudit
       summary: Retrieve real-time node operational and security audit logs
       description: |-
         List node (appliance or agent) audits
@@ -561,19 +618,85 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    uid:
+                      description: Unique identifier
+                      type: string
+                    fqdn:
+                      description: FQDN of the node that performed the action
+                      type: string
+                    category:
+                      description: Action category (e.g. "Node Action")
+                      type: string
+                    value:
+                      description: Human-readable description of the action taken
+                      type: string
+                    timestamp:
+                      description: Unix epoch timestamp (seconds) when the action occurred
+                      type: integer
+                    expires:
+                      description: Unix epoch timestamp (seconds) when this audit record expires
+                      type: integer
+                    org:
+                      description: Organization ID
+                      type: string
       tags:
         - Audit
   /audit/tail/user:
     get:
+      operationId: tailUserAudit
       summary: Retrieve real-time user authentication and session audit logs
       description: Requires `audits::read:user` permission.
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    uid:
+                      description: Unique identifier
+                      type: string
+                    userId:
+                      description: User who performed the authentication
+                      example: admin@example.com
+                      type: string
+                    message:
+                      description: Human-readable description (e.g. "Portal login (Local Authentication)")
+                      type: string
+                    source:
+                      description: Authentication source (e.g. "portal")
+                      type: string
+                    ip:
+                      description: IP address of the client
+                      type: string
+                    timestamp:
+                      description: Unix epoch timestamp (seconds) when the event occurred
+                      type: integer
+                    expires:
+                      description: Unix epoch timestamp (seconds) when this audit record expires
+                      type: integer
+                    orgId:
+                      description: Organization ID
+                      type: string
+                    type:
+                      description: Object type discriminator
+                      example: AuthAudit
+                      type: string
       tags:
         - Audit
   /cluster:
     get:
+      operationId: listClusters
       summary: Retrieve all high-availability node clusters in the organization
       parameters:
         - description: >-
@@ -628,6 +751,7 @@ paths:
       tags:
         - Cluster
     get:
+      operationId: getCluster
       summary: Retrieve detailed configuration and status of a specific cluster
       responses:
         '200':
@@ -954,6 +1078,7 @@ paths:
         - Cluster
   /domain/{domainName}:
     get:
+      operationId: getDomain
       summary: Retrieve domain configuration including security and network settings
       description: Requires `domains::read` permission.
       responses:
@@ -1051,13 +1176,14 @@ paths:
         - Domain
   /group:
     get:
+      operationId: listGroups
       summary: Retrieve all user groups and their access permissions
       description: Requires `groups::read` permissions
       responses:
         '200':
           description: List of groups
           content:
-            '*/*':
+            application/json:
               schema:
                 items:
                   $ref: '#/components/schemas/Group'
@@ -1122,6 +1248,7 @@ paths:
         - User
         - Group
     get:
+      operationId: getGroup
       summary: Retrieve detailed information about a specific group
       description: Requires `groups::read` permissions
       parameters:
@@ -1135,7 +1262,7 @@ paths:
         '200':
           description: The group object
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/Group'
         '404':
@@ -1145,6 +1272,7 @@ paths:
         - Group
   /group/{uid}/idps:
     get:
+      operationId: listGroupIdps
       summary: List all identity providers associated with a group
       description: Requires `groups::read` permissions
       parameters:
@@ -1158,7 +1286,7 @@ paths:
         '200':
           description: List of Identity Providers
           content:
-            '*/*':
+            application/json:
               schema:
                 items:
                   $ref: '#/components/schemas/IdpGroup'
@@ -1168,6 +1296,7 @@ paths:
         - Group
   /group/{uid}/members:
     get:
+      operationId: listGroupMembers
       summary: Retrieve all users that belong to a specific group
       description: Requires `groups::read` permissions
       parameters:
@@ -1181,7 +1310,7 @@ paths:
         '200':
           description: List of group members
           content:
-            '*/*':
+            application/json:
               schema:
                 items:
                   $ref: '#/components/schemas/GroupMember'
@@ -1214,6 +1343,7 @@ paths:
         - Group
   /node:
     get:
+      operationId: listNodes
       summary: Retrieve all network nodes including appliances and agents with filtering options
       description: |-
         List both appliances and agents.
@@ -1236,25 +1366,53 @@ paths:
           name: tags
           schema:
             type: string
-        - description: >-
-            List of fields to return from the API. Supports nested fields and
-            anything in the Node schema. Each field should be listed
-            individually, e.g., `projection[]=online&projection[]=uid`.
+          description: >-
+            Reduces the response to a smaller set of fields. When **omitted**, all fields are returned
+            (`name`, `fqdn`, `online`, `cluster`, `lastip`, `last_connect`, `created_at`, `device`,
+            `location`, `heartbeat`, `lifecycleState`, `disconnectTime`, `orderID`, plus base fields).
 
 
-            ---
+            When **specified**, the response contains only a fixed base set plus each explicitly requested field.
 
 
-            If using curl, the `-g` flag will automatically escape the brackets
-            for you.
+            **Base set** (always present when any projection is specified): `uid`, `state`, `type`, `tags`,
+            `tgTags`, `tgrn`, `keys`, `shadow`, `config`
+
+
+            **Top-level requestable fields**: `name`, `fqdn`, `online`, `cluster`, `lastip`, `last_connect`,
+            `created_at`, `device`, `location`, `heartbeat`, `lifecycleState`, `disconnectTime`, `orderID`
+
+
+            **WARNING**: Dot-notation strings do NOT work for nested fields. `projection[]=config.gateway.enabled`
+            silently returns an empty `config: {}` object. Do not use dot notation.
+
+
+            **For AI/agent use**: Request the full top-level object instead of sub-fields.
+            `projection[]=config` returns the complete config object. `projection[]=shadow` returns
+            the complete shadow with all reported keys. This is simpler and reliable.
+
+
+            **Advanced nested projection** (browser/qs library): If you need sub-field filtering,
+            use indexed bracket notation where each projection entry has an outer index N and each
+            path segment has an inner index M. To request only `config.gateway.enabled` (entry 0)
+            and `shadow.reported["node-core.version"]` (entry 1):
+
+            `projection[0][0]=config&projection[0][1]=gateway&projection[0][2]=enabled&projection[1][0]=shadow&projection[1][1]=reported&projection[1][2]=node-core.version`
+
+
+            If using curl, use the `-g` flag to prevent brace expansion.
           in: query
           name: projection[]
           style: form
-          explode: false
+          explode: true
           schema:
             type: array
             items:
-              type: string
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
       responses:
         '200':
           description: OK
@@ -1269,6 +1427,7 @@ paths:
         - Agent
   /node/license:
     get:
+      operationId: getNodeLicense
       summary: Generate a license key for registering a new node to the organization
       responses:
         '200':
@@ -1310,6 +1469,7 @@ paths:
         - Appliance
         - Agent
     get:
+      operationId: getNode
       summary: Retrieve detailed configuration and status information for a specific node
       description: |-
         Get a node (appliance or agent)
@@ -1944,6 +2104,7 @@ paths:
         - Agent
   /org/mine:
     get:
+      operationId: getOrg
       summary: Retrieve organization details and configuration settings
       responses:
         '200':
@@ -1958,6 +2119,7 @@ paths:
         - Org
   /provisioning/api/v1/orders:
     get:
+      operationId: listOrders
       summary: Retrieve all hardware provisioning orders and their current status
       description: >-
         The responses for orders from this API request are not fully hydrated
@@ -1990,6 +2152,7 @@ paths:
         - Order
   /provisioning/api/v1/orders/{uid}:
     get:
+      operationId: getOrder
       summary: Retrieve detailed information about a specific provisioning order
       responses:
         '200':
@@ -2066,6 +2229,7 @@ paths:
         - Order
   /repositories:
     get:
+      operationId: listRepositories
       summary: Retrieve all container repositories available for edge computing
       responses:
         '200':
@@ -2087,6 +2251,7 @@ paths:
       tags:
         - Repository
     get:
+      operationId: getRepository
       summary: Retrieve available image tags and metadata for a specific repository
       responses:
         '200':
@@ -2126,6 +2291,7 @@ paths:
           type: string
   /stats/realtime/usage:
     get:
+      operationId: getRealtimeUsage
       summary: Retrieve real-time network usage statistics and bandwidth metrics for nodes
       description: >-
         Returns an array of usage data buckets for specified nodes within the
@@ -2171,7 +2337,7 @@ paths:
         '200':
           description: An array of usage data buckets.
           content:
-            '*/*':
+            application/json:
               schema:
                 items:
                   properties:
@@ -2193,6 +2359,7 @@ paths:
         - Appliance
   /tags:
     get:
+      operationId: listTags
       summary: Retrieve all available metadata tags used for node and cluster organization
       responses:
         '200':
@@ -2207,6 +2374,7 @@ paths:
         - Tag
   /tags/{tagName}:
     get:
+      operationId: getTag
       summary: Retrieve details and usage information for a specific tag
       responses:
         '200':
@@ -2228,6 +2396,7 @@ paths:
           type: string
   /upgrade-manager/api/v1/upgrades:
     get:
+      operationId: listUpgrades
       summary: Retrieve all firmware upgrade campaigns and their execution status
       description: Requires `upgrade-manager::read` permission.
       responses:
@@ -2262,6 +2431,7 @@ paths:
         - Upgrade Manager
   /upgrade-manager/api/v1/upgrades/active:
     get:
+      operationId: getActiveUpgrade
       summary: Retrieve the currently running firmware upgrade campaign
       description: Requires `upgrade-manager::read` permission.
       responses:
@@ -2287,6 +2457,7 @@ paths:
       tags:
         - Upgrade Manager
     get:
+      operationId: getUpgrade
       summary: Retrieve detailed status and progress of a specific upgrade campaign
       description: Requires `upgrade-manager::read` permission.
       responses:
@@ -2430,6 +2601,7 @@ paths:
         - Upgrade Manager
   /upgrade-manager/api/v1/upgrades/{upgradeID}/logs:
     get:
+      operationId: getUpgradeLogs
       summary: Retrieve detailed execution logs and error messages for an upgrade campaign
       description: Requires `upgrade-manager::read` permission.
       responses:
@@ -2528,6 +2700,7 @@ paths:
         - Upgrade Manager
   /user:
     get:
+      operationId: listUsers
       summary: Retrieve all users in the organization with their roles and permissions
       description: >
         Changes to users sometimes take a few minutes to appear while being
@@ -2628,6 +2801,7 @@ paths:
           type: string
   /user/{email}/groups:
     get:
+      operationId: listUserGroups
       summary: Retrieve all groups that a specific user belongs to
       responses:
         '200':
@@ -2649,6 +2823,7 @@ paths:
           type: string
   /v2/alarm:
     get:
+      operationId: listAlarms
       summary: Retrieve all configured alarm filters and their trigger conditions
       description: Requires `alarms::read` permission.
       responses:
@@ -2680,6 +2855,7 @@ paths:
         - Alarm
   /v2/alarm-channel:
     get:
+      operationId: listAlarmChannels
       summary: Retrieve all configured notification channels for alarm delivery
       responses:
         '200':
@@ -2716,6 +2892,7 @@ paths:
       tags:
         - Alarm
     get:
+      operationId: getAlarmChannel
       summary: Retrieve configuration details for a specific notification channel
       responses:
         '200':
@@ -2756,6 +2933,7 @@ paths:
       tags:
         - Alarm
     get:
+      operationId: getAlarmSuppression
       summary: Retrieve current or upcoming alert suppression schedule details
       responses:
         '200':
@@ -2795,6 +2973,7 @@ paths:
       tags:
         - Alarm
     get:
+      operationId: getAlarm
       summary: Retrieve detailed configuration of a specific alarm filter
       responses:
         '200':
@@ -2828,6 +3007,7 @@ paths:
         - Alarm
   /v2/alert:
     get:
+      operationId: listAlertsV2
       summary: Retrieve all recent security and operational alerts across the organization
       description: Requires `alerts::read` permission.
       responses:
@@ -2843,6 +3023,7 @@ paths:
         - Alert
   /v2/alert/{nodeID}:
     get:
+      operationId: listNodeAlertsV2
       summary: Retrieve security and operational alerts specific to a single node
       description: Requires `alerts::read` permission.
       responses:
@@ -2887,6 +3068,7 @@ paths:
           type: string
   /v2/audit/flow-logs:
     get:
+      operationId: getFlowLogs
       summary: Retrieve network traffic flow logs with advanced filtering and pagination
       description: Requires `audits::read:flows` permission.
       parameters:
@@ -3021,28 +3203,47 @@ paths:
                 items:
                   description: FlowLog
                   properties:
-                    activityID:
-                      description: Threat Intelligence activity ID
-                      example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
+                    nodeId:
+                      description: ID of the node that logged this flow
                       type: string
-                    destBytes:
-                      description: Destination bytes transferred
+                    sourceNode:
+                      description: Source node name
+                      example: mynode
+                      type: string
+                    sourceIP:
+                      description: Source IP address
+                      example: 2.2.2.2
+                      type: string
+                    sourcePort:
+                      description: Source port
+                      example: 1234
+                      type: number
+                    sourceBytes:
+                      description: Source bytes transferred
                       example: 100
                       type: number
-                    destIP:
-                      description: Destination IP address
-                      example: 1.1.1.1
-                      type: string
                     destNode:
                       description: Destination node name
                       example: mynode
+                      type: string
+                    destIP:
+                      description: Destination IP address
+                      example: 1.1.1.1
                       type: string
                     destPort:
                       description: Destination port
                       example: 1234
                       type: number
+                    destBytes:
+                      description: Destination bytes transferred
+                      example: 100
+                      type: number
+                    startTime:
+                      description: Start time of the flow (ISO 8601)
+                      example: '2022-11-01T22:46:01.765Z'
+                      type: string
                     endTime:
-                      description: Start time of the flow
+                      description: End time of the flow (ISO 8601)
                       example: '2022-11-01T22:46:02.730Z'
                       type: string
                     protocol:
@@ -3054,43 +3255,35 @@ paths:
                         - UNKNOWN
                       example: TCP
                       type: string
-                    sourceBytes:
-                      description: Source bytes transferred
-                      example: 100
-                      type: number
-                    sourceIP:
-                      description: Source IP address
-                      example: 2.2.2.2
-                      type: string
-                    sourceNode:
-                      description: Source node name
-                      example: mynode
-                      type: string
-                    sourcePort:
-                      description: Source port
-                      example: 1234
-                      type: number
-                    startTime:
-                      description: Start time of the flow
-                      example: '2022-11-01T22:46:01.765Z'
-                      type: string
                     tcpFlags:
                       description: |-
-                        TCP Flags encoded in hex:
+                        TCP flags as a decimal string:
                         * 0x01 - FIN
                         * 0x02 - SYN
                         * 0x04 - RST
                         * 0x08 - PSH
                         * 0x10 - ACK
                         * 0x20 - URG
-                      example: '00100001'
+                      example: '2'
                       type: string
+                    flags:
+                      description: Additional flow flags as a decimal string
+                      example: '40019'
+                      type: string
+                    activityID:
+                      description: Threat Intelligence activity ID (if applicable)
+                      example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
+                      type: string
+                    meta:
+                      description: Additional metadata (nullable)
+                      nullable: true
                   type: object
                 type: array
       tags:
         - Audit
   /v2/certificates:
     get:
+      operationId: listCertificates
       summary: Retrieve all TLS certificates and their expiration status
       description: Requires `certificates::read` permission.
       responses:
@@ -3164,6 +3357,7 @@ paths:
         - Certificate
   /v2/cluster/{clusterFQDN}/exec/container:
     get:
+      operationId: listClusterContainers
       summary: Retrieve all edge computing containers running on a cluster
       description: Requires `node-exec::read` permission.
       responses:
@@ -3215,7 +3409,8 @@ paths:
       tags:
         - Compute
     get:
-      summary: Get a container
+      operationId: getClusterContainer
+      summary: Get edge compute container configuration on a cluster
       description: Requires `node-exec::read` permission.
       responses:
         '200':
@@ -3262,6 +3457,7 @@ paths:
         - Compute
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/capability:
     get:
+      operationId: getClusterContainerCapabilities
       summary: Retrieve security capabilities and permissions for a container
       description: Requires `node-exec::read` permission.
       responses:
@@ -3323,6 +3519,7 @@ paths:
         - Compute
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/healthcheck:
     get:
+      operationId: getClusterContainerHealthCheck
       summary: Get container health check
       description: Requires `node-exec::read` permission.
       responses:
@@ -3349,6 +3546,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/interface:
     get:
+      operationId: listClusterContainerInterfaces
       summary: List container interfaces
       description: Requires `node-exec::read` permission.
       responses:
@@ -3377,6 +3575,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/limit:
     get:
+      operationId: listClusterContainerLimits
       summary: List container limits
       description: Requires `node-exec::read` permission.
       responses:
@@ -3403,6 +3602,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/logging:
     get:
+      operationId: getClusterContainerLogging
       summary: Get container logging configuration
       description: Requires `node-exec::read` permission.
       responses:
@@ -3429,6 +3629,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/mount:
     get:
+      operationId: listClusterContainerMounts
       summary: List container mounts
       description: Requires `node-exec::read` permission.
       responses:
@@ -3457,6 +3658,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/port-mapping:
     get:
+      operationId: listClusterContainerPortMappings
       summary: List container port mappings
       description: Requires `node-exec::read` permission.
       responses:
@@ -3485,6 +3687,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/variable:
     get:
+      operationId: listClusterContainerVariables
       summary: List container variables
       description: Requires `node-exec::read` permission.
       responses:
@@ -3513,6 +3716,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/virtual-network:
     get:
+      operationId: listClusterContainerVirtualNetworks
       summary: List container virtual networks
       description: Requires `node-exec::read` permission.
       responses:
@@ -3541,6 +3745,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/volume:
     get:
+      operationId: listClusterContainerVolumes
       summary: List container volumes
       description: Requires `node-exec::read` permission.
       responses:
@@ -3569,6 +3774,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/container/{containerID}/vrf:
     get:
+      operationId: getClusterContainerVrf
       summary: Get container VRF
       description: Requires `node-exec::read` permission.
       responses:
@@ -3595,6 +3801,7 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/exec/volume:
     get:
+      operationId: listClusterVolumes
       summary: List volumes
       description: Requires `node-exec::read` permission.
       responses:
@@ -3660,7 +3867,8 @@ paths:
           type: string
   /v2/cluster/{clusterFQDN}/vpn:
     get:
-      summary: Returns all the VPN networks
+      operationId: listClusterVpnNetworks
+      summary: List all VPN networks attached to a cluster, including IP assignments and routing
       responses:
         '200':
           description: OK
@@ -3702,7 +3910,8 @@ paths:
       tags:
         - Virtual Network
     get:
-      summary: Returns information about a VPN network
+      operationId: getClusterVpnNetwork
+      summary: Get full details of a VPN network on a cluster, including routes, services, interfaces, and DNS
       responses:
         '200':
           description: OK
@@ -3744,6 +3953,7 @@ paths:
       tags:
         - Virtual Network
     get:
+      operationId: getClusterVpnDns
       summary: Get a VPN DNS configuration
       responses:
         '200':
@@ -3794,6 +4004,7 @@ paths:
         - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/export-route:
     get:
+      operationId: listClusterVpnExportRoutes
       summary: Get a VPN's dynamic export routes
       responses:
         '200':
@@ -3868,6 +4079,7 @@ paths:
         - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/import-route:
     get:
+      operationId: listClusterVpnImportRoutes
       summary: Get a VPN's dynamic import routes
       responses:
         '200':
@@ -3942,6 +4154,7 @@ paths:
         - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/interface:
     get:
+      operationId: listClusterVpnInterfaces
       summary: Get a VPN's interfaces
       responses:
         '200':
@@ -4016,6 +4229,7 @@ paths:
         - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/route:
     get:
+      operationId: listClusterVpnRoutes
       summary: Get a VPN's routes
       responses:
         '200':
@@ -4090,6 +4304,7 @@ paths:
         - Virtual Network
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/service:
     get:
+      operationId: listClusterVpnServices
       summary: Get a VPN's services
       responses:
         '200':
@@ -4164,6 +4379,7 @@ paths:
         - Virtual Network
   /v2/domain/{domainName}/network:
     get:
+      operationId: listVirtualNetworks
       summary: List virtual networks
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -4239,6 +4455,7 @@ paths:
           type: string
   /v2/domain/{domainName}/network/{networkName}/access-policy:
     get:
+      operationId: listNetworkAccessPolicies
       summary: List a virtual network's access policies
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -4356,6 +4573,7 @@ paths:
         - Access Policy
   /v2/domain/{domainName}/network/{networkName}/auth-group:
     get:
+      operationId: listNetworkAuthGroups
       summary: List a network's auth groups
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -4419,6 +4637,7 @@ paths:
         - Virtual Network
         - Auth Group
     get:
+      operationId: getNetworkAuthGroup
       summary: List a network auth group's members
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -4561,15 +4780,21 @@ paths:
         - Auth Group
   /v2/domain/{domainName}/network/{networkName}/change:
     get:
-      summary: List staged changes
-      description: Requires `virtual-networks::read` permission.
+      operationId: listNetworkChanges
+      summary: List staged changes awaiting commit
+      description: >-
+        Returns staged (uncommitted) changes to the virtual network. Changes
+        are staged before being committed via the change/commit endpoint.
+        Requires `virtual-networks::read` permission.
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VirtualNetworkInventory'
+                type: array
+                items:
+                  $ref: '#/components/schemas/VirtualNetworkInventory'
       tags:
         - Domain
         - Virtual Network
@@ -4637,6 +4862,7 @@ paths:
         - Change Management
   /v2/domain/{domainName}/network/{networkName}/change/validate:
     get:
+      operationId: validateNetworkChanges
       summary: List validation errors for staged changes
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -4714,6 +4940,7 @@ paths:
           type: string
   /v2/domain/{domainName}/network/{networkName}/dns:
     get:
+      operationId: getNetworkDns
       summary: Get a network's DNS configuration
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -4722,9 +4949,7 @@ paths:
           content:
             application/json:
               schema:
-                items:
-                  $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
-                type: array
+                $ref: '#/components/schemas/VirtualNetworkDNSConfiguration'
       tags:
         - Domain
         - Virtual Network
@@ -4772,6 +4997,7 @@ paths:
         - DNS
   /v2/domain/{domainName}/network/{networkName}/dns-zone:
     get:
+      operationId: listNetworkDnsZones
       summary: List a network's DNS zones
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -4878,6 +5104,7 @@ paths:
         - DNS Zone
   /v2/domain/{domainName}/network/{networkName}/dns-zone/{zoneName}/dns-record:
     get:
+      operationId: listNetworkDnsRecords
       summary: List a network zone's DNS records
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -5002,6 +5229,7 @@ paths:
         - DNS Record
   /v2/domain/{domainName}/network/{networkName}/network-group:
     get:
+      operationId: listNetworkGroups
       summary: List a network's groups
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -5065,6 +5293,7 @@ paths:
         - Virtual Network
         - Network Group
     get:
+      operationId: getNetworkGroup
       summary: List a network's group memberships
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -5172,6 +5401,7 @@ paths:
         - Network Group
   /v2/domain/{domainName}/network/{networkName}/network-object:
     get:
+      operationId: listNetworkObjects
       summary: List a network's objects
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -5278,6 +5508,7 @@ paths:
         - Network Object
   /v2/domain/{domainName}/network/{networkName}/port-forwarding:
     get:
+      operationId: listNetworkPortForwardings
       summary: List a network's port forwardings
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -5388,6 +5619,7 @@ paths:
         - Port Forwarding
   /v2/domain/{domainName}/network/{networkName}/route:
     get:
+      operationId: listNetworkRoutes
       summary: List a network's routes
       description: Requires `virtual-networks::read` permission.
       responses:
@@ -5497,8 +5729,17 @@ paths:
 
   /v2/event:
     get:
-      summary: Get all events by time range
-      description: Requires `events::read` permission.
+      operationId: listEvents
+      summary: List audit events across the organization filtered by time range and type
+      description: |-
+        Returns a paginated list of audit events (node connects/disconnects,
+        config changes, certificate warnings, order updates, etc.) within a
+        time window. Supports filtering by node, event type, level, and item
+        type. Use `sTime`/`eTime` for the time range (ISO 8601).
+
+        ---
+
+        Requires `events::read` permission.
       parameters:
         - description: ISO 8601 datetime string for the start of the range (e.g. `2025-01-01T05:00:00.000Z`)
           in: query
@@ -5595,6 +5836,7 @@ paths:
         - Alarms
   /v2/event/{nodeId}:
     get:
+      operationId: listNodeEvents
       summary: Get all events by time range for a Node
       description: Requires `events::read` permission.
       parameters:
@@ -5694,6 +5936,7 @@ paths:
         - Alarms
   /v2/idp:
     get:
+      operationId: listIdps
       summary: Retrieve all configured identity providers for user authentication
       responses:
         '200':
@@ -5796,6 +6039,7 @@ paths:
       tags:
         - IDP
     get:
+      operationId: getIdp
       summary: Retrieve configuration details for a specific identity provider
       responses:
         '200':
@@ -5939,6 +6183,7 @@ paths:
         - Appliance
   /v2/node/{nodeID}/data-store/list:
     get:
+      operationId: listNodeDataStoreContents
       summary: List the data store contents
       description: Requires `nodes::service:datastore-manager` permission.
       responses:
@@ -6058,6 +6303,7 @@ paths:
         - Appliance
   /v2/node/{nodeID}/data-store/tasks:
     get:
+      operationId: listNodeDataStoreTasks
       summary: List recent data store activity
       description: Requires `nodes::service:datastore-manager` permission.
       responses:
@@ -6084,6 +6330,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container:
     get:
+      operationId: listNodeContainers
       summary: List containers
       description: Requires `node-exec::read` permission.
       responses:
@@ -6135,7 +6382,8 @@ paths:
       tags:
         - Compute
     get:
-      summary: Get a container
+      operationId: getNodeContainer
+      summary: Get edge compute container configuration on a node
       description: Requires `node-exec::read` permission.
       responses:
         '200':
@@ -6182,6 +6430,7 @@ paths:
         - Compute
   /v2/node/{nodeID}/exec/container/{containerID}/capability:
     get:
+      operationId: getNodeContainerCapabilities
       summary: Get container capabilities
       description: Requires `node-exec::read` permission.
       responses:
@@ -6243,6 +6492,7 @@ paths:
         - Compute
   /v2/node/{nodeID}/exec/container/{containerID}/healthcheck:
     get:
+      operationId: getNodeContainerHealthCheck
       summary: Get container health check
       description: Requires `node-exec::read` permission.
       responses:
@@ -6269,6 +6519,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/interface:
     get:
+      operationId: listNodeContainerInterfaces
       summary: List container interfaces
       description: Requires `node-exec::read` permission.
       responses:
@@ -6297,6 +6548,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/limit:
     get:
+      operationId: listNodeContainerLimits
       summary: List container limits
       description: Requires `node-exec::read` permission.
       responses:
@@ -6323,6 +6575,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/logging:
     get:
+      operationId: getNodeContainerLogging
       summary: Get container logging configuration
       description: Requires `node-exec::read` permission.
       responses:
@@ -6349,6 +6602,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/mount:
     get:
+      operationId: listNodeContainerMounts
       summary: List container mounts
       description: Requires `node-exec::read` permission.
       responses:
@@ -6377,6 +6631,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/port-mapping:
     get:
+      operationId: listNodeContainerPortMappings
       summary: List container port mappings
       description: Requires `node-exec::read` permission.
       responses:
@@ -6405,6 +6660,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/variable:
     get:
+      operationId: listNodeContainerVariables
       summary: List container variables
       description: Requires `node-exec::read` permission.
       responses:
@@ -6433,6 +6689,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/virtual-network:
     get:
+      operationId: listNodeContainerVirtualNetworks
       summary: List container virtual networks
       description: Requires `node-exec::read` permission.
       responses:
@@ -6461,6 +6718,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/volume:
     get:
+      operationId: listNodeContainerVolumes
       summary: List container volumes
       description: Requires `node-exec::read` permission.
       responses:
@@ -6489,6 +6747,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/container/{containerID}/vrf:
     get:
+      operationId: getNodeContainerVrf
       summary: Get container VRF
       description: Requires `node-exec::read` permission.
       responses:
@@ -6515,6 +6774,7 @@ paths:
           type: string
   /v2/node/{nodeID}/exec/volume:
     get:
+      operationId: listNodeVolumes
       summary: List volumes
       description: Requires `node-exec::read` permission.
       responses:
@@ -6580,74 +6840,87 @@ paths:
           type: string
   /v2/node/{nodeID}/plugin-logs/gateway-details:
     get:
-      summary: |
-        Get gateway connection telemetry logs for a node (appliance)
-      description: |
-        schema:
-          items:
-            properties:
-              stats:
-                items:
-                  properties:
-                    hops:
-                      description: Network hop telemetry, if available
-                      items:
-                        properties:
-                          fqdn:
-                            type: string
-                          hop:
-                            type: number
-                          ip:
-                            type: string
-                          maxRtt:
-                            type: number
-                          meanRtt:
-                            type: number
-                          minRtt:
-                            type: number
-                          numRtt:
-                            type: number
-                        type: object
-                      type: array
-                    maxRtt:
-                      description: Max round-trip time measured for this interval
-                      type: number
-                    meanRtt:
-                      description: Mean round-trip time measured for this interval
-                      type: number
-                    minRtt:
-                      description: Min round-trip time measured for this interval
-                      type: number
-                    node:
-                      description: Node RTT being measured
-                      type: string
-                    numRtt:
-                      description: Number of RTTs measured for this interval
-                      type: number
-                    stdRtt:
-                      description: Standard deviation of RTTs measured for this interval
-                      type: number
-                    time:
-                      description: Unix timestamp, in milliseconds, of the start of the interval
-                      type: number
-                  type: object
-                type: array
-            type: object
-          type: array
+      operationId: getNodeGatewayDetails
+      summary: Get per-minute gateway RTT telemetry for a node's VPN peer connections
+      description: |-
+        Returns time-series RTT (round-trip time) statistics for each VPN peer
+        the node is connected to. Each element covers one minute bucket.
+        Results are only available for online appliance nodes.
+
+        ---
+
+        Requires `nodes::read` permission.
       tags:
         - Appliance
       responses:
-        default:
-          description: Default response
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    stats:
+                      description: Per-peer RTT measurements for this time bucket
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          time:
+                            description: Unix timestamp (milliseconds) of the start of the 1-minute interval
+                            type: number
+                          node:
+                            description: Friendly name of the VPN peer node being measured
+                            type: string
+                          numRtt:
+                            description: Number of RTT probes sent in this interval
+                            type: number
+                          minRtt:
+                            description: Minimum round-trip time in milliseconds
+                            type: number
+                          maxRtt:
+                            description: Maximum round-trip time in milliseconds
+                            type: number
+                          meanRtt:
+                            description: Mean round-trip time in milliseconds
+                            type: number
+                          stdRtt:
+                            description: Standard deviation of RTT in milliseconds
+                            type: number
+                          hops:
+                            description: Per-hop traceroute telemetry, if available
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                hop:
+                                  description: Hop number (1-based)
+                                  type: number
+                                ip:
+                                  description: IP address of this hop
+                                  type: string
+                                fqdn:
+                                  description: Reverse DNS name of this hop, if resolved
+                                  type: string
+                                minRtt:
+                                  type: number
+                                maxRtt:
+                                  type: number
+                                meanRtt:
+                                  type: number
+                                numRtt:
+                                  type: number
     parameters:
       - $ref: '#/components/parameters/nodeID'
-      - description: Unix timestamp
+      - description: Start of the time range as a Unix timestamp (seconds)
         in: query
         name: startDate
         required: true
         schema:
           type: number
-      - description: Unix timestamp
+      - description: End of the time range as a Unix timestamp (seconds)
         in: query
         name: endDate
         required: true
@@ -6655,7 +6928,8 @@ paths:
           type: number
   /v2/node/{nodeID}/vpn:
     get:
-      summary: Returns all the VPN networks
+      operationId: listNodeVpnNetworks
+      summary: List all VPN networks attached to a node, including IP assignments and routing
       responses:
         '200':
           description: OK
@@ -6698,7 +6972,8 @@ paths:
       tags:
         - Virtual Network
     get:
-      summary: Get a VPN network
+      operationId: getNodeVpnNetwork
+      summary: Get full details of a VPN network on a node, including routes, services, interfaces, DNS, and WireGuard config
       responses:
         '200':
           description: OK
@@ -6740,6 +7015,7 @@ paths:
       tags:
         - Virtual Network
     get:
+      operationId: getNodeVpnDns
       summary: Get a VPN's DNS configuration
       responses:
         '200':
@@ -6790,6 +7066,7 @@ paths:
         - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/export-route:
     get:
+      operationId: listNodeVpnExportRoutes
       summary: Get a VPN's dynamic export routes
       responses:
         '200':
@@ -6864,6 +7141,7 @@ paths:
         - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/import-route:
     get:
+      operationId: listNodeVpnImportRoutes
       summary: Get a VPN's dynamic import routes
       responses:
         '200':
@@ -6938,6 +7216,7 @@ paths:
         - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/interface:
     get:
+      operationId: listNodeVpnInterfaces
       summary: Get a VPN's interfaces
       responses:
         '200':
@@ -7012,6 +7291,7 @@ paths:
         - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/route:
     get:
+      operationId: listNodeVpnRoutes
       summary: Get a VPN's routes
       responses:
         '200':
@@ -7086,6 +7366,7 @@ paths:
         - Virtual Network
   /v2/node/{nodeID}/vpn/{networkName}/service:
     get:
+      operationId: listNodeVpnServices
       summary: Get a VPN's services
       description: Requires `node-vpn::read` permission.
       responses:
@@ -7195,6 +7476,7 @@ paths:
         - Agent
   /v2/policy:
     get:
+      operationId: listPolicies
       summary: Retrieve all access control policies and their permission rules
       description: Requires `permissions::read` permission.
       responses:
@@ -7241,6 +7523,7 @@ paths:
       tags:
         - Permissions
     get:
+      operationId: getPolicy
       summary: Retrieve detailed configuration of a specific access control policy
       description: Requires `permissions::read` permission.
       responses:
@@ -7333,6 +7616,7 @@ paths:
           type: string
   /v2/service-user/{name}:
     get:
+      operationId: getServiceUser
       summary: Retrieve configuration details for a specific service account
       parameters:
         - name: name
@@ -7345,7 +7629,7 @@ paths:
         '200':
           description: A service user
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/ServiceUser'
         '404':
@@ -7366,7 +7650,7 @@ paths:
         '200':
           description: API credentials
           content:
-            '*/*':
+            application/json:
               schema:
                 type: object
                 properties:
@@ -7380,12 +7664,13 @@ paths:
         - ServiceUser
   /v2/service-user:
     get:
+      operationId: listServiceUsers
       summary: Retrieve all API-only service accounts configured for the organization
       responses:
         '200':
           description: A list of service users
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:
@@ -7411,7 +7696,7 @@ paths:
         '201':
           description: Service user created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/ServiceUser'
         '400':
@@ -7421,13 +7706,14 @@ paths:
 
   /v2/observability-exporter:
     get:
+      operationId: listObservabilityExporters
       summary: Retrieve all configured telemetry data exporters for external monitoring systems
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       responses:
         '200':
           description: A list of observability exporters
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:
@@ -7464,6 +7750,7 @@ paths:
         - ObservabilityExporter
   /v2/observability-exporter/{id}:
     get:
+      operationId: getObservabilityExporter
       summary: Retrieve configuration details for a specific telemetry data exporter
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
@@ -7477,7 +7764,7 @@ paths:
         '200':
           description: An observability exporter
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityExporter'
         '404':
@@ -7531,6 +7818,7 @@ paths:
         - ObservabilityExporter
   /v2/observability-exporter/splunk/{id}:
     get:
+      operationId: getSplunkObservabilityExporter
       summary: Retrieve Splunk-specific configuration for a telemetry data exporter
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
@@ -7544,7 +7832,7 @@ paths:
         '200':
           description: An observability exporter
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/SplunkExporter'
         '404':
@@ -7585,6 +7873,7 @@ paths:
         - SplunkExporter
   /v2/observability-exporter/http/{id}:
     get:
+      operationId: getHttpObservabilityExporter
       summary: Retrieve HTTP-specific configuration for a telemetry data exporter
       description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
@@ -7598,7 +7887,7 @@ paths:
         '200':
           description: An observability exporter
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/HTTPExporter'
         '404':
@@ -8447,90 +8736,131 @@ components:
   securitySchemes:
     JWTAuthorizer:
       description: >-
-        An API key, as documented
-        https://docs.trustgrid.io/docs/user-management/api-access/
-      in: header
-      name: Authorization
-      type: apiKey
+        JWT Bearer token. Send as `Authorization: Bearer <token>`.
+        Obtain via the Trustgrid portal or service user credentials.
+        See https://docs.trustgrid.io/docs/user-management/api-access/
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     AlarmChannelModel:
+      description: >-
+        A notification channel used to deliver alarm alerts. Exactly one of
+        the channel-type fields should be populated to indicate the delivery method.
       properties:
-        emails:
-          type: string
-        genericWebhook:
-          type: string
-        msTeams:
-          type: string
         name:
-          type: string
-        opsGenie:
-          type: string
-        pagerduty:
-          type: string
-        slackChannel:
-          type: string
-        slackWebhook:
+          description: Human-readable name for the channel
           type: string
         uid:
+          description: Unique identifier for this channel
+          type: string
+        orgId:
+          description: Organization ID that owns this channel
+          type: string
+        internal:
+          description: Whether this channel is managed by Trustgrid (read-only)
+          type: boolean
+        emails:
+          description: Comma-separated email addresses for email delivery
+          type: string
+        slackWebhook:
+          description: Slack incoming webhook URL
+          type: string
+        slackChannel:
+          description: Slack channel name (requires Slack integration)
+          type: string
+        pagerduty:
+          description: PagerDuty integration key
+          type: string
+        opsGenie:
+          description: OpsGenie API key
+          type: string
+        msTeams:
+          description: Microsoft Teams webhook URL
+          type: string
+        genericWebhook:
+          description: Generic HTTPS webhook URL for custom integrations
           type: string
       required:
         - name
       title: AlarmChannel
       type: object
     AlarmModel:
+      description: >-
+        An alarm filter that watches for matching events and delivers alerts
+        to configured channels. Criteria fields are combined using `operator`.
       properties:
+        uid:
+          description: Unique identifier for this alarm filter
+          type: string
+        name:
+          description: Human-readable name for the alarm filter
+          type: string
+        description:
+          description: Optional description of the alarm's purpose
+          type: string
+        enabled:
+          description: Whether this alarm filter is active
+          type: boolean
+        internal:
+          description: Whether this alarm is managed by Trustgrid (read-only)
+          type: boolean
+        orgId:
+          description: Organization ID that owns this alarm
+          type: string
         channels:
-          description: Channel IDs to broadcast alerts to
+          description: UIDs of AlarmChannels to notify when this alarm triggers
           items:
             type: string
           type: array
-        description:
-          type: string
-        freetext:
-          description: text to match
-          type: string
-        name:
-          type: string
+        types:
+          description: >-
+            Event types to match (e.g., "Node Connect", "Node Disconnect",
+            "Network Error"). An empty list matches all types.
+          items:
+            type: string
+          type: array
         nodes:
-          description: Node names to match
+          description: Node names to scope this alarm to. Empty matches all nodes.
+          items:
+            type: string
+          type: array
+        tags:
+          description: >-
+            Tag filters expressed as `key=value` strings. Nodes must match
+            these tags (combined per `operator`) to trigger this alarm.
           items:
             type: string
           type: array
         operator:
-          description: Logical operator for criteria matching
+          description: >-
+            How multiple criteria (nodes, tags, types) are combined.
+            `all` = all criteria must match; `any` = at least one must match;
+            `none` = no criteria should match.
           enum:
             - any
             - all
             - none
           type: string
-        tags:
-          description: Tags expressed as key=value to match
-          items:
-            type: string
-          type: array
         tagsOperator:
-          description: How tag criteria should match
+          description: How multiple tag criteria are combined
           enum:
             - any
             - all
           type: string
         threshold:
-          description: Event threshold to match
+          description: Minimum event severity level to trigger this alarm
           enum:
             - INFO
             - WARNING
             - ERROR
             - CRITICAL
           type: string
-        expr:
-          description: CEL expression to match
+        freetext:
+          description: Free-text string that must appear in the event message
           type: string
-        types:
-          description: Event types to match
-          items:
-            type: string
-          type: array
-        uid:
+        expr:
+          description: CEL (Common Expression Language) expression for advanced matching
           type: string
       required:
         - name
@@ -8610,17 +8940,24 @@ components:
       title: Alert V2
       type: object
     Certificate:
-      description: Certificate
+      description: TLS certificate managed by the Trustgrid platform
       properties:
         expiresAt:
-          description: Unix timestamp when certificate expires
+          description: Unix timestamp (seconds) when the certificate expires
           type: number
         fqdn:
-          description: FQDN of certificate
+          description: Fully qualified domain name the certificate covers
           example: mynode.trustgrid.io
           type: string
+        orgId:
+          description: Organization ID that owns this certificate
+          example: aad89024-5927-4ebd-97e2-3cc605c1da5f
+          type: string
         warning:
-          description: Warning message
+          description: >-
+            Warning status for the certificate. `none` means healthy;
+            other values indicate expiration proximity or issues.
+          example: none
           type: string
       title: Certificate
       type: object
@@ -8665,6 +9002,34 @@ components:
           type: string
         name:
           description: Cluster name
+          type: string
+        org:
+          description: Organization ID (UUID) that owns this cluster
+          type: string
+        tags:
+          description: User-defined tags for organizing and filtering clusters
+          type: object
+          additionalProperties:
+            type: string
+        tgTags:
+          description: System-managed tags assigned by the Trustgrid platform (read-only)
+          type: object
+          additionalProperties:
+            type: string
+        tgrn:
+          description: "Trustgrid Resource Name for this cluster. Format: `tgrn:tg::nodes:cluster/{fqdn}`"
+          example: tgrn:tg::nodes:cluster/mycluster.myorg.trustgrid.io
+          type: string
+        created_at:
+          description: Unix timestamp (seconds) when the cluster was created
+          type: integer
+        lifecycleState:
+          description: Operational lifecycle state of the cluster
+          enum:
+            - pre-production
+            - production
+            - maintenance
+            - decommissioned
           type: string
       title: ClusterModel
       type: object
@@ -8870,6 +9235,15 @@ components:
             starting the container.  This will override the USER specified in
             the image
           type: string
+        nodeUid:
+          description: UUID of the node this container is configured on
+          type: string
+        namespace:
+          description: Container namespace, typically "exec"
+          type: string
+        saveOutput:
+          description: Whether to persist stdout/stderr from on-demand container runs
+          type: boolean
       title: Container
       type: object
     ContainerCapabilities:
@@ -9216,14 +9590,24 @@ components:
     VirtualNetworkAccessPolicy:
       description: Virtual Network Access Policy
       properties:
-        description:
+        uid:
+          description: Unique identifier (UUID)
+          type: string
+        action:
+          description: Whether traffic matching this policy is allowed or denied
+          type: string
+          enum:
+            - allow
+            - deny
+        source:
+          description: Source CIDR
           type: string
         dest:
+          description: Destination CIDR
           type: string
         notDest:
+          description: Invert the destination match
           type: boolean
-        ports:
-          type: string
         protocol:
           description: Protocol
           enum:
@@ -9232,9 +9616,26 @@ components:
             - udp
             - icmp
           type: string
-        source:
+        ports:
+          description: Port or port range (empty string means all ports)
           type: string
-        uid:
+        description:
+          type: string
+        lineNumber:
+          description: Display order position of this policy rule
+          type: integer
+        networkName:
+          description: Virtual network this policy belongs to
+          type: string
+        domainName:
+          description: Domain this policy belongs to
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        type:
+          description: Object type discriminator
+          example: AccessPolicy
           type: string
       required:
         - protocol
@@ -9268,11 +9669,27 @@ components:
       title: Virtual Network Authorization Group Membership
       type: object
     VirtualNetworkDNSConfiguration:
-      description: Virtual Network DNS Configuration
+      description: DNS configuration for a virtual network
       properties:
         enabled:
+          description: Whether DNS is enabled for the network
           type: boolean
         server:
+          description: IP address of the DNS server
+          example: "1.1.1.13"
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        networkName:
+          description: Virtual network name this config belongs to
+          type: string
+        domainName:
+          description: Domain name this config belongs to
+          type: string
+        type:
+          description: Object type discriminator
+          example: DNSConfig
           type: string
       title: Virtual Network DNS Configuration
       type: object
@@ -9292,30 +9709,73 @@ components:
     VirtualNetworkDNSZone:
       description: Virtual Network DNS Zone
       properties:
+        name:
+          description: DNS zone name (e.g. "test.com")
+          type: string
         description:
           type: string
-        name:
-          type: string
         resolver:
+          description: Custom resolver IP (if set)
+          type: string
+        networkName:
+          description: Virtual network this zone belongs to
+          type: string
+        domainName:
+          description: Domain this zone belongs to
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        type:
+          description: Object type discriminator
+          example: DNSZone
           type: string
       title: Virtual Network DNS Zone
       type: object
     VirtualNetworkGroup:
       description: Virtual Network Group
       properties:
+        name:
+          description: Group name
+          type: string
         description:
           type: string
-        name:
-          description: Name
+        networkName:
+          description: Virtual network this group belongs to
+          type: string
+        domainName:
+          description: Domain this group belongs to
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        type:
+          description: Object type discriminator
+          example: NetworkGroup
           type: string
       title: Virtual Network Group
       type: object
     VirtualNetworkGroupMembership:
-      description: Virtual Network Group Membership
+      description: Membership of a network object in a network group
       properties:
         groupName:
+          description: Name of the group this membership belongs to
           type: string
         objectName:
+          description: Name of the network object that is a member
+          type: string
+        networkName:
+          description: Virtual network this membership belongs to
+          type: string
+        domainName:
+          description: Domain this membership belongs to
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        type:
+          description: Object type discriminator
+          example: NetworkGroupMembership
           type: string
       title: Virtual Network Group Membership
       type: object
@@ -9357,13 +9817,29 @@ components:
       title: Virtual Network Inventory
       type: object
     VirtualNetworkObject:
-      description: Virtual Network Object
+      description: Virtual Network Object (named CIDR for use in access policies)
       properties:
+        name:
+          description: Object name
+          type: string
         cidr:
+          description: CIDR this object represents
+          example: 1.2.3.0/24
           type: string
         description:
           type: string
-        name:
+        networkName:
+          description: Virtual network this object belongs to
+          type: string
+        domainName:
+          description: Domain this object belongs to
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        type:
+          description: Object type discriminator
+          example: NetworkObject
           type: string
       title: Virtual Network Object
       type: object
@@ -9432,13 +9908,13 @@ components:
           example: "Node Disconnected"
           type: string
         timestamp:
-          description: Time when event got generated
-          example: "2025-09-07T19:17:41Z"
-          type: string
+          description: Unix epoch timestamp (seconds) when the event was generated
+          example: 1775196846
+          type: integer
         receivedTime:
-          description: Time when the control plane received the event
-          example: "2025-09-07T19:17:41Z"
-          type: string
+          description: Unix epoch timestamp (seconds) when the control plane received the event
+          example: 1775196846
+          type: integer
         subject:
           description: Event item type
           example: Node
@@ -9482,13 +9958,11 @@ components:
           example: "32Nt3pyfAJisyUADctXZW6bcwJD"
           type: string
         details:
-          description: Metadata associated to the event (if applicable)
-          example:
-            key: "value"
-            key2: "value2"
+          description: >-
+            Metadata associated to the event. Shape varies by `eventType`.
+            Values may be strings, numbers, or nested objects.
           type: object
-          additionalProperties:
-            type: string
+          additionalProperties: {}
         state:
           description: Event state (if applicable)
           example: EXCEEDED
@@ -9498,14 +9972,30 @@ components:
             - CLEARED
             - UNKNOWN
     Group:
+      description: User group for organizing access permissions
       properties:
-        description:
+        uid:
+          description: Group unique identifier (UUID)
           type: string
         name:
+          description: Group display name
+          type: string
+        description:
           type: string
         referenceId:
+          description: Internal reference identifier (e.g. "idp-name group-name")
           type: string
-        uid:
+        orgId:
+          description: Organization ID
+          type: string
+        policyIds:
+          description: >-
+            Named policies assigned to this group. May be an object map
+            or an array of policy ID strings depending on context.
+          additionalProperties: {}
+        type:
+          description: Object type discriminator
+          example: Group
           type: string
       type: object
     GroupMember:
@@ -9602,8 +10092,28 @@ components:
           description: True when the node is connected to the control plane
           type: boolean
         shadow:
-          description: Node shadow
+          description: >-
+            AWS IoT Device Shadow — the node's desired and reported state store.
+            `reported` is a flat key-value map updated by the node itself;
+            `desired` holds pending configuration the node has not yet acknowledged
+            (usually empty). Most fields in `reported` use dot-notation keys.
+            Common `reported` keys: `node-core.version` (software version),
+            `memory` (RAM in MB), `storage` (disk free in GB), `cores` (CPU count),
+            `dnsResolution` ("healthy"/"unhealthy"), `repoConnectivity` ("true"/"false"),
+            `os.distro.id` (e.g., "ubuntu"), `ssh.local` ("true"/"false"),
+            `profile.name`, `node.upgrade.state`, `features` (object of enabled
+            feature flags), `nic.{name}.mac/mtu/speed/dhcp` (NIC telemetry).
           type: object
+          properties:
+            desired:
+              description: Pending configuration changes the node has not yet applied. Typically empty.
+              type: object
+            reported:
+              description: >-
+                Live telemetry reported by the node. Keys use dot-notation
+                (e.g., `nic.eth0.mtu`). Values may be strings, numbers, or objects.
+              type: object
+              additionalProperties: {}
         state:
           description: Node state
           enum:
@@ -9617,11 +10127,91 @@ components:
           description: Device type
           enum:
             - Agent
-            - Appliance
+            - Node
           type: string
         uid:
           description: Node ID
           example: 19084f81-5668-41ee-adbe-295e4c65531a
+          type: string
+        fqdn:
+          description: Fully qualified domain name, e.g., `mynode.myorg.trustgrid.io`. Omitted when projection[] is used without this field.
+          example: mynode.myorg.trustgrid.io
+          type: string
+        lastip:
+          description: Last IP address observed when the node connected. Omitted when projection[] is used without this field.
+          example: 203.0.113.42
+          type: string
+        last_connect:
+          description: Unix timestamp in milliseconds of the most recent control plane connection. Omitted when projection[] is used without this field.
+          type: integer
+        org:
+          description: Organization ID (UUID) that owns this node. Returned only by GET /node/{nodeID}.
+          example: aad89024-5927-4ebd-97e2-3cc605c1da5f
+          type: string
+        domain:
+          description: Domain FQDN this node belongs to. Returned only by GET /node/{nodeID}.
+          example: myorg.trustgrid.io
+          type: string
+        tgTags:
+          description: System-managed tags assigned by the Trustgrid platform. Read-only; always returned in list and single-node responses.
+          type: object
+          additionalProperties:
+            type: string
+        keys:
+          description: Named cryptographic public keys used for node authentication and WireGuard tunneling. Always returned but rarely needed directly.
+          type: object
+        tgrn:
+          description: "Trustgrid Resource Name \u2014 a globally unique identifier for this node across the platform. Format: `tgrn:tg::nodes:node/{uid}`. Always returned."
+          example: tgrn:tg::nodes:node/19084f81-5668-41ee-adbe-295e4c65531a
+          type: string
+        created_at:
+          description: Unix timestamp (seconds) when the node was registered. Omitted when projection[] is used without this field.
+          type: integer
+        device:
+          description: Hardware device information detected from the physical or virtual appliance. Omitted when projection[] is used without this field.
+          type: object
+          properties:
+            mac:
+              description: MAC address of the primary network interface
+              type: string
+            model:
+              description: Hardware model identifier (e.g., `esx`, `kvm`)
+              type: string
+            vendor:
+              description: Hardware vendor name (e.g., `vmware`)
+              type: string
+        location:
+          description: IP geolocation derived from the node's last observed IP address. Omitted when projection[] is used without this field.
+          type: object
+        heartbeat:
+          description: Most recent heartbeat received from the node's control plane connection. Omitted when projection[] is used without this field.
+          type: object
+          properties:
+            nodeId:
+              type: string
+            orgId:
+              type: string
+            gatekeeper:
+              description: ARN of the AWS ECS task handling this node's connection
+              type: string
+            timestamp:
+              description: Unix timestamp of the heartbeat
+              type: integer
+            source:
+              type: string
+        lifecycleState:
+          description: Operational lifecycle state of the node. Omitted when projection[] is used without this field.
+          enum:
+            - pre-production
+            - production
+            - maintenance
+            - decommissioned
+          type: string
+        disconnectTime:
+          description: Unix timestamp (seconds) when the node last disconnected from the control plane. Omitted when projection[] is used without this field.
+          type: integer
+        orderID:
+          description: UUID of the hardware provisioning order associated with this node. Omitted when projection[] is used without this field.
           type: string
       title: Node
       type: object
@@ -9818,26 +10408,90 @@ components:
       type: object
     OrgModel:
       properties:
-        domain:
-          description: Org root domain
+        uid:
+          description: Organization ID (UUID)
           type: string
         name:
-          description: Org name
+          description: Organization display name
+          type: string
+        domain:
+          description: Root domain for this organization (e.g. "myorg.trustgrid.io")
+          type: string
+        idp_provider:
+          description: Identity provider used for authentication (e.g. "trustgrid" for built-in)
+          type: string
+        aws_account_id:
+          description: AWS account ID associated with the organization
+          type: string
+        supportable:
+          description: Whether Trustgrid support can access this org
+          type: boolean
+        allowed_ips:
+          description: IP allowlist for portal access (empty = unrestricted)
+          type: array
+          items:
+            type: string
+        emergencyDestination:
+          description: Emergency contact email
+          type: string
+        licenses:
+          description: License counts for node types
+          type: object
+          properties:
+            appliances:
+              type: integer
+            agents:
+              type: integer
+        technicalContact:
+          description: Technical contact for the organization
+          type: object
+          properties:
+            name:
+              type: string
+              nullable: true
+            phone:
+              type: string
+              nullable: true
+            email:
+              type: string
+              nullable: true
+        billingContact:
+          description: Billing contact for the organization
+          type: object
+          properties:
+            name:
+              type: string
+              nullable: true
+            phone:
+              type: string
+              nullable: true
+            email:
+              type: string
+              nullable: true
+        businessContact:
+          description: Business contact for the organization
+          type: object
+          properties:
+            name:
+              type: string
+              nullable: true
+            phone:
+              type: string
+              nullable: true
+            email:
+              type: string
+              nullable: true
+        s3_bucket:
+          description: S3 bucket for log exports (if configured)
           type: string
         s3_access_key:
-          description: S3 access key for log exports
-          type: string
-        s3_bucket:
-          description: S3 bucket for log exports
+          description: S3 access key for log exports (if configured)
           type: string
         s3_prefix:
-          description: S3 key prefix for log exports
+          description: S3 key prefix for log exports (if configured)
           type: string
         s3_region:
-          description: S3 region for log exports
-          type: string
-        uid:
-          description: Org ID
+          description: S3 region for log exports (if configured)
           type: string
       required:
         - name
@@ -9920,17 +10574,35 @@ components:
       title: Policy
       type: object
     PortForwarding:
-      description: Port Forwarding
+      description: Port Forwarding rule — maps a virtual network service to a node IP and port
       properties:
-        ip:
+        uid:
+          description: Unique identifier (UUID)
+          type: string
+        serviceName:
+          description: Name of the service being forwarded
           type: string
         nodeName:
+          description: Name of the node receiving forwarded traffic
+          type: string
+        ip:
+          description: Node IP address traffic is forwarded to
           type: string
         port:
-          type: number
-        serviceName:
+          description: Port number traffic is forwarded to
+          type: integer
+        networkName:
+          description: Virtual network this rule belongs to
           type: string
-        uid:
+        domainName:
+          description: Domain this rule belongs to
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        type:
+          description: Object type discriminator
+          example: PortForward
           type: string
       title: Port Forwarding
       type: object
@@ -10212,19 +10884,34 @@ components:
     UserModel:
       properties:
         email:
-          description: User's email
+          description: User's email address (also used as login)
           type: string
-        policyIds:
-          items:
-            description: User's policy IDs
-            type: string
-          type: array
         status:
-          description: User's status
+          description: Whether the user account is active
           enum:
             - active
             - inactive
           type: string
+        policyIds:
+          description: IDs of named policies assigned to this user
+          items:
+            type: string
+          type: array
+        policy:
+          description: >-
+            Inline permission policy map. Keys are resource types (e.g.
+            "virtual-networks"), values are scope → action → boolean maps.
+            Present when the user has inline permissions in addition to named policies.
+          type: object
+          additionalProperties: {}
+        permissions:
+          description: Resolved effective permissions (may be empty object if using policyIds)
+          type: object
+          additionalProperties: {}
+        landingPage:
+          description: Custom landing page path after login (null = default)
+          type: string
+          nullable: true
       title: UserModel
       type: object
     ValidationFailed:
@@ -10237,14 +10924,33 @@ components:
     VirtualNetwork:
       description: Virtual Network
       properties:
-        description:
-          type: string
+        id:
+          description: Internal numeric ID
+          type: integer
         name:
           description: Name of virtual network
+          type: string
+        description:
           type: string
         networkCidr:
           description: Virtual network CIDR
           example: 10.10.14.0/24
+          type: string
+        orgId:
+          description: Organization ID
+          type: string
+        uid:
+          description: Unique identifier (UUID)
+          type: string
+        domainName:
+          description: Domain this network belongs to
+          type: string
+        noNat:
+          description: Whether NAT is disabled for this network
+          type: boolean
+        type:
+          description: Object type discriminator
+          example: DomainNetwork
           type: string
       title: Virtual Network
       type: object
@@ -10339,10 +11045,22 @@ components:
     VpnDnsUpdateModel:
       properties:
         enabled:
+          description: Whether DNS forwarding is enabled on this VPN network
           type: boolean
         upstream:
+          description: Upstream DNS servers to forward queries to
           items:
-            type: string
+            type: object
+            properties:
+              ip:
+                description: IP address of the upstream DNS server
+                type: string
+              port:
+                description: Port of the upstream DNS server (default 53)
+                type: string
+              description:
+                description: Human-readable label for this upstream server
+                type: string
           type: array
       type: object
     VpnInterfaceUpdateModel:
@@ -10365,16 +11083,26 @@ components:
         outDefaultRoute:
           type: boolean
         outsideNats:
+          description: >-
+            NAT rules for traffic leaving the VPN network (outbound). Maps
+            VPN-side CIDRs to local node CIDRs.
           items:
             properties:
               description:
                 type: string
               localCidr:
+                description: Local node CIDR to map to
                 type: string
               networkCidr:
+                description: VPN-side CIDR to translate
                 type: string
               networkGroup:
                 type: string
+              proxyArp:
+                description: >-
+                  When true, the node responds to ARP requests for the
+                  networkCidr on behalf of local hosts
+                type: boolean
             type: object
           type: array
       type: object
@@ -10406,39 +11134,80 @@ components:
               type: string
           type: object
     VpnNodeNetworkInventoryModel:
+      description: >-
+        Full details of a VPN network attached to a node, including all
+        routes, services, interfaces, DNS, and WireGuard configuration.
       properties:
+        networkName:
+          description: Name of the VPN network
+          type: string
+        ip:
+          description: IP address assigned to this node within the VPN network
+          example: 172.16.101.201
+          type: string
+        route:
+          description: CIDR of the VPN network's address space
+          example: 172.16.101.0/24
+          type: string
         dns:
           $ref: '#/components/schemas/VpnNodeDnsModel'
         exportRoutes:
+          description: Dynamic export routes advertised by this node into the VPN
           items:
             $ref: '#/components/schemas/VpnNodeRouteModel'
           type: array
         importRoutes:
+          description: Dynamic import routes received by this node from the VPN
           items:
             $ref: '#/components/schemas/VpnNodeRouteModel'
           type: array
         interfaces:
+          description: Physical or virtual interfaces bound to this VPN network with NAT rules
           items:
             $ref: '#/components/schemas/VpnNodeInterfaceModel'
           type: array
-        route:
-          type: string
         routes:
+          description: Static routes published by this node into the VPN network
           items:
             $ref: '#/components/schemas/VpnNodeRouteModel'
           type: array
         services:
+          description: L4 services exposed by this node on the VPN network
           items:
             $ref: '#/components/schemas/VpnNodeServiceModel'
           type: array
+        wireguard:
+          description: WireGuard tunnel configuration for this VPN network attachment
+          type: object
+          properties:
+            enabled:
+              description: Whether WireGuard tunneling is enabled
+              type: boolean
+            port:
+              description: WireGuard listen port on this node
+              type: integer
+            forwarding:
+              description: Whether IP forwarding is enabled for WireGuard traffic
+              type: boolean
+            clients:
+              description: List of authorized WireGuard peer clients
+              type: array
+              items:
+                type: object
       type: object
     VpnNodeNetworkModel:
+      description: Summary of a VPN network attached to a node, as returned by the list endpoint
       allOf:
         - $ref: '#/components/schemas/VpnNetworkUpdateModel'
         - properties:
+            id:
+              description: Numeric identifier for this node-network attachment
+              type: integer
             networkName:
+              description: Name of the VPN network
               type: string
             nodeUid:
+              description: UUID of the node this network is attached to
               type: string
           type: object
     VpnNodeRouteModel:
@@ -10446,22 +11215,41 @@ components:
         - $ref: '#/components/schemas/VpnRouteUpdateModel'
         - properties:
             networkName:
+              description: Name of the VPN network this route belongs to
               type: string
             nodeUid:
+              description: UUID of the node that owns this route
               type: string
             uid:
+              description: Unique identifier for this route
               type: string
+            nodeFriendlyName:
+              description: Human-readable name of the node that owns this route
+              type: string
+            type:
+              description: Record type discriminator, always "Route"
+              type: string
+              enum:
+                - Route
           type: object
     VpnNodeServiceModel:
       allOf:
         - $ref: '#/components/schemas/VpnServiceUpdateModel'
         - properties:
             networkName:
+              description: Name of the VPN network this service belongs to
               type: string
             nodeUid:
+              description: UUID of the node that owns this service
               type: string
             uid:
+              description: Unique identifier for this service
               type: string
+            type:
+              description: Record type discriminator, always "Service"
+              type: string
+              enum:
+                - Service
           type: object
     VpnRouteUpdateModel:
       properties:
@@ -10493,24 +11281,30 @@ components:
       type: object
       properties:
         name:
+          description: Service account name (used as identifier)
           type: string
-        orgId:
-          type: string
-        policyIds:
-          description: Policy IDs attached to the user
-          example:
-            - policy1
-          type: array
-          items:
-            type: string
         status:
+          description: Whether the service account is active
           type: string
           enum:
             - active
             - inactive
-        tokenCreated:
+        clientId:
+          description: Client ID used for API authentication (present after token generation)
           type: string
-          format: date-time
+        policyIds:
+          description: Named policy IDs attached to this service account
+          example:
+            - builtin-tg-monitor
+          type: array
+          items:
+            type: string
+        tokenCreated:
+          description: Unix epoch timestamp (seconds) when the API token was last generated
+          type: integer
+        orgId:
+          description: Organization ID
+          type: string
     ObservabilityExporter:
       properties:
         uid:
