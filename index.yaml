@@ -1090,8 +1090,44 @@ paths:
                 description: Domain
                 properties:
                   config:
-                    description: Domain configuration
+                    description: >-
+                      Domain-level configuration. Includes firewall policy
+                      snapshots derived from virtual network access policies,
+                      API gateway routing, and hosted gateway settings.
                     type: object
+                    properties:
+                      updateTime:
+                        description: Unix timestamp of the last configuration update
+                        type: integer
+                      gateway:
+                        description: Hosted gateway settings for the domain
+                        type: object
+                        properties:
+                          hosted:
+                            description: Whether the domain uses a Trustgrid-managed hosted gateway
+                            type: boolean
+                      apigw:
+                        description: API gateway routing configuration for the domain
+                        type: object
+                        properties:
+                          host:
+                            description: API gateway hostname
+                            type: string
+                          port:
+                            description: API gateway port
+                            type: string
+                          gateway_node:
+                            description: FQDN of the node acting as the primary API gateway
+                            type: string
+                          application_gateway_node:
+                            description: FQDN of the application gateway node (if separate from the primary)
+                            type: string
+                      firewall:
+                        description: >-
+                          Compiled firewall policy snapshot derived from virtual
+                          network access policies. Read-only; updated automatically
+                          when network policies change.
+                        type: object
                 type: object
         '404':
           description: Not found
@@ -1119,8 +1155,36 @@ paths:
         content:
           application/json:
             schema:
-              description: Alert configuration
+              description: Domain-level alert threshold configuration
               type: object
+              properties:
+                enabled:
+                  description: Whether alert threshold evaluation is active for this domain
+                  type: boolean
+                thresholds:
+                  description: Alert rules evaluated against node telemetry values within the domain
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        description: Rule ID (UUID)
+                        type: string
+                      name:
+                        description: Human-readable rule name
+                        type: string
+                      telemetry:
+                        description: Shadow `reported` key to evaluate (e.g. `memory`, `storage`)
+                        type: string
+                      max:
+                        description: Upper bound — alert fires when the value exceeds this
+                        type: number
+                      exceededWindow:
+                        description: Number of time units the value must continuously exceed `max`
+                        type: number
+                      exceededWindowUnit:
+                        description: Time unit for `exceededWindow` (e.g. `minutes`, `hours`)
+                        type: string
         description: Alert configuration
         required: true
       responses:
@@ -1154,8 +1218,16 @@ paths:
         content:
           application/json:
             schema:
-              description: APIGW configuration
+              description: Domain-level API gateway routing configuration
               type: object
+              properties:
+                gateway_node:
+                  description: FQDN of the node that acts as the primary API gateway for the domain
+                  example: gw.myorg.trustgrid.io
+                  type: string
+                new_cloud_gateway:
+                  description: Enable the next-generation cloud gateway routing path
+                  type: boolean
         description: APIGW configuration
         required: true
       responses:
@@ -1346,7 +1418,10 @@ paths:
       operationId: listNodes
       summary: Retrieve all network nodes including appliances and agents with filtering options
       description: |-
-        List both appliances and agents.
+        List both appliances and agents. The fields `config` and `shadow` will be empty unless 
+        specified in the `projection` parameter. The query for the config or shadow must be at least
+        one level deep - `projection[]=config` won't work, but `projection[][]=["config", "gateway"]`
+        will result in `config.gateway` being populated.
 
         ---
 
@@ -1366,7 +1441,7 @@ paths:
           name: tags
           schema:
             type: string
-          description: >-
+        - description: >-
             Reduces the response to a smaller set of fields. When **omitted**, all fields are returned
             (`name`, `fqdn`, `online`, `cluster`, `lastip`, `last_connect`, `created_at`, `device`,
             `location`, `heartbeat`, `lifecycleState`, `disconnectTime`, `orderID`, plus base fields).
@@ -1376,26 +1451,24 @@ paths:
 
 
             **Base set** (always present when any projection is specified): `uid`, `state`, `type`, `tags`,
-            `tgTags`, `tgrn`, `keys`, `shadow`, `config`
-
+            `tgTags`, `tgrn`, `keys`. 
 
             **Top-level requestable fields**: `name`, `fqdn`, `online`, `cluster`, `lastip`, `last_connect`,
             `created_at`, `device`, `location`, `heartbeat`, `lifecycleState`, `disconnectTime`, `orderID`
 
 
-            **WARNING**: Dot-notation strings do NOT work for nested fields. `projection[]=config.gateway.enabled`
+            **IMPORTANT**: `shadow` and `config` cannot be used as flat projection keys (e.g.,
+            `projection[]=shadow` or `projection[]=config` are rejected as too large). To retrieve
+            data from these objects, you must use nested indexed projection (see below).
+
+
+            **WARNING**: Dot-notation strings do NOT work. `projection[]=config.gateway.enabled`
             silently returns an empty `config: {}` object. Do not use dot notation.
 
 
-            **For AI/agent use**: Request the full top-level object instead of sub-fields.
-            `projection[]=config` returns the complete config object. `projection[]=shadow` returns
-            the complete shadow with all reported keys. This is simpler and reliable.
-
-
-            **Advanced nested projection** (browser/qs library): If you need sub-field filtering,
-            use indexed bracket notation where each projection entry has an outer index N and each
-            path segment has an inner index M. To request only `config.gateway.enabled` (entry 0)
-            and `shadow.reported["node-core.version"]` (entry 1):
+            **Nested projection** uses indexed bracket notation where each projection entry has an
+            outer index N and each path segment has an inner index M. To request `config.gateway.enabled`
+            as entry 0 and `shadow.reported["node-core.version"]` as entry 1:
 
             `projection[0][0]=config&projection[0][1]=gateway&projection[0][2]=enabled&projection[1][0]=shadow&projection[1][1]=reported&projection[1][2]=node-core.version`
 
@@ -10082,8 +10155,410 @@ components:
           example: mycluster.trustgrid.io
           type: string
         config:
-          description: Node config
+          description: >-
+            Complete node configuration. Each sub-key mirrors an individual
+            `PUT /node/{nodeID}/config/*` endpoint. Present only when the node
+            record is fetched directly (not via list projections).
           type: object
+          properties:
+            gateway:
+              description: >-
+                Gateway configuration — controls whether this node acts as a
+                gateway server accepting client connections, a client connecting to
+                gateway servers, or both.
+              type: object
+              properties:
+                enabled:
+                  description: Whether the gateway plugin is active on this node
+                  type: boolean
+                host:
+                  description: IP or hostname the gateway server listens on
+                  type: string
+                port:
+                  description: TCP port the gateway server listens on
+                  type: integer
+                udpPort:
+                  description: UDP port for DTLS traffic when UDP is enabled
+                  type: integer
+                udpEnabled:
+                  description: Enable UDP/DTLS transport in addition to TCP
+                  type: boolean
+                maxmbps:
+                  description: Maximum aggregate throughput cap for all connected clients, in Mbps
+                  type: number
+                maxClientWriteMbps:
+                  description: Per-client write throughput cap, in Mbps
+                  type: number
+                connectToPublic:
+                  description: Whether this node connects outbound through the public gateway tier
+                  type: boolean
+                monitorGateway:
+                  description: Enable latency and hop monitoring for gateway connections
+                  type: boolean
+                master:
+                  description: Whether this node is the active master in a cluster gateway pair
+                  type: boolean
+                mesh:
+                  description: Mesh group name if this node participates in a gateway mesh
+                  type: string
+                cert:
+                  description: Name of the TLS certificate used by the gateway server
+                  type: string
+                paths:
+                  description: Outbound client paths — connections this node makes to gateway servers
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        description: Path identifier (UUID)
+                        type: string
+                      host:
+                        description: Gateway server hostname or IP
+                        type: string
+                      port:
+                        description: Gateway server TCP port
+                        type: integer
+                      node:
+                        description: FQDN of the target gateway server node
+                        type: string
+                      enabled:
+                        type: boolean
+                      default:
+                        description: Whether this is the preferred (default) path
+                        type: boolean
+                      local:
+                        description: Local IP to bind when opening this path
+                        type: string
+                clients:
+                  description: Named clients permitted to connect to this gateway server
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        description: Client node FQDN
+                        type: string
+                      enabled:
+                        type: boolean
+                routes:
+                  description: Static routes advertised through the gateway
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      route:
+                        description: CIDR
+                        type: string
+                      dest:
+                        description: Destination gateway node FQDN
+                        type: string
+                      metric:
+                        type: integer
+                acls:
+                  description: Gateway-level access control rules
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      source:
+                        description: Source CIDR or node FQDN
+                        type: string
+                      dest:
+                        description: Destination CIDR or node FQDN
+                        type: string
+            cluster:
+              description: High-availability cluster settings for this node
+              type: object
+              properties:
+                enabled:
+                  description: Whether cluster mode is active on this node
+                  type: boolean
+                host:
+                  description: IP address used for cluster heartbeat traffic
+                  type: string
+                port:
+                  description: TCP port used for cluster heartbeat communication
+                  type: integer
+                shared:
+                  description: Floating IP address managed by the active cluster master
+                  type: string
+                master:
+                  description: Whether this node is currently the cluster master
+                  type: boolean
+                statusHost:
+                  description: Host used for cluster health-status checks
+                  type: string
+                statusPort:
+                  description: Port used for cluster health-status checks
+                  type: integer
+                updateTime:
+                  description: Unix timestamp of the last cluster config change
+                  type: integer
+                versionCounter:
+                  description: Monotonically increasing config version counter
+                  type: integer
+                masterVersion:
+                  description: Config version currently held by the cluster master
+                  type: integer
+            exec:
+              description: Edge compute (container runtime) configuration
+              type: object
+              properties:
+                commands:
+                  description: Container definitions managed by this node
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ContainerConfig'
+                volumes:
+                  description: Named volumes available to containers on this node
+                  type: array
+                  items:
+                    type: object
+                limits:
+                  description: Global resource limits applied across all containers
+                  type: object
+            snmp:
+              description: SNMPv3 monitoring agent configuration
+              type: object
+              properties:
+                enabled:
+                  description: Whether the SNMP agent is running
+                  type: boolean
+                interface:
+                  description: Network interface the SNMP agent binds to (e.g. `eth0`)
+                  type: string
+                port:
+                  description: UDP port the SNMP agent listens on (default 161)
+                  type: integer
+                engineId:
+                  description: SNMP engine identifier
+                  type: string
+                username:
+                  description: SNMPv3 username
+                  type: string
+                authProtocol:
+                  description: Authentication hash algorithm
+                  enum:
+                    - SHA
+                    - MD5
+                  type: string
+                authPassphrase:
+                  description: Authentication passphrase
+                  type: string
+                privacyProtocol:
+                  description: Privacy (encryption) algorithm
+                  enum:
+                    - AES128
+                    - AES192
+                    - AES256
+                    - DES
+                  type: string
+                privacyPassphrase:
+                  description: Privacy passphrase
+                  type: string
+            alert:
+              description: Node-level alert threshold configuration
+              type: object
+              properties:
+                enabled:
+                  description: Whether alert threshold evaluation is active on this node
+                  type: boolean
+                thresholds:
+                  description: Alert rules evaluated against shadow reported telemetry values
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        description: Rule ID (UUID)
+                        type: string
+                      name:
+                        description: Human-readable rule name
+                        type: string
+                      telemetry:
+                        description: Shadow `reported` key to evaluate (e.g. `memory`, `storage`)
+                        type: string
+                      max:
+                        description: Upper bound — alert fires when the value exceeds this
+                        type: number
+                      exceededWindow:
+                        description: >-
+                          Number of time units the value must continuously exceed
+                          `max` before the alert fires
+                        type: number
+                      exceededWindowUnit:
+                        description: Time unit for `exceededWindow` (e.g. `minutes`, `hours`)
+                        type: string
+            vpn:
+              description: Virtual network (overlay) membership and routing configuration
+              type: object
+              properties:
+                networks:
+                  description: Per-virtual-network configuration entries for this node
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        description: Virtual network numeric ID
+                        type: integer
+                      name:
+                        description: Virtual network name
+                        type: string
+                      ip:
+                        description: Node's IP address within this virtual network
+                        type: string
+                      interfaces:
+                        description: LAN-side interface bindings with inside/outside NAT rules
+                        type: array
+                        items:
+                          type: object
+                      routes:
+                        description: Routes exported into or imported from this virtual network
+                        type: array
+                        items:
+                          type: object
+                      services:
+                        description: Services exposed through this virtual network
+                        type: array
+                        items:
+                          type: object
+                      dns:
+                        description: DNS settings for this virtual network membership
+                        type: object
+            dns:
+              description: Local DNS resolver configuration on the node
+              type: object
+              properties:
+                enabled:
+                  description: Whether the local DNS resolver is active
+                  type: boolean
+                upstream:
+                  description: Upstream DNS server IPs the resolver forwards to
+                  type: array
+                  items:
+                    type: string
+                records:
+                  description: Static DNS records served by the local resolver
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        description: Hostname for this record
+                        type: string
+            network:
+              description: >-
+                Layer-3 network configuration — physical interfaces, tunnels,
+                static routes, NAT rules, ACLs, traffic rules, and VRFs
+              type: object
+              properties:
+                interfaces:
+                  description: Physical and logical network interface configurations
+                  type: array
+                  items:
+                    type: object
+                tunnels:
+                  description: IPsec, GRE, WireGuard, and VNet tunnel definitions
+                  type: array
+                  items:
+                    type: object
+                routes:
+                  description: Static routes installed on this node
+                  type: array
+                  items:
+                    type: object
+                nats:
+                  description: NAT rules (SNAT, DNAT, masquerade)
+                  type: array
+                  items:
+                    type: object
+                acls:
+                  description: IP access control rules
+                  type: array
+                  items:
+                    type: object
+                rules:
+                  description: Advanced traffic shaping and policy-based forwarding rules
+                  type: array
+                  items:
+                    type: object
+                vrfs:
+                  description: VRF (Virtual Routing and Forwarding) instance definitions
+                  type: array
+                  items:
+                    type: object
+                darkMode:
+                  description: When true the node ignores unsolicited inbound traffic (stealth mode)
+                  type: boolean
+                forwarding:
+                  description: Enable IP forwarding between interfaces
+                  type: boolean
+                bridgeCIDR:
+                  description: CIDR assigned to the bridge interface used by container networking
+                  type: string
+            services:
+              description: Edge service (port-forwarding target) configuration
+              type: object
+              properties:
+                enabled:
+                  description: Whether the services plugin is active on this node
+                  type: boolean
+                version:
+                  description: >-
+                    Schema version — `2` means `items` is a UUID-keyed map;
+                    absent means `services` is a legacy ordered array
+                  type: integer
+                  enum:
+                    - 2
+                items:
+                  description: Service definitions keyed by UUID (version 2 only)
+                  type: object
+                  additionalProperties:
+                    type: object
+                services:
+                  description: Service definitions as an ordered array (legacy version 1 only)
+                  type: array
+                  items:
+                    type: object
+            connectors:
+              description: Edge connector (outbound tunnel endpoint) configuration
+              type: object
+              properties:
+                enabled:
+                  description: Whether the connectors plugin is active on this node
+                  type: boolean
+                version:
+                  description: >-
+                    Schema version — `2` means `items` is a UUID-keyed map;
+                    absent means `connectors` is a legacy ordered array
+                  type: integer
+                  enum:
+                    - 2
+                items:
+                  description: Connector definitions keyed by UUID (version 2 only)
+                  type: object
+                  additionalProperties:
+                    type: object
+                connectors:
+                  description: Connector definitions as an ordered array (legacy version 1 only)
+                  type: array
+                  items:
+                    type: object
+            jvm:
+              description: JVM heap memory settings for embedded Java workloads
+              type: object
+              properties:
+                memory:
+                  type: object
+                  properties:
+                    min:
+                      description: Minimum heap size (e.g. `512m`, `1g`)
+                      type: string
+                    max:
+                      description: Maximum heap size (e.g. `2g`)
+                      type: string
         name:
           description: Node name
           example: mynode
