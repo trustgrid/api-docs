@@ -530,7 +530,7 @@ paths:
                     sourcePort:
                       description: Source port
                       example: 1234
-                      type: number
+                      type: integer
                     sourceBytes:
                       description: Source bytes transferred
                       example: 100
@@ -546,7 +546,7 @@ paths:
                     destPort:
                       description: Destination port
                       example: 1234
-                      type: number
+                      type: integer
                     destBytes:
                       description: Destination bytes transferred
                       example: 100
@@ -570,7 +570,7 @@ paths:
                       type: string
                     tcpFlags:
                       description: |-
-                        TCP flags as a decimal string:
+                        TCP flags as a bitmask encoded decimal string:
                         * 0x01 - FIN
                         * 0x02 - SYN
                         * 0x04 - RST
@@ -1418,9 +1418,9 @@ paths:
       operationId: listNodes
       summary: Retrieve all network nodes including appliances and agents with filtering options
       description: |-
-        List both appliances and agents. The fields `config` and `shadow` will be empty unless 
+        List both appliances and agents. The fields `config` and `shadow` will be empty unless
         specified in the `projection` parameter. The query for the config or shadow must be at least
-        one level deep - `projection[]=config` won't work, but `projection[][]=["config", "gateway"]`
+        one level deep - `projection[0][0]=config` won't work, but `projection[0][0]=config&projection[0][1]=gateway`
         will result in `config.gateway` being populated.
 
         ---
@@ -1451,7 +1451,7 @@ paths:
 
 
             **Base set** (always present when any projection is specified): `uid`, `state`, `type`, `tags`,
-            `tgTags`, `tgrn`, `keys`. 
+            `tgTags`, `tgrn`, `keys`.
 
             **Top-level requestable fields**: `name`, `fqdn`, `online`, `cluster`, `lastip`, `last_connect`,
             `created_at`, `device`, `location`, `heartbeat`, `lifecycleState`, `disconnectTime`, `orderID`
@@ -1524,6 +1524,35 @@ paths:
         required: true
         schema:
           type: string
+  /node/by-fqdn/{fqdn}:
+    get:
+      operationId: getNodeByFQDN
+      summary: Retrieve a node by its fully-qualified domain name
+      description: |-
+        Get a node using its FQDN directly, as an alternative to looking up the nodeID first.
+
+        ---
+
+        Requires `nodes::read` permission on the node.
+      parameters:
+        - name: fqdn
+          in: path
+          required: true
+          description: Node FQDN (e.g., appliance.example.trustgrid.io)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '404':
+          description: Node not found or permission denied
+      tags:
+        - Appliance
+        - Agent
   /node/{nodeID}:
     delete:
       summary: Permanently remove a node from the organization and revoke access
@@ -3290,7 +3319,7 @@ paths:
                     sourcePort:
                       description: Source port
                       example: 1234
-                      type: number
+                      type: integer
                     sourceBytes:
                       description: Source bytes transferred
                       example: 100
@@ -3306,7 +3335,7 @@ paths:
                     destPort:
                       description: Destination port
                       example: 1234
-                      type: number
+                      type: integer
                     destBytes:
                       description: Destination bytes transferred
                       example: 100
@@ -3330,7 +3359,7 @@ paths:
                       type: string
                     tcpFlags:
                       description: |-
-                        TCP flags as a decimal string:
+                        TCP flags as a bitmask encoded decimal string:
                         * 0x01 - FIN
                         * 0x02 - SYN
                         * 0x04 - RST
@@ -4229,6 +4258,11 @@ paths:
     get:
       operationId: listClusterVpnInterfaces
       summary: Get a VPN's interfaces
+      description: >-
+        Get the list of interfaces attached to a VPN network on a cluster.
+        Note: NATs within a VPN interface can share the same source and destination
+        CIDRs provided they are differentiated by route metric. This is intentional
+        and not a configuration error.
       responses:
         '200':
           description: OK
@@ -6942,8 +6976,10 @@ paths:
                         type: object
                         properties:
                           time:
-                            description: Unix timestamp (milliseconds) of the start of the 1-minute interval
-                            type: number
+                            description: >-
+                              Unix timestamp in milliseconds of the start of the 1-minute interval.
+                              Note: query params startDate/endDate use Unix seconds.
+                            type: integer
                           node:
                             description: Friendly name of the VPN peer node being measured
                             type: string
@@ -7291,6 +7327,11 @@ paths:
     get:
       operationId: listNodeVpnInterfaces
       summary: Get a VPN's interfaces
+      description: >-
+        Get the list of interfaces attached to a VPN network on a node.
+        Note: NATs within a VPN interface can share the same source and destination
+        CIDRs provided they are differentiated by route metric. This is intentional
+        and not a configuration error.
       responses:
         '200':
           description: OK
@@ -8356,6 +8397,9 @@ components:
                   type: object
                 type: array
               nats:
+                description: >-
+                  NAT rules (SNAT, DNAT, masquerade) applied to this interface.
+                  Duplicate source/dest CIDR pairs are allowed when differentiated by route metric.
                 items:
                   properties:
                     description:
@@ -8607,6 +8651,9 @@ components:
                       description: VRF name
                       type: string
                     nats:
+                      description: >-
+                        NAT rules within this VRF.
+                        Duplicate source/dest CIDR pairs are allowed when differentiated by route metric.
                       items:
                         properties:
                           description:
@@ -10156,9 +10203,10 @@ components:
           type: string
         config:
           description: >-
-            Complete node configuration. Each sub-key mirrors an individual
-            `PUT /node/{nodeID}/config/*` endpoint. Present only when the node
-            record is fetched directly (not via list projections).
+            Node configuration. Each sub-key mirrors an individual `PUT /node/{nodeID}/config/*`
+            endpoint. In direct single-node responses, this object contains the complete configuration.
+            In list responses, `config` may be included when explicitly requested via `projection`;
+            when returned that way, only the projected `config` fields are present.
           type: object
           properties:
             gateway:
@@ -11532,7 +11580,7 @@ components:
                 type: string
               port:
                 description: Port of the upstream DNS server (default 53)
-                type: string
+                type: integer
               description:
                 description: Human-readable label for this upstream server
                 type: string
