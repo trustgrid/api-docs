@@ -613,6 +613,7 @@ paths:
                       type: string
                     meta:
                       description: Additional metadata (nullable)
+                      type: object
                       nullable: true
                   type: object
                 type: array
@@ -3402,6 +3403,7 @@ paths:
                       type: string
                     meta:
                       description: Additional metadata (nullable)
+                      type: object
                       nullable: true
                   type: object
                 type: array
