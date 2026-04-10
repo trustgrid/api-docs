@@ -29,11 +29,11 @@ describe('Container trigger documentation', () => {
   });
 
   it('documents container trigger request schemas', () => {
-    const schemaRefs = post?.requestBody?.content?.['application/json']?.schema?.oneOf?.map(
+    const schemaRefs = post?.requestBody?.content?.['application/json']?.schema?.anyOf?.map(
       (entry) => entry.$ref
     );
 
-    assert.ok(Array.isArray(schemaRefs), 'Request body should define oneOf schemas');
+    assert.ok(Array.isArray(schemaRefs), 'Request body should define anyOf schemas');
     assert.ok(
       schemaRefs.includes('#/components/schemas/NodeTriggerContainerActionRequest'),
       'Request body should include container action schema'

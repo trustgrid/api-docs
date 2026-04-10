@@ -2252,7 +2252,7 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - $ref: '#/components/schemas/NodeTriggerContainerActionRequest'
                 - $ref: '#/components/schemas/NodeTriggerContainerStatusRequest'
                 - $ref: '#/components/schemas/NodeTriggerContainerImageRequest'
