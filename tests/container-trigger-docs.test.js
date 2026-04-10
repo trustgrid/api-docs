@@ -62,7 +62,7 @@ describe('Container trigger documentation', () => {
   });
 
   it('documents container trigger response schemas', () => {
-    const schemaDefs = post?.responses?.['200']?.content?.['application/json']?.schema?.oneOf;
+    const schemaDefs = post?.responses?.['200']?.content?.['application/json']?.schema?.anyOf;
     const schemaRefs = schemaDefs?.filter((entry) => entry.$ref).map((entry) => entry.$ref);
     const hasBooleanResponse = schemaDefs?.some((entry) => entry.type === 'boolean');
 

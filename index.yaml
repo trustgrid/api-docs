@@ -2284,7 +2284,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
+                anyOf:
                   - type: boolean
                   - $ref: '#/components/schemas/NodeTriggerContainerActionResponse'
                   - $ref: '#/components/schemas/NodeTriggerContainerStatusResponse'
