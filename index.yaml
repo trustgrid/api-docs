@@ -2212,31 +2212,12 @@ paths:
       - in: path
         name: event
         required: true
-        description: >-
-          Node service or event name to execute. For container management, use the
-          container service name itself to start or stop a containerized service,
-          `container-status` to retrieve runtime status, or `container-image` to
-          list and delete cached images.
         schema:
           type: string
     post:
       summary: Execute a remote operation or command on a specific node
       description: >-
         Triggers a node service and optionally waits for the service response.
-
-        Common container management examples:
-
-        - Start a container service: set `{event}` to the container service name and
-          send `{"cmd_action":"start"}`.
-        - Stop a container service: set `{event}` to the container service name and
-          send `{"cmd_action":"stop"}`.
-        - Get container runtime status: set `{event}` to `container-status` and
-          optionally include `{"container":"<container-name>"}` to scope the
-          response to one container.
-        - List cached images: set `{event}` to `container-image` and send
-          `{"action":"list"}`.
-        - Delete a cached image: set `{event}` to `container-image` and send
-          `{"action":"delete","image":"repository/tag"}`.
 
         Requires either `nodes::remote-execute` or `nodes::service:{event}`
         permission.
@@ -2256,30 +2237,7 @@ paths:
               additionalProperties: true
               description: >-
                 Optional event-specific payload. The request body shape depends on
-                the `{event}` being executed; container-related payloads are shown
-                below as examples, but other event payload objects are also valid.
-            examples:
-              startContainer:
-                summary: Start a container service
-                value:
-                  cmd_action: start
-              stopContainer:
-                summary: Stop a container service
-                value:
-                  cmd_action: stop
-              containerStatus:
-                summary: Retrieve one container's runtime status
-                value:
-                  container: mycontainer
-              listImages:
-                summary: List cached container images
-                value:
-                  action: list
-              deleteImage:
-                summary: Delete a cached image
-                value:
-                  action: delete
-                  image: mycontainer/latest
+                the `{event}` being executed.
       responses:
         '200':
           description: OK
@@ -2292,35 +2250,6 @@ paths:
                   - $ref: '#/components/schemas/NodeTriggerContainerStatusResponse'
                   - $ref: '#/components/schemas/NodeTriggerContainerImageListResponse'
                   - $ref: '#/components/schemas/NodeTriggerContainerImageDeleteResponse'
-              examples:
-                noWait:
-                  summary: Trigger accepted without waiting for service output
-                  value: true
-                started:
-                  summary: Container service start response
-                  value:
-                    message: Successful start
-                stopped:
-                  summary: Container service stop response
-                  value:
-                    message: Successful stop
-                containerStatus:
-                  summary: Container runtime status response
-                  value:
-                    mycontainer:
-                      status: RUNNING
-                      imageName: mycontainer/latest
-                      imageId: a1b2c3d4e5f6
-                listImages:
-                  summary: Container image list response
-                  value:
-                    images:
-                      - name: mycontainer
-                        tag: latest
-                deleteImage:
-                  summary: Container image delete response
-                  value:
-                    success: Successful deletion
       tags:
         - Appliance
         - Agent
