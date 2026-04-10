@@ -2252,10 +2252,12 @@ paths:
         content:
           application/json:
             schema:
-              anyOf:
-                - $ref: '#/components/schemas/NodeTriggerContainerActionRequest'
-                - $ref: '#/components/schemas/NodeTriggerContainerStatusRequest'
-                - $ref: '#/components/schemas/NodeTriggerContainerImageRequest'
+              type: object
+              additionalProperties: true
+              description: >-
+                Optional event-specific payload. The request body shape depends on
+                the `{event}` being executed; container-related payloads are shown
+                below as examples, but other event payload objects are also valid.
             examples:
               startContainer:
                 summary: Start a container service
@@ -8263,24 +8265,6 @@ components:
           schema:
             $ref: '#/components/schemas/TagValueModel'
       required: true
-    NodeTriggerContainerActionRequest:
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/NodeTriggerContainerActionRequest'
-      description: Container start or stop request
-    NodeTriggerContainerStatusRequest:
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/NodeTriggerContainerStatusRequest'
-      description: Container runtime status request
-    NodeTriggerContainerImageRequest:
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/NodeTriggerContainerImageRequest'
-      description: Container image list or delete request
     VirtualNetworkRoute:
       content:
         application/json:
@@ -9462,22 +9446,34 @@ components:
       description: >-
         Request body used when `{event}` is `container-image` to list cached
         images or delete one cached image.
-      additionalProperties: false
-      properties:
-        action:
-          description: Image management action
-          enum:
-            - list
-            - delete
-          type: string
-        image:
-          description: >-
-            Image reference to delete, in `repository/tag` format. Required when
-            `action` is `delete`.
-          example: mycontainer/latest
-          type: string
-      required:
-        - action
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            action:
+              description: Image management action
+              enum:
+                - list
+              type: string
+          required:
+            - action
+        - type: object
+          additionalProperties: false
+          properties:
+            action:
+              description: Image management action
+              enum:
+                - delete
+              type: string
+            image:
+              description: >-
+                Image reference to delete, in `repository/tag` format. Required when
+                `action` is `delete`.
+              example: mycontainer/latest
+              type: string
+          required:
+            - action
+            - image
       title: NodeTriggerContainerImageRequest
       type: object
     NodeTriggerContainerStatusRequest:

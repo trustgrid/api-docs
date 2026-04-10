@@ -29,22 +29,14 @@ describe('Container trigger documentation', () => {
   });
 
   it('documents container trigger request schemas', () => {
-    const schemaRefs = post?.requestBody?.content?.['application/json']?.schema?.anyOf?.map(
-      (entry) => entry.$ref
-    );
+    const schema = post?.requestBody?.content?.['application/json']?.schema;
 
-    assert.ok(Array.isArray(schemaRefs), 'Request body should define anyOf schemas');
-    assert.ok(
-      schemaRefs.includes('#/components/schemas/NodeTriggerContainerActionRequest'),
-      'Request body should include container action schema'
-    );
-    assert.ok(
-      schemaRefs.includes('#/components/schemas/NodeTriggerContainerStatusRequest'),
-      'Request body should include container status schema'
-    );
-    assert.ok(
-      schemaRefs.includes('#/components/schemas/NodeTriggerContainerImageRequest'),
-      'Request body should include container image schema'
+    assert.equal(schema?.type, 'object');
+    assert.equal(schema?.additionalProperties, true);
+    assert.match(
+      schema?.description ?? '',
+      /other event payload objects are also valid/i,
+      'Request body should remain generic for non-container trigger payloads'
     );
   });
 
@@ -118,15 +110,14 @@ describe('Container trigger schemas', () => {
   });
 
   it('defines container image request and response schemas', () => {
-    assert.deepEqual(schemas?.NodeTriggerContainerImageRequest?.required, ['action']);
-    assert.deepEqual(schemas?.NodeTriggerContainerImageRequest?.properties?.action?.enum, [
-      'list',
-      'delete'
-    ]);
-    assert.equal(
-      schemas?.NodeTriggerContainerImageRequest?.properties?.image?.type,
-      'string'
-    );
+    const imageVariants = schemas?.NodeTriggerContainerImageRequest?.oneOf;
+
+    assert.equal(Array.isArray(imageVariants), true);
+    assert.deepEqual(imageVariants?.[0]?.required, ['action']);
+    assert.deepEqual(imageVariants?.[0]?.properties?.action?.enum, ['list']);
+    assert.deepEqual(imageVariants?.[1]?.required, ['action', 'image']);
+    assert.deepEqual(imageVariants?.[1]?.properties?.action?.enum, ['delete']);
+    assert.equal(imageVariants?.[1]?.properties?.image?.type, 'string');
     assert.equal(
       schemas?.NodeTriggerContainerImageListResponse?.properties?.images?.items?.$ref,
       '#/components/schemas/ContainerImageRecord'
