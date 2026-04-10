@@ -9411,6 +9411,7 @@ components:
       description: >-
         Request body used when `{event}` is set to a container service name and
         you want to start or stop that service.
+      additionalProperties: false
       properties:
         cmd_action:
           description: Container service action to execute
@@ -9461,6 +9462,7 @@ components:
       description: >-
         Request body used when `{event}` is `container-image` to list cached
         images or delete one cached image.
+      additionalProperties: false
       properties:
         action:
           description: Image management action
@@ -9482,6 +9484,7 @@ components:
       description: >-
         Request body used when `{event}` is `container-status` to retrieve the
         runtime status of one container or all containers.
+      additionalProperties: false
       properties:
         container:
           description: Optional container service name to filter the response
