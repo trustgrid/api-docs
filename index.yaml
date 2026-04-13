@@ -41,7 +41,7 @@ info:
 tags:
   - name: Alert
     description: |
-      Security and operational events broadcast when significant node or system activity occurs (connects/disconnects, certificate warnings, order updates). Requires `alerts::read` permission.
+      Security and operational events broadcast when significant node or system activity occurs (connects/disconnects, certificate warnings, order updates). Required permissions vary by endpoint; see each operation description for the specific permission needed.
   - name: Audit
     description: |
       Immutable logs for compliance and troubleshooting. Trustgrid exposes [authentication audits](https://docs.trustgrid.io/docs/operations/authentication/) (`audits::read:user`), [configuration changes](https://docs.trustgrid.io/docs/operations/changes/) (`audits::read:config`), [node events](https://docs.trustgrid.io/docs/operations/node-events/) (`audits::read:node`), and [flow logs](https://docs.trustgrid.io/docs/operations/flow-logs/) (`audits::read:flows`).
@@ -123,34 +123,34 @@ tags:
       Generic HTTP observability exporter for forwarding telemetry to any OpenTelemetry-compatible HTTP endpoint. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
   - name: DNS
     description: |
-      DNS configuration within virtual networks, including zone and record management for resolving names across the overlay network. Requires `domains::read` permission.
+      DNS configuration within virtual networks, including zone and record management for resolving names across the overlay network. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: DNS Zone
     description: |
-      DNS zones hosted within a virtual network, used to resolve internal hostnames for nodes and services. Requires `domains::read` permission.
+      DNS zones hosted within a virtual network, used to resolve internal hostnames for nodes and services. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: DNS Record
     description: |
-      Individual DNS A/CNAME records within a virtual network DNS zone. Requires `domains::read` to view, `domains::modify` to manage.
+      Individual DNS A/CNAME records within a virtual network DNS zone. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: Route
     description: |
-      Static routes within a virtual network directing traffic between nodes and subnets. Requires `domains::read` to view, `domains::modify` to manage.
+      Static routes within a virtual network directing traffic between nodes and subnets. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: Access Policy
     description: |
-      Access policies within virtual networks controlling which nodes and groups can communicate. Requires `domains::read` to view, `domains::modify` to manage.
+      Access policies within virtual networks controlling which nodes and groups can communicate. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: Network Object
     description: |
-      Network objects (subnets, hosts, ranges) used as reusable references in access policies and routes. Requires `domains::read` to view, `domains::modify` to manage.
+      Network objects (subnets, hosts, ranges) used as reusable references in access policies and routes. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: Network Group
     description: |
-      Named collections of network objects for use in access policies. Requires `domains::read` to view, `domains::modify` to manage.
+      Named collections of network objects for use in access policies. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: Port Forwarding
     description: |
-      Port forwarding rules that expose node services through the virtual network to other nodes. Requires `domains::read` to view, `domains::modify` to manage.
+      Port forwarding rules that expose node services through the virtual network to other nodes. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   - name: Change Management
     description: |
-      Tracked network configuration changes with approval workflows. Requires `domains::read` to view changes.
+      Tracked network configuration changes with approval workflows. Requires `virtual-networks::read` to view changes, `virtual-networks::modify` to stage and commit changes.
   - name: Auth Group
     description: |
-      Authentication groups that map identity provider groups to Trustgrid access groups, controlling ZTNA application access. Requires `groups::read` permission.
+      Authentication groups that map identity provider groups to Trustgrid access groups, controlling ZTNA application access. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   
 x-tagGroups:
   - name: Alerts
@@ -2266,41 +2266,20 @@ paths:
       - in: path
         name: event
         required: true
+        description: |
+          Event name to trigger on the node. This parameter is open-ended; the backend
+          may support additional event names beyond those documented here.
+
+          Known values include: aws-route-tables, gateway-routes, tg-tcpdump,
+          datastore-manager, gateway-ping, gateway-perf, gateway-traceroute,
+          gateway-mtr, wg-clients, vpn-dump, vpn-key, vpn-nats, vpn-routes,
+          node-debug, tg-net-ping, tg-net-nc, nat-hits, ipsec-statusall,
+          ipsec-restart, tg-ping, tg-cluster-ping, speed-test, tg-nc,
+          tg-traceroute, flows, tg-mtr, bgp, tg-arping,
+          node-restart-service, node-reboot, node-upgrade, web-sessions.
         schema:
           type: string
-          enum:
-            - aws-route-tables
-            - gateway-routes
-            - tg-tcpdump
-            - datastore-manager
-            - gateway-ping
-            - gateway-perf
-            - gateway-traceroute
-            - gateway-mtr
-            - wg-clients
-            - vpn-dump
-            - vpn-key
-            - vpn-nats
-            - vpn-routes
-            - node-debug
-            - tg-net-ping
-            - tg-net-nc
-            - nat-hits
-            - ipsec-statusall
-            - ipsec-restart
-            - tg-ping
-            - tg-cluster-ping
-            - speed-test
-            - tg-nc
-            - tg-traceroute
-            - flows
-            - tg-mtr
-            - bgp
-            - tg-arping
-            - node-restart-service
-            - node-reboot
-            - node-upgrade
-            - web-sessions
+          example: gateway-routes
     post:
       summary: Execute a remote operation or command on a specific node
       parameters:
