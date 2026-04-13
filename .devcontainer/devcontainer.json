@@ -1,0 +1,11 @@
+{
+  "name": "api-docs",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false
+    }
+  },
+  "postCreateCommand": "npm install",
+  "remoteUser": "node"
+}
