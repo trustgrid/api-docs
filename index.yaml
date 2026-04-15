@@ -608,7 +608,7 @@ paths:
                     sourcePort:
                       description: Source port
                       example: 1234
-                      type: integer
+                      type: number
                     sourceBytes:
                       description: Source bytes transferred
                       example: 100
@@ -624,7 +624,7 @@ paths:
                     destPort:
                       description: Destination port
                       example: 1234
-                      type: integer
+                      type: number
                     destBytes:
                       description: Destination bytes transferred
                       example: 100
@@ -3512,7 +3512,7 @@ paths:
                     sourcePort:
                       description: Source port
                       example: 1234
-                      type: integer
+                      type: number
                     sourceBytes:
                       description: Source bytes transferred
                       example: 100
@@ -3528,7 +3528,7 @@ paths:
                     destPort:
                       description: Destination port
                       example: 1234
-                      type: integer
+                      type: number
                     destBytes:
                       description: Destination bytes transferred
                       example: 100
@@ -7187,7 +7187,7 @@ paths:
                             description: >-
                               Unix timestamp in milliseconds of the start of the 1-minute interval.
                               Note: query params startDate/endDate use Unix seconds.
-                            type: integer
+                            type: number
                           node:
                             description: Friendly name of the VPN peer node being measured
                             type: string
