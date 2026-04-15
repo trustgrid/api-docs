@@ -7771,9 +7771,9 @@ paths:
 
         `resources` is a top-level field on the policy object, not nested inside `statements`.
 
-        Resource names use TGRN format and require the org ID: `tgrn:tg::nodes:node/{orgId}/{nodeId}`. Use `*` to match all resources of a type.
+        Resource names use TGRN format, e.g. `tgrn:tg::nodes:node/{uid}` or `tgrn:tg::access-apps:app/{uid}`. Use `*` to match all resources of a type.
 
-        Action names use the format `{resource-type}::{action}`, e.g. `nodes::configure:apigw`. The resource type is plural.
+        Action names must match the exact permission identifier accepted by the API, e.g. `nodes::configure:apigw`.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
       responses:
@@ -7832,9 +7832,9 @@ paths:
 
         `resources` is a top-level field on the policy object, not nested inside `statements`.
 
-        Resource names use TGRN format and require the org ID: `tgrn:tg::nodes:node/{orgId}/{nodeId}`. Use `*` to match all resources of a type.
+        Resource names use TGRN format, e.g. `tgrn:tg::nodes:node/{uid}` or `tgrn:tg::access-apps:app/{uid}`. Use `*` to match all resources of a type.
 
-        Action names use the format `{resource-type}::{action}`, e.g. `nodes::configure:apigw`. The resource type is plural.
+        Action names must match the exact permission identifier accepted by the API, e.g. `nodes::configure:apigw`.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
       responses:
