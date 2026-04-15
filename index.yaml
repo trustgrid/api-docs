@@ -2005,6 +2005,8 @@ paths:
       description: |-
         Update gateway configuration
 
+        Use `host` (not `ip`) for the gateway hostname.
+
         ---
 
         Requires `nodes::configure:gateway` permission.
@@ -4414,6 +4416,13 @@ paths:
           type: string
     post:
       summary: Create a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the cluster config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -4451,6 +4460,13 @@ paths:
           type: string
     put:
       summary: Update a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the cluster config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7483,6 +7499,13 @@ paths:
           type: string
     post:
       summary: Create a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the node config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7520,6 +7543,13 @@ paths:
           type: string
     put:
       summary: Update a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the node config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7736,7 +7766,14 @@ paths:
         - Permissions
     post:
       summary: Create a new access control policy with specified permissions and conditions
-      description: Requires `permissions::modify` permission.
+      description: |-
+        Requires `permissions::modify` permission.
+
+        `resources` is a top-level field on the policy object, not nested inside `statements`.
+
+        Resource names use TGRN format, e.g. `tgrn:tg::nodes:node/{uid}` or `tgrn:tg::access-apps:app/{uid}`. Use `*` to match all resources of a type.
+
+        Action names must match the exact permission identifier accepted by the API, e.g. `nodes::configure:apigw`.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
       responses:
@@ -7790,7 +7827,14 @@ paths:
           type: string
     put:
       summary: Modify permissions and conditions for an existing access control policy
-      description: Requires `permissions::modify` permission.
+      description: |-
+        Requires `permissions::modify` permission.
+
+        `resources` is a top-level field on the policy object, not nested inside `statements`.
+
+        Resource names use TGRN format, e.g. `tgrn:tg::nodes:node/{uid}` or `tgrn:tg::access-apps:app/{uid}`. Use `*` to match all resources of a type.
+
+        Action names must match the exact permission identifier accepted by the API, e.g. `nodes::configure:apigw`.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
       responses:
