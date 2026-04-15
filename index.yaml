@@ -2216,6 +2216,11 @@ paths:
           type: string
     post:
       summary: Execute a remote operation or command on a specific node
+      description: >-
+        Triggers a node service and optionally waits for the service response.
+
+        Requires either `nodes::remote-execute` or `nodes::service:{event}`
+        permission.
       parameters:
         - description: If present, the request will return the node's event output
           in: query
@@ -2223,9 +2228,28 @@ paths:
           required: false
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: >-
+                Optional event-specific payload. The request body shape depends on
+                the `{event}` being executed.
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: boolean
+                  - $ref: '#/components/schemas/NodeTriggerContainerActionResponse'
+                  - $ref: '#/components/schemas/NodeTriggerContainerStatusResponse'
+                  - $ref: '#/components/schemas/NodeTriggerContainerImageListResponse'
+                  - $ref: '#/components/schemas/NodeTriggerContainerImageDeleteResponse'
       tags:
         - Appliance
         - Agent
@@ -9176,6 +9200,42 @@ components:
         - private_key
       title: CertificateParts
       type: object
+    ContainerImageRecord:
+      description: Cached container image reference
+      properties:
+        name:
+          description: Image repository or name
+          example: mycontainer
+          type: string
+        tag:
+          description: Image tag
+          example: latest
+          type: string
+      required:
+        - name
+        - tag
+      title: ContainerImageRecord
+      type: object
+    ContainerRuntimeStatus:
+      description: Runtime status for a container service on a node
+      properties:
+        status:
+          description: Current container runtime state
+          enum:
+            - INITIALIZING
+            - RUNNING
+            - STOPPED
+          type: string
+        imageName:
+          description: Resolved image name for the running container
+          example: mycontainer/latest
+          type: string
+        imageId:
+          description: Resolved image identifier for the running container
+          example: a1b2c3d4e5f6
+          type: string
+      title: ContainerRuntimeStatus
+      type: object
     ClusterModel:
       properties:
         config:
@@ -9315,6 +9375,111 @@ components:
         - port
         - protocol
         - service
+    NodeTriggerContainerActionRequest:
+      description: >-
+        Request body used when `{event}` is set to a container service name and
+        you want to start or stop that service.
+      additionalProperties: false
+      properties:
+        cmd_action:
+          description: Container service action to execute
+          enum:
+            - start
+            - stop
+          type: string
+        name:
+          description: Optional container service name echoed by some clients
+          example: mycontainer
+          type: string
+      required:
+        - cmd_action
+      title: NodeTriggerContainerActionRequest
+      type: object
+    NodeTriggerContainerActionResponse:
+      description: Response returned by a container start or stop request
+      properties:
+        message:
+          description: Human-readable service response message
+          example: Successful start
+          type: string
+      title: NodeTriggerContainerActionResponse
+      type: object
+    NodeTriggerContainerImageDeleteResponse:
+      description: Response returned after attempting to delete a cached image
+      properties:
+        success:
+          description: Success message when the image delete completed
+          example: Successful deletion
+          type: string
+        error:
+          description: Error message when the image could not be deleted
+          example: Unable to delete image because it is currently in use
+          type: string
+      title: NodeTriggerContainerImageDeleteResponse
+      type: object
+    NodeTriggerContainerImageListResponse:
+      description: Cached container images available on the node
+      properties:
+        images:
+          items:
+            $ref: '#/components/schemas/ContainerImageRecord'
+          type: array
+      title: NodeTriggerContainerImageListResponse
+      type: object
+    NodeTriggerContainerImageRequest:
+      description: >-
+        Request body used when `{event}` is `container-image` to list cached
+        images or delete one cached image.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            action:
+              description: Image management action
+              enum:
+                - list
+              type: string
+          required:
+            - action
+        - type: object
+          additionalProperties: false
+          properties:
+            action:
+              description: Image management action
+              enum:
+                - delete
+              type: string
+            image:
+              description: >-
+                Image reference to delete, in `repository/tag` format. Required when
+                `action` is `delete`.
+              example: mycontainer/latest
+              type: string
+          required:
+            - action
+            - image
+      title: NodeTriggerContainerImageRequest
+      type: object
+    NodeTriggerContainerStatusRequest:
+      description: >-
+        Request body used when `{event}` is `container-status` to retrieve the
+        runtime status of one container or all containers.
+      additionalProperties: false
+      properties:
+        container:
+          description: Optional container service name to filter the response
+          example: mycontainer
+          type: string
+      title: NodeTriggerContainerStatusRequest
+      type: object
+    NodeTriggerContainerStatusResponse:
+      description: >-
+        Map of container service name to runtime status details. When `container`
+        is provided, the response typically contains a single entry.
+      additionalProperties:
+        $ref: '#/components/schemas/ContainerRuntimeStatus'
+      title: NodeTriggerContainerStatusResponse
+      type: object
     ConnectorConfig:
       example:
         connectors:
