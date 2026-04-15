@@ -2926,6 +2926,61 @@ paths:
         required: true
         schema:
           type: string
+  /user/{email}/policy:
+    get:
+      summary: Retrieve the effective merged policy for a user
+      description: Returns the combined policy derived from all policies directly attached to the user plus those inherited via group membership.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - User
+    parameters:
+      - description: User email
+        in: path
+        name: email
+        required: true
+        schema:
+          type: string
+  /user/{email}/policy/{policy_id}:
+    parameters:
+      - description: User email
+        in: path
+        name: email
+        required: true
+        schema:
+          type: string
+      - description: Policy name
+        in: path
+        name: policy_id
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Attach a named policy to a user
+      description: |-
+        Adds `policy_id` to the user's set of directly attached policies.
+
+        Policies whose names start with `restricted-` cannot be attached via this endpoint.
+
+        Requires `permissions::modify` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - User
+    delete:
+      summary: Detach a named policy from a user
+      description: Requires `permissions::modify` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - User
   /user/{email}/groups:
     get:
       operationId: listUserGroups
