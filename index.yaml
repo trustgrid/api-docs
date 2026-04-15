@@ -39,77 +39,118 @@ info:
     Permissions follow the pattern `resource::action` (e.g. `nodes::read`, `virtual-networks::modify`).
   
 tags:
-  - name: Alerting
+  - name: Alert
     description: |
-      [Alerts](https://docs.trustgrid.io/docs/alarms/) are broadcast through channels
+      Security and operational events broadcast when significant node or system activity occurs (connects/disconnects, certificate warnings, order updates). Required permissions vary by endpoint; see each operation description for the specific permission needed.
   - name: Audit
     description: |
-      Audits are logged to keep track of user and system changes. Trustgrid exposes [authentication audits](https://docs.trustgrid.io/docs/operations/authentication/), [configuration changes](https://docs.trustgrid.io/docs/operations/changes/), and [flow logs](https://docs.trustgrid.io/docs/operations/flow-logs/)      
+      Immutable logs for compliance and troubleshooting. Trustgrid exposes [authentication audits](https://docs.trustgrid.io/docs/operations/authentication/) (`audits::read:user`), [configuration changes](https://docs.trustgrid.io/docs/operations/changes/) (`audits::read:config`), [node events](https://docs.trustgrid.io/docs/operations/node-events/) (`audits::read:node`), and [flow logs](https://docs.trustgrid.io/docs/operations/flow-logs/) (`audits::read:flows`).
   - name: Cluster
     description: |
-      [Clusters](https://docs.trustgrid.io/docs/clusters/) allow shared config and HA
+      [Clusters](https://docs.trustgrid.io/docs/clusters/) group nodes for high availability and shared configuration. Changes applied to a cluster propagate to all member nodes. Requires `nodes::read` permission.
   - name: Domain
     description: |
-      A [domain](https://docs.trustgrid.io/docs/domain/) provides a logical grouping of nodes inside an organization. 
+      A [domain](https://docs.trustgrid.io/docs/domain/) is a logical grouping of nodes within an organization, providing the namespace for virtual networks, DNS zones, and access policies. Requires `domains::read` permission.
   - name: User
     description: |
-      All interactions with the Trustgrid API require a [user](https://docs.trustgrid.io/docs/user-management/).
+      [User](https://docs.trustgrid.io/docs/user-management/) accounts for portal and API access. Authenticated via SSO (IDP) or local credentials and assigned permissions via policies. Requires `users::read` permission.
   - name: Group
     description: |
-      [Groups](https://docs.trustgrid.io/docs/user-management/groups/) allow exposing ZTNA applications to users.
+      [Groups](https://docs.trustgrid.io/docs/user-management/groups/) control which users can access ZTNA applications exposed through virtual networks. Can be synchronized from identity providers. Requires `groups::read` permission.
   - name: Appliance
     description: |
-      [Appliances](https://docs.trustgrid.io/docs/nodes/appliances/) are Trustgrid nodes deployed either physically or as a virtual machine.
+      [Appliances](https://docs.trustgrid.io/docs/nodes/appliances/) are physical or virtual machine Trustgrid nodes providing full network, VPN, edge compute, and monitoring capabilities. Requires `nodes::read` permission.
   - name: Agent
     description: |
-      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) run on consumer devices and have a subset of appliance functionality
+      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) are lightweight software clients installed on user devices or servers, supporting VPN/ZTNA connectivity. Requires `nodes::read` permission.
   - name: Org
     description: |
-      Org-related APIs expose [support requests](https://docs.trustgrid.io/docs/support/), support settings, and [shared documents](https://docs.trustgrid.io/docs/support/documents/).
+      Organization-level settings including [support requests](https://docs.trustgrid.io/docs/support/), notification preferences, and [shared documents](https://docs.trustgrid.io/docs/support/documents/). Requires `orgs::read` permission.
   - name: Order
     description: |
-      Provision process management
+      [Provisioning orders](https://docs.trustgrid.io/docs/provisioning/) track the lifecycle of Trustgrid appliances from purchase through deployment. Requires `orders::read` permission.
   - name: Repository
-    description: Container repository
+    description: |
+      Container image repositories for storing and distributing Docker images to edge compute nodes. Requires `repositories::read` permission.
   - name: Tag
     description: |
-      [Tags](https://docs.trustgrid.io/docs/nodes/shared/tags/) allow grouping clusters and nodes for permissions and reporting.
+      [Tags](https://docs.trustgrid.io/docs/nodes/shared/tags/) are key-value metadata attached to nodes and clusters for grouping, permissions scoping, and dashboard filtering. Requires `nodes::read` to view, `nodes::tag` to modify.
   - name: Upgrade Manager
     description: |
-      Nodes can be upgraded in bulk using the [upgrade manager](https://docs.trustgrid.io/docs/upgrade-manager/).
+      The [upgrade manager](https://docs.trustgrid.io/docs/upgrade-manager/) orchestrates software upgrades for nodes and clusters in bulk with scheduling and rollback support. Requires `upgrade-manager::read` permission.
   - name: Alarm
     description: |
-      [Alarm filters](https://docs.trustgrid.io/docs/alarms/alarm-filters/) manage criteria and thresholds for what events generate alerts.
+      [Alarm filters](https://docs.trustgrid.io/docs/alarms/alarm-filters/) define criteria and thresholds for when events generate alert notifications. Configure alert channels (email, Slack, PagerDuty, OpsGenie, Teams, webhooks) and maintenance windows. Requires `alarms::read` permission.
   - name: Certificate
     description: |
-      [TLS certificates](https://docs.trustgrid.io/docs/certificates/)
+      [TLS certificates](https://docs.trustgrid.io/docs/certificates/) provisioned for nodes to secure communications. Requires `certificates::read` to view, `certificates::modify` to manage.
   - name: Virtual Networks
     description: |
-      [Virtual network configuration](https://docs.trustgrid.io/docs/domain/virtual-networks/)
+      [Virtual networks](https://docs.trustgrid.io/docs/domain/virtual-networks/) are Layer-3 overlay networks enabling zero-trust connectivity between nodes. Configure routes, DNS, access policies, port forwarding, and IP pools. Requires `virtual-networks::read` permission.
   - name: Cluster > VPN
     x-displayName: VPN
     description: |
-      Per-cluster attachment to virtual networks
+      Per-cluster attachment to virtual networks. Configure which virtual networks a cluster participates in and its VPN interface settings. Requires `node-vpn::read` permission.
   - name: Cluster > Compute
     x-displayName: Compute
     description: |
-      [Cluster edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
+      [Cluster edge compute](https://docs.trustgrid.io/docs/nodes/appliances/containers/) — Docker container workloads deployed across cluster nodes. Requires `node-exec::read` permission. Requires `exec` feature flag.
   - name: Appliance > VPN
     x-displayName: VPN
     description: |
-      Per-appliance attachment to virtual networks
+      Per-appliance attachment to virtual networks. Configure which virtual networks an appliance participates in and its VPN interface settings. Requires `node-vpn::read` permission.
   - name: Appliance > Compute
     x-displayName: Compute
     description: |
-      [Appliance edge compute configuration](https://docs.trustgrid.io/docs/nodes/appliances/containers/)
+      [Appliance edge compute](https://docs.trustgrid.io/docs/nodes/appliances/containers/) — Docker container workloads deployed on a specific appliance. Requires `node-exec::read` permission. Requires `exec` feature flag.
   - name: IDP
     description: |
-      [Identity provider configuration](https://docs.trustgrid.io/docs/idps/)
+      [Identity provider](https://docs.trustgrid.io/docs/idps/) integrations (Okta, Azure AD, Google, SAML, OIDC) for SSO authentication and user/group synchronization. Requires `identity-providers::read` permission.
   - name: Permissions
     description: |
-      [Permissions management](https://docs.trustgrid.io/docs/user-management/policies/)
+      [Role-based access control](https://docs.trustgrid.io/docs/user-management/policies/) via policies assigning permissions to users and groups. Includes a simulator to evaluate permission decisions. Requires `permissions::read` to view, `permissions::modify` to configure.
   - name: ServiceUser
-    description: Users who only have API access
+    description: |
+      Machine accounts for API-only access, used for automation and integrations. Each service user can have API tokens generated without portal access. Requires `users::read` to view.
+  - name: ObservabilityExporter
+    description: |
+      [Observability exporters](https://docs.trustgrid.io/docs/observability/) configure telemetry data forwarding to external monitoring systems (Splunk, HTTP endpoints) via OpenTelemetry. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
+  - name: SplunkExporter
+    description: |
+      Splunk-specific observability exporter configuration for forwarding Trustgrid telemetry to a Splunk HEC endpoint. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
+  - name: HTTPExporter
+    description: |
+      Generic HTTP observability exporter for forwarding telemetry to any OpenTelemetry-compatible HTTP endpoint. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
+  - name: DNS
+    description: |
+      DNS configuration within virtual networks, including zone and record management for resolving names across the overlay network. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: DNS Zone
+    description: |
+      DNS zones hosted within a virtual network, used to resolve internal hostnames for nodes and services. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: DNS Record
+    description: |
+      Individual DNS A/CNAME records within a virtual network DNS zone. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: Route
+    description: |
+      Static routes within a virtual network directing traffic between nodes and subnets. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: Access Policy
+    description: |
+      Access policies within virtual networks controlling which nodes and groups can communicate. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: Network Object
+    description: |
+      Network objects (subnets, hosts, ranges) used as reusable references in access policies and routes. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: Network Group
+    description: |
+      Named collections of network objects for use in access policies. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: Port Forwarding
+    description: |
+      Port forwarding rules that expose node services through the virtual network to other nodes. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
+  - name: Change Management
+    description: |
+      Tracked network configuration changes with approval workflows. Requires `virtual-networks::read` to view changes, `virtual-networks::modify` to stage and commit changes.
+  - name: Auth Group
+    description: |
+      Authentication groups that map identity provider groups to Trustgrid access groups, controlling ZTNA application access. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   
 x-tagGroups:
   - name: Alerts
@@ -120,6 +161,15 @@ x-tagGroups:
     tags:
       - Domain
       - Virtual Networks
+      - Access Policy
+      - Change Management
+      - DNS
+      - DNS Zone
+      - DNS Record
+      - Network Group
+      - Network Object
+      - Port Forwarding
+      - Route
   - name: Cluster
     tags:
       - Cluster
@@ -142,13 +192,17 @@ x-tagGroups:
   - name: Management
     tags:
       - Audit
+      - Auth Group
       - Certificate
       - Group
+      - HTTPExporter
       - IDP
+      - ObservabilityExporter
       - Org
       - Order
       - Permissions
       - ServiceUser
+      - SplunkExporter
       - Tag
       - User
 
@@ -2215,13 +2269,21 @@ paths:
         name: event
         required: true
         description: |-
-          Name of the event to trigger. Common values:
-          `node-restart-service`, `node-reboot`, `node-upgrade`, `gateway-routes`,
-          `vpn-routes`, `vpn-nats`, `tg-ping`, `tg-traceroute`, `tg-net-ping`,
-          `speed-test`, `flows`, `bgp`, `ipsec-restart`, `ipsec-statusall`.
+          Event name to trigger on the node. This parameter is open-ended; the backend
+          may support additional event names beyond those documented here.
+
+          Known values include: aws-route-tables, gateway-routes, tg-tcpdump,
+          datastore-manager, gateway-ping, gateway-perf, gateway-traceroute,
+          gateway-mtr, wg-clients, vpn-dump, vpn-key, vpn-nats, vpn-routes,
+          node-debug, tg-net-ping, tg-net-nc, nat-hits, ipsec-statusall,
+          ipsec-restart, tg-ping, tg-cluster-ping, speed-test, tg-nc,
+          tg-traceroute, flows, tg-mtr, bgp, tg-arping,
+          node-restart-service, node-reboot, node-upgrade, web-sessions.
+
           Each requires either `nodes::remote-execute` or `nodes::service:{event}` permission.
         schema:
           type: string
+          example: gateway-routes
     post:
       summary: Execute a remote operation or command on a specific node
       description: |-
@@ -6086,7 +6148,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/EventModel'
       tags:
-        - Alarms
+        - Alert
   /v2/event/{nodeId}:
     get:
       operationId: listNodeEvents
@@ -6161,7 +6223,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/EventModel'
       tags:
-        - Alarms
+        - Alert
     parameters:
       - in: path
         name: nodeId
@@ -6186,7 +6248,7 @@ paths:
         '200':
           description: OK
       tags:
-        - Alarms
+        - Alert
   /v2/idp:
     get:
       operationId: listIdps
