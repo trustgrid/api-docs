@@ -2936,7 +2936,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/Policy'
       tags:
         - User
     parameters:
@@ -2946,7 +2946,7 @@ paths:
         required: true
         schema:
           type: string
-  /user/{email}/policy/{policy_id}:
+  /user/{email}/policy/{name}:
     parameters:
       - description: User email
         in: path
@@ -2956,14 +2956,14 @@ paths:
           type: string
       - description: Policy name
         in: path
-        name: policy_id
+        name: name
         required: true
         schema:
           type: string
     post:
       summary: Attach a named policy to a user
       description: |-
-        Adds `policy_id` to the user's set of directly attached policies.
+        Adds `name` to the user's set of directly attached policies.
 
         Policies whose names start with `restricted-` cannot be attached via this endpoint.
 
