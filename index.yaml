@@ -2216,6 +2216,28 @@ paths:
           type: string
     post:
       summary: Execute a remote operation or command on a specific node
+      description: |-
+        Sends an event to the node and optionally waits for its response.
+
+        Common `event` values:
+        - `node-restart-service` — restart the Trustgrid node service (requires `nodes::service:node-restart-service`)
+        - `node-reboot` — reboot the host OS (requires `nodes::service:node-reboot`)
+        - `node-upgrade` — upgrade node software (requires `nodes::service:node-upgrade`)
+        - `gateway-routes` — fetch current gateway routes (requires `nodes::service:gateway-routes`)
+        - `vpn-routes` — fetch virtual network routing table (requires `nodes::service:vpn-routes`)
+        - `vpn-nats` — fetch virtual network NAT table (requires `nodes::service:vpn-nats`)
+        - `tg-ping` — run a ping via the Trustgrid overlay (requires `nodes::service:tg-ping`)
+        - `tg-traceroute` — run a traceroute via the overlay (requires `nodes::service:tg-traceroute`)
+        - `tg-net-ping` — ping through the virtual network (requires `nodes::service:tg-net-ping`)
+        - `speed-test` — measure internet bandwidth (requires `nodes::service:speed-test`)
+        - `flows` — manage active network flows (requires `nodes::service:flows`)
+        - `bgp` — interact with the BGP server (requires `nodes::service:bgp`)
+        - `ipsec-restart` — restart the IPSec service (requires `nodes::service:ipsec-restart`)
+        - `ipsec-statusall` — retrieve IPSec status (requires `nodes::service:ipsec-statusall`)
+
+        All service events also accept the broad `nodes::remote-execute` permission as an alternative.
+
+        Add `?wait=1` to block until the node responds (useful for synchronous checks).
       parameters:
         - description: If present, the request will return the node's event output
           in: query
