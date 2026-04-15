@@ -2212,6 +2212,12 @@ paths:
       - in: path
         name: event
         required: true
+        description: |-
+          Name of the event to trigger. Common values:
+          `node-restart-service`, `node-reboot`, `node-upgrade`, `gateway-routes`,
+          `vpn-routes`, `vpn-nats`, `tg-ping`, `tg-traceroute`, `tg-net-ping`,
+          `speed-test`, `flows`, `bgp`, `ipsec-restart`, `ipsec-statusall`.
+          Each requires either `nodes::remote-execute` or `nodes::service:{event}` permission.
         schema:
           type: string
     post:
@@ -2240,12 +2246,13 @@ paths:
 
         Add `?wait=1` to block until the node responds (useful for synchronous checks).
       parameters:
-        - description: If present, the request will return the node's event output
+        - description: Pass `1` to block until the node responds and return its output. Omit for fire-and-forget.
           in: query
           name: wait
           required: false
           schema:
-            type: string
+            type: integer
+            enum: [1]
       requestBody:
         required: false
         content:
