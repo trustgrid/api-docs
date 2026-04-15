@@ -2059,6 +2059,8 @@ paths:
       description: |-
         Update gateway configuration
 
+        Use `host` (not `ip`) for the gateway hostname.
+
         ---
 
         Requires `nodes::configure:gateway` permission.
@@ -2266,7 +2268,7 @@ paths:
       - in: path
         name: event
         required: true
-        description: |
+        description: |-
           Event name to trigger on the node. This parameter is open-ended; the backend
           may support additional event names beyond those documented here.
 
@@ -2277,21 +2279,66 @@ paths:
           ipsec-restart, tg-ping, tg-cluster-ping, speed-test, tg-nc,
           tg-traceroute, flows, tg-mtr, bgp, tg-arping,
           node-restart-service, node-reboot, node-upgrade, web-sessions.
+
+          Each requires either `nodes::remote-execute` or `nodes::service:{event}` permission.
         schema:
           type: string
           example: gateway-routes
     post:
       summary: Execute a remote operation or command on a specific node
+      description: |-
+        Sends an event to the node and optionally waits for its response.
+
+        Common `event` values:
+        - `node-restart-service` — restart the Trustgrid node service (requires `nodes::service:node-restart-service`)
+        - `node-reboot` — reboot the host OS (requires `nodes::service:node-reboot`)
+        - `node-upgrade` — upgrade node software (requires `nodes::service:node-upgrade`)
+        - `gateway-routes` — fetch current gateway routes (requires `nodes::service:gateway-routes`)
+        - `vpn-routes` — fetch virtual network routing table (requires `nodes::service:vpn-routes`)
+        - `vpn-nats` — fetch virtual network NAT table (requires `nodes::service:vpn-nats`)
+        - `tg-ping` — run a ping via the Trustgrid overlay (requires `nodes::service:tg-ping`)
+        - `tg-traceroute` — run a traceroute via the overlay (requires `nodes::service:tg-traceroute`)
+        - `tg-net-ping` — ping through the virtual network (requires `nodes::service:tg-net-ping`)
+        - `speed-test` — measure internet bandwidth (requires `nodes::service:speed-test`)
+        - `flows` — manage active network flows (requires `nodes::service:flows`)
+        - `bgp` — interact with the BGP server (requires `nodes::service:bgp`)
+        - `ipsec-restart` — restart the IPSec service (requires `nodes::service:ipsec-restart`)
+        - `ipsec-statusall` — retrieve IPSec status (requires `nodes::service:ipsec-statusall`)
+
+        All services require either `nodes::remote-execute` or `nodes::service:{event}`
+        permission.
+
+        Add `?wait=1` to block until the node responds (useful for synchronous checks).
       parameters:
-        - description: If present, the request will return the node's event output
+        - description: Pass `1` to block until the node responds and return its output. Omit for fire-and-forget.
           in: query
           name: wait
           required: false
           schema:
-            type: string
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: >-
+                Optional event-specific payload. The request body shape depends on
+                the `{event}` being executed.
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: boolean
+                  - $ref: '#/components/schemas/NodeTriggerContainerActionResponse'
+                  - $ref: '#/components/schemas/NodeTriggerContainerStatusResponse'
+                  - $ref: '#/components/schemas/NodeTriggerContainerImageListResponse'
+                  - $ref: '#/components/schemas/NodeTriggerContainerImageDeleteResponse'
       tags:
         - Appliance
         - Agent
@@ -2992,6 +3039,61 @@ paths:
         required: true
         schema:
           type: string
+  /user/{email}/policy:
+    get:
+      summary: Retrieve the effective merged policy for a user
+      description: Returns the combined policy derived from all policies directly attached to the user plus those inherited via group membership.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+      tags:
+        - User
+    parameters:
+      - description: User email
+        in: path
+        name: email
+        required: true
+        schema:
+          type: string
+  /user/{email}/policy/{name}:
+    parameters:
+      - description: User email
+        in: path
+        name: email
+        required: true
+        schema:
+          type: string
+      - description: Policy name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Attach a named policy to a user
+      description: |-
+        Adds `name` to the user's set of directly attached policies.
+
+        Policies whose names start with `restricted-` cannot be attached via this endpoint.
+
+        Requires `permissions::modify` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - User
+    delete:
+      summary: Detach a named policy from a user
+      description: Requires `permissions::modify` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - User
   /user/{email}/groups:
     get:
       operationId: listUserGroups
@@ -4376,6 +4478,13 @@ paths:
           type: string
     post:
       summary: Create a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the cluster config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -4413,6 +4522,13 @@ paths:
           type: string
     put:
       summary: Update a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the cluster config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7445,6 +7561,13 @@ paths:
           type: string
     post:
       summary: Create a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the node config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7482,6 +7605,13 @@ paths:
           type: string
     put:
       summary: Update a VPN interface
+      description: |-
+        `inDefaultRoute` and `outDefaultRoute` are mutually exclusive — set at most one to `true`.
+
+        Inside NATs (`insideNats`) rewrite traffic arriving from the VPN before it enters the local network.
+        Outside NATs (`outsideNats`) rewrite traffic leaving the local network before it enters the VPN.
+
+        After creating or updating a VPN interface, push the node config for the change to take effect.
       requestBody:
         $ref: '#/components/requestBodies/VpnInterfaceUpdateModel'
       responses:
@@ -7698,7 +7828,14 @@ paths:
         - Permissions
     post:
       summary: Create a new access control policy with specified permissions and conditions
-      description: Requires `permissions::modify` permission.
+      description: |-
+        Requires `permissions::modify` permission.
+
+        `resources` is a top-level field on the policy object, not nested inside `statements`.
+
+        Resource names use TGRN format, e.g. `tgrn:tg::nodes:node/{uid}` or `tgrn:tg::access-apps:app/{uid}`. Use `*` to match all resources of a type.
+
+        Action names must match the exact permission identifier accepted by the API, e.g. `nodes::configure:apigw`.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
       responses:
@@ -7752,7 +7889,14 @@ paths:
           type: string
     put:
       summary: Modify permissions and conditions for an existing access control policy
-      description: Requires `permissions::modify` permission.
+      description: |-
+        Requires `permissions::modify` permission.
+
+        `resources` is a top-level field on the policy object, not nested inside `statements`.
+
+        Resource names use TGRN format, e.g. `tgrn:tg::nodes:node/{uid}` or `tgrn:tg::access-apps:app/{uid}`. Use `*` to match all resources of a type.
+
+        Action names must match the exact permission identifier accepted by the API, e.g. `nodes::configure:apigw`.
       requestBody:
         $ref: '#/components/requestBodies/Policy'
       responses:
@@ -9187,6 +9331,42 @@ components:
         - private_key
       title: CertificateParts
       type: object
+    ContainerImageRecord:
+      description: Cached container image reference
+      properties:
+        name:
+          description: Image repository or name
+          example: mycontainer
+          type: string
+        tag:
+          description: Image tag
+          example: latest
+          type: string
+      required:
+        - name
+        - tag
+      title: ContainerImageRecord
+      type: object
+    ContainerRuntimeStatus:
+      description: Runtime status for a container service on a node
+      properties:
+        status:
+          description: Current container runtime state
+          enum:
+            - INITIALIZING
+            - RUNNING
+            - STOPPED
+          type: string
+        imageName:
+          description: Resolved image name for the running container
+          example: mycontainer/latest
+          type: string
+        imageId:
+          description: Resolved image identifier for the running container
+          example: a1b2c3d4e5f6
+          type: string
+      title: ContainerRuntimeStatus
+      type: object
     ClusterModel:
       properties:
         config:
@@ -9326,6 +9506,111 @@ components:
         - port
         - protocol
         - service
+    NodeTriggerContainerActionRequest:
+      description: >-
+        Request body used when `{event}` is set to a container service name and
+        you want to start or stop that service.
+      additionalProperties: false
+      properties:
+        cmd_action:
+          description: Container service action to execute
+          enum:
+            - start
+            - stop
+          type: string
+        name:
+          description: Optional container service name echoed by some clients
+          example: mycontainer
+          type: string
+      required:
+        - cmd_action
+      title: NodeTriggerContainerActionRequest
+      type: object
+    NodeTriggerContainerActionResponse:
+      description: Response returned by a container start or stop request
+      properties:
+        message:
+          description: Human-readable service response message
+          example: Successful start
+          type: string
+      title: NodeTriggerContainerActionResponse
+      type: object
+    NodeTriggerContainerImageDeleteResponse:
+      description: Response returned after attempting to delete a cached image
+      properties:
+        success:
+          description: Success message when the image delete completed
+          example: Successful deletion
+          type: string
+        error:
+          description: Error message when the image could not be deleted
+          example: Unable to delete image because it is currently in use
+          type: string
+      title: NodeTriggerContainerImageDeleteResponse
+      type: object
+    NodeTriggerContainerImageListResponse:
+      description: Cached container images available on the node
+      properties:
+        images:
+          items:
+            $ref: '#/components/schemas/ContainerImageRecord'
+          type: array
+      title: NodeTriggerContainerImageListResponse
+      type: object
+    NodeTriggerContainerImageRequest:
+      description: >-
+        Request body used when `{event}` is `container-image` to list cached
+        images or delete one cached image.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            action:
+              description: Image management action
+              enum:
+                - list
+              type: string
+          required:
+            - action
+        - type: object
+          additionalProperties: false
+          properties:
+            action:
+              description: Image management action
+              enum:
+                - delete
+              type: string
+            image:
+              description: >-
+                Image reference to delete, in `repository/tag` format. Required when
+                `action` is `delete`.
+              example: mycontainer/latest
+              type: string
+          required:
+            - action
+            - image
+      title: NodeTriggerContainerImageRequest
+      type: object
+    NodeTriggerContainerStatusRequest:
+      description: >-
+        Request body used when `{event}` is `container-status` to retrieve the
+        runtime status of one container or all containers.
+      additionalProperties: false
+      properties:
+        container:
+          description: Optional container service name to filter the response
+          example: mycontainer
+          type: string
+      title: NodeTriggerContainerStatusRequest
+      type: object
+    NodeTriggerContainerStatusResponse:
+      description: >-
+        Map of container service name to runtime status details. When `container`
+        is provided, the response typically contains a single entry.
+      additionalProperties:
+        $ref: '#/components/schemas/ContainerRuntimeStatus'
+      title: NodeTriggerContainerStatusResponse
+      type: object
     ConnectorConfig:
       example:
         connectors:
