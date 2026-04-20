@@ -12805,6 +12805,7 @@ components:
       title: HTTPExporter
       type: object
     ChangeAuditRecord:
+      title: ChangeAuditRecord
       type: object
       properties:
         uid:
@@ -12837,12 +12838,18 @@ components:
         auditType:
           type: string
           description: Type of audit event
-          example: change
+          enum:
+            - action
+            - create
+            - update
+            - delete
+          example: update
         message:
           type: string
           description: Human-readable description of the change
           example: Updated node configuration
     NodeAuditRecord:
+      title: NodeAuditRecord
       type: object
       properties:
         uid:
@@ -12870,6 +12877,7 @@ components:
           type: number
           description: Unix epoch timestamp when this record expires
     AuthAuditRecord:
+      title: AuthAuditRecord
       type: object
       properties:
         uid:

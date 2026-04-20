@@ -73,6 +73,7 @@ describe('/v2/audit/changes', () => {
   it('auditTypes has correct enum', () => {
     const p = findParam(getParams(pathKey), 'auditTypes');
     const enums = p?.schema?.items?.enum;
+    assert.ok(enums, 'auditTypes enum should be defined');
     assert.deepEqual([...enums].sort(), ['action', 'create', 'delete', 'update']);
   });
 
@@ -175,7 +176,9 @@ describe('/v2/audit/node', () => {
 
   it('categories has correct enum', () => {
     const p = findParam(getParams(pathKey), 'categories');
+    assert.ok(p, 'should have categories param');
     const enums = p?.schema?.items?.enum;
+    assert.ok(enums, 'categories enum should exist');
     assert.deepEqual([...enums].sort(), ['Node Action', 'Node Update', 'OS Update']);
   });
 
