@@ -666,8 +666,12 @@ paths:
                       example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
                       type: string
                     meta:
-                      description: Additional metadata (nullable)
+                      description: >-
+                        Additional metadata about the flow event. Contents vary
+                        by event source and may include arbitrary string,
+                        numeric, or nested values. Nullable.
                       type: object
+                      additionalProperties: true
                       nullable: true
                   type: object
                 type: array
@@ -1205,8 +1209,11 @@ paths:
                         description: >-
                           Compiled firewall policy snapshot derived from virtual
                           network access policies. Read-only; updated automatically
-                          when network policies change.
+                          when network policies change. Shape mirrors the
+                          internal iptables-style rule set and is not part of
+                          the public API contract — treat as opaque.
                         type: object
+                        additionalProperties: true
                 type: object
         '404':
           description: Not found
@@ -1253,7 +1260,18 @@ paths:
                         description: Human-readable rule name
                         type: string
                       telemetry:
-                        description: Shadow `reported` key to evaluate (e.g. `memory`, `storage`)
+                        description: Telemetry metric to evaluate
+                        enum:
+                          - cpu
+                          - ram
+                          - disk
+                          - heap
+                          - embflows
+                          - latency
+                          - bandwidthIn
+                          - bandwidthOut
+                          - tcpResets
+                          - vpnFlows
                         type: string
                       max:
                         description: Upper bound — alert fires when the value exceeds this
@@ -1262,7 +1280,10 @@ paths:
                         description: Number of time units the value must continuously exceed `max`
                         type: number
                       exceededWindowUnit:
-                        description: Time unit for `exceededWindow` (e.g. `minutes`, `hours`)
+                        description: Time unit for `exceededWindow`
+                        enum:
+                          - minutes
+                          - hours
                         type: string
         description: Alert configuration
         required: true
@@ -1720,7 +1741,56 @@ paths:
       description: |
         Applicable to appliances only.
       requestBody:
-        $ref: '#/components/requestBodies/Config2'
+        required: true
+        content:
+          application/json:
+            schema:
+              description: Node-level alert threshold configuration
+              type: object
+              properties:
+                enabled:
+                  description: Whether alert threshold evaluation is active on this node
+                  type: boolean
+                thresholds:
+                  description: Alert rules evaluated against shadow reported telemetry values
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        description: Rule ID (UUID)
+                        type: string
+                      name:
+                        description: Human-readable rule name
+                        type: string
+                      telemetry:
+                        description: Telemetry metric to evaluate
+                        enum:
+                          - cpu
+                          - ram
+                          - disk
+                          - heap
+                          - embflows
+                          - latency
+                          - bandwidthIn
+                          - bandwidthOut
+                          - tcpResets
+                          - vpnFlows
+                        type: string
+                      max:
+                        description: Upper bound — alert fires when the value exceeds this
+                        type: number
+                      exceededWindow:
+                        description: >-
+                          Number of time units the value must continuously exceed
+                          `max` before the alert fires
+                        type: number
+                      exceededWindowUnit:
+                        description: Time unit for `exceededWindow`
+                        enum:
+                          - minutes
+                          - hours
+                        type: string
       responses:
         '200':
           description: OK
@@ -1734,7 +1804,40 @@ paths:
       description: |
         Applicable to appliances only.
       requestBody:
-        $ref: '#/components/requestBodies/Config2'
+        required: true
+        content:
+          application/json:
+            schema:
+              description: HA cluster configuration for the node
+              type: object
+              properties:
+                enabled:
+                  description: Whether the node participates in an HA cluster
+                  type: boolean
+                host:
+                  description: Peer IP or hostname used for cluster heartbeat and state sync
+                  type: string
+                port:
+                  description: TCP port used for cluster heartbeat and state sync
+                  type: integer
+                statusHost:
+                  description: Optional dedicated host used for cluster status checks
+                  type: string
+                statusPort:
+                  description: Optional dedicated port used for cluster status checks
+                  type: integer
+                master:
+                  description: True when this node is currently the active master of the cluster pair
+                  type: boolean
+                updateTime:
+                  description: Unix timestamp of the last cluster config change
+                  type: integer
+                versionCounter:
+                  description: Monotonically increasing config version counter
+                  type: integer
+                masterVersion:
+                  description: Config version currently held by the cluster master
+                  type: integer
       responses:
         '200':
           description: OK
@@ -3570,8 +3673,12 @@ paths:
                       example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
                       type: string
                     meta:
-                      description: Additional metadata (nullable)
+                      description: >-
+                        Additional metadata about the flow event. Contents vary
+                        by event source and may include arbitrary string,
+                        numeric, or nested values. Nullable.
                       type: object
+                      additionalProperties: true
                       nullable: true
                   type: object
                 type: array
@@ -9003,13 +9110,6 @@ components:
             type: object
       description: Network Config
       required: true
-    Config2:
-      content:
-        application/json:
-          schema:
-            type: object
-      description: Config body
-      required: true
     AlarmChannelModel:
       content:
         application/json:
@@ -9370,8 +9470,31 @@ components:
     ClusterModel:
       properties:
         config:
-          description: Cluster Configuration
+          description: >-
+            Cluster-wide configuration. Mirrors the subset of node configuration
+            sections that are shared across cluster members. Use the
+            `/cluster/{clusterFQDN}/config/*` endpoints to modify individual
+            sections rather than editing this object directly.
           type: object
+          properties:
+            exec:
+              $ref: '#/components/schemas/NodeExecConfig'
+            vpn:
+              $ref: '#/components/schemas/NodeVpnConfig'
+            network:
+              $ref: '#/components/schemas/NodeNetworkConfig'
+            services:
+              $ref: '#/components/schemas/NodeServicesConfig'
+            connectors:
+              $ref: '#/components/schemas/NodeConnectorsConfig'
+            apigw:
+              description: API gateway configuration
+              type: object
+              additionalProperties: true
+            core:
+              description: Opaque core platform configuration — a free-form map of string keys to values
+              type: object
+              additionalProperties: true
         domain:
           description: Cluster domain
           type: string
@@ -10727,22 +10850,7 @@ components:
                   description: Config version currently held by the cluster master
                   type: integer
             exec:
-              description: Edge compute (container runtime) configuration
-              type: object
-              properties:
-                commands:
-                  description: Container definitions managed by this node
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/ContainerConfig'
-                volumes:
-                  description: Named volumes available to containers on this node
-                  type: array
-                  items:
-                    type: object
-                limits:
-                  description: Global resource limits applied across all containers
-                  type: object
+              $ref: '#/components/schemas/NodeExecConfig'
             snmp:
               description: SNMPv3 monitoring agent configuration
               type: object
@@ -10802,7 +10910,18 @@ components:
                         description: Human-readable rule name
                         type: string
                       telemetry:
-                        description: Shadow `reported` key to evaluate (e.g. `memory`, `storage`)
+                        description: Telemetry metric to evaluate
+                        enum:
+                          - cpu
+                          - ram
+                          - disk
+                          - heap
+                          - embflows
+                          - latency
+                          - bandwidthIn
+                          - bandwidthOut
+                          - tcpResets
+                          - vpnFlows
                         type: string
                       max:
                         description: Upper bound — alert fires when the value exceeds this
@@ -10813,45 +10932,13 @@ components:
                           `max` before the alert fires
                         type: number
                       exceededWindowUnit:
-                        description: Time unit for `exceededWindow` (e.g. `minutes`, `hours`)
+                        description: Time unit for `exceededWindow`
+                        enum:
+                          - minutes
+                          - hours
                         type: string
             vpn:
-              description: Virtual network (overlay) membership and routing configuration
-              type: object
-              properties:
-                networks:
-                  description: Per-virtual-network configuration entries for this node
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        description: Virtual network numeric ID
-                        type: integer
-                      name:
-                        description: Virtual network name
-                        type: string
-                      ip:
-                        description: Node's IP address within this virtual network
-                        type: string
-                      interfaces:
-                        description: LAN-side interface bindings with inside/outside NAT rules
-                        type: array
-                        items:
-                          type: object
-                      routes:
-                        description: Routes exported into or imported from this virtual network
-                        type: array
-                        items:
-                          type: object
-                      services:
-                        description: Services exposed through this virtual network
-                        type: array
-                        items:
-                          type: object
-                      dns:
-                        description: DNS settings for this virtual network membership
-                        type: object
+              $ref: '#/components/schemas/NodeVpnConfig'
             dns:
               description: Local DNS resolver configuration on the node
               type: object
@@ -10874,103 +10961,11 @@ components:
                         description: Hostname for this record
                         type: string
             network:
-              description: >-
-                Layer-3 network configuration — physical interfaces, tunnels,
-                static routes, NAT rules, ACLs, traffic rules, and VRFs
-              type: object
-              properties:
-                interfaces:
-                  description: Physical and logical network interface configurations
-                  type: array
-                  items:
-                    type: object
-                tunnels:
-                  description: IPsec, GRE, WireGuard, and VNet tunnel definitions
-                  type: array
-                  items:
-                    type: object
-                routes:
-                  description: Static routes installed on this node
-                  type: array
-                  items:
-                    type: object
-                nats:
-                  description: NAT rules (SNAT, DNAT, masquerade)
-                  type: array
-                  items:
-                    type: object
-                acls:
-                  description: IP access control rules
-                  type: array
-                  items:
-                    type: object
-                rules:
-                  description: Advanced traffic shaping and policy-based forwarding rules
-                  type: array
-                  items:
-                    type: object
-                vrfs:
-                  description: VRF (Virtual Routing and Forwarding) instance definitions
-                  type: array
-                  items:
-                    type: object
-                darkMode:
-                  description: When true the node ignores unsolicited inbound traffic (stealth mode)
-                  type: boolean
-                forwarding:
-                  description: Enable IP forwarding between interfaces
-                  type: boolean
-                bridgeCIDR:
-                  description: CIDR assigned to the bridge interface used by container networking
-                  type: string
+              $ref: '#/components/schemas/NodeNetworkConfig'
             services:
-              description: Edge service (port-forwarding target) configuration
-              type: object
-              properties:
-                enabled:
-                  description: Whether the services plugin is active on this node
-                  type: boolean
-                version:
-                  description: >-
-                    Schema version — `2` means `items` is a UUID-keyed map;
-                    absent means `services` is a legacy ordered array
-                  type: integer
-                  enum:
-                    - 2
-                items:
-                  description: Service definitions keyed by UUID (version 2 only)
-                  type: object
-                  additionalProperties:
-                    type: object
-                services:
-                  description: Service definitions as an ordered array (legacy version 1 only)
-                  type: array
-                  items:
-                    type: object
+              $ref: '#/components/schemas/NodeServicesConfig'
             connectors:
-              description: Edge connector (outbound tunnel endpoint) configuration
-              type: object
-              properties:
-                enabled:
-                  description: Whether the connectors plugin is active on this node
-                  type: boolean
-                version:
-                  description: >-
-                    Schema version — `2` means `items` is a UUID-keyed map;
-                    absent means `connectors` is a legacy ordered array
-                  type: integer
-                  enum:
-                    - 2
-                items:
-                  description: Connector definitions keyed by UUID (version 2 only)
-                  type: object
-                  additionalProperties:
-                    type: object
-                connectors:
-                  description: Connector definitions as an ordered array (legacy version 1 only)
-                  type: array
-                  items:
-                    type: object
+              $ref: '#/components/schemas/NodeConnectorsConfig'
             jvm:
               description: JVM heap memory settings for embedded Java workloads
               type: object
@@ -11006,8 +11001,12 @@ components:
           type: object
           properties:
             desired:
-              description: Pending configuration changes the node has not yet applied. Typically empty.
+              description: >-
+                Pending configuration changes the node has not yet applied.
+                Typically empty; when populated, contents mirror the structure
+                of `reported` (flat dot-notation key-value map).
               type: object
+              additionalProperties: true
             reported:
               description: >-
                 Live telemetry reported by the node. Keys use dot-notation
@@ -11021,8 +11020,10 @@ components:
             - INACTIVE
           type: string
         tags:
-          description: Node tags
+          description: User-defined tags for organizing and filtering nodes
           type: object
+          additionalProperties:
+            type: string
         type:
           description: Device type
           enum:
@@ -11058,8 +11059,14 @@ components:
           additionalProperties:
             type: string
         keys:
-          description: Named cryptographic public keys used for node authentication and WireGuard tunneling. Always returned but rarely needed directly.
+          description: >-
+            Named cryptographic public keys used for node authentication and
+            WireGuard tunneling. Keyed by purpose (e.g. `wireguard`,
+            `identity`); values are opaque string-encoded public keys.
+            Always returned but rarely needed directly.
           type: object
+          additionalProperties:
+            type: string
         tgrn:
           description: "Trustgrid Resource Name \u2014 a globally unique identifier for this node across the platform. Format: `tgrn:tg::nodes:node/{uid}`. Always returned."
           example: tgrn:tg::nodes:node/19084f81-5668-41ee-adbe-295e4c65531a
@@ -11083,6 +11090,21 @@ components:
         location:
           description: IP geolocation derived from the node's last observed IP address. Omitted when projection[] is used without this field.
           type: object
+          properties:
+            latitude:
+              type: number
+            longitude:
+              type: number
+            city:
+              type: string
+            region:
+              description: State, province, or administrative region
+              type: string
+            country:
+              description: ISO country code
+              type: string
+            zipcode:
+              type: string
         heartbeat:
           description: Most recent heartbeat received from the node's control plane connection. Omitted when projection[] is used without this field.
           type: object
@@ -11115,6 +11137,533 @@ components:
           type: string
       title: Node
       type: object
+    NodeConnectorsConfig:
+      description: Edge connector (outbound tunnel endpoint) configuration
+      type: object
+      properties:
+        enabled:
+          description: Whether the connectors plugin is active on this node
+          type: boolean
+        version:
+          description: >-
+            Schema version — `2` means `items` is a UUID-keyed map;
+            absent means `connectors` is a legacy ordered array
+          type: integer
+          enum:
+            - 2
+        items:
+          description: Connector definitions keyed by UUID (version 2 only)
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/EdgeConnector'
+        connectors:
+          description: Connector definitions as an ordered array (legacy version 1 only)
+          type: array
+          items:
+            $ref: '#/components/schemas/EdgeConnector'
+    NodeExecConfig:
+      description: Edge compute (container runtime) configuration
+      type: object
+      properties:
+        commands:
+          description: Container definitions managed by this node
+          type: array
+          items:
+            $ref: '#/components/schemas/ContainerConfig'
+        volumes:
+          description: Named volumes available to containers on this node
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                description: Volume name (referenced by container mounts)
+                type: string
+              encrypted:
+                description: Whether the volume is stored encrypted on disk
+                type: boolean
+              location:
+                description: Optional filesystem path backing the volume
+                type: string
+        limits:
+          description: Global resource limits applied across all containers
+          type: object
+          properties:
+            cpuMax:
+              description: Maximum CPU utilization across all containers (percent of a single core, e.g. 200 for 2 cores)
+              type: number
+            memMax:
+              description: Hard memory limit in bytes
+              type: number
+            memHigh:
+              description: Soft memory limit in bytes (throttling threshold)
+              type: number
+            ioRbps:
+              description: Maximum aggregate read throughput in bytes per second
+              type: number
+            ioWbps:
+              description: Maximum aggregate write throughput in bytes per second
+              type: number
+            ioRiops:
+              description: Maximum aggregate read IOPS
+              type: number
+            ioWiops:
+              description: Maximum aggregate write IOPS
+              type: number
+    NodeNetworkConfig:
+      description: >-
+        Layer-3 network configuration — physical interfaces, tunnels,
+        static routes, NAT rules, ACLs, traffic rules, and VRFs
+      type: object
+      properties:
+        interfaces:
+          description: Physical and logical network interface configurations
+          type: array
+          items:
+            type: object
+            properties:
+              nic:
+                description: Physical or virtual NIC name (e.g. `eth0`)
+                type: string
+              vrf:
+                description: VRF this interface belongs to
+                type: string
+              virtual:
+                description: True when this is a virtual (bridge or bonded) interface rather than a physical NIC
+                type: boolean
+              dhcp:
+                description: Whether the interface gets its address via DHCP
+                type: boolean
+              ip:
+                description: Static IP address (with prefix length) when DHCP is disabled
+                type: string
+              subnet:
+                description: Subnet mask or CIDR
+                type: string
+              gateway:
+                description: Default gateway reachable through this interface
+                type: string
+              dns:
+                description: DNS server addresses configured on this interface
+                type: array
+                items:
+                  type: string
+              mtu:
+                description: Maximum transmission unit in bytes
+                type: integer
+              duplex:
+                description: Link duplex mode (`full`, `half`, `auto`)
+                type: string
+              speed:
+                description: Link speed in Mbps
+                type: number
+              mode:
+                description: Configuration mode
+                enum:
+                  - auto
+                  - manual
+                type: string
+              description:
+                type: string
+              subInterfaces:
+                description: VLAN sub-interfaces attached to this NIC
+                type: array
+                items:
+                  type: object
+                  properties:
+                    vlanID:
+                      type: integer
+                    vrf:
+                      type: string
+                    ip:
+                      type: string
+                    description:
+                      type: string
+              routes:
+                description: Per-interface static routes
+                type: array
+                items:
+                  type: object
+                  properties:
+                    route:
+                      type: string
+                    next:
+                      type: string
+                    description:
+                      type: string
+        tunnels:
+          description: IPsec, GRE, WireGuard, and VNet tunnel definitions
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                description: Tunnel type
+                enum:
+                  - ipsec
+                  - gre
+                  - vnet
+                  - wireguard
+                type: string
+              name:
+                description: Tunnel name (unique on the node)
+                type: string
+              enabled:
+                type: boolean
+              description:
+                type: string
+              ip:
+                description: Local tunnel endpoint IP
+                type: string
+              vrf:
+                description: VRF the tunnel terminates in
+                type: string
+              mtu:
+                type: integer
+              destination:
+                description: Remote tunnel endpoint (IPsec, GRE)
+                type: string
+              networkId:
+                description: Virtual network ID (vnet tunnels) or IPsec SA ID
+                type: integer
+              publicKey:
+                description: WireGuard peer public key (wireguard tunnels)
+                type: string
+              presharedKey:
+                description: WireGuard preshared key (wireguard tunnels)
+                type: string
+              ike:
+                description: IKE version (ipsec tunnels)
+                type: integer
+              ikeCipher:
+                description: IKE cipher suite (ipsec tunnels)
+                type: string
+              ikeGroup:
+                description: IKE Diffie-Hellman group (ipsec tunnels)
+                type: integer
+              ipsecCipher:
+                description: ESP cipher suite (ipsec tunnels)
+                type: string
+              psk:
+                description: Pre-shared key (ipsec tunnels)
+                type: string
+              localId:
+                type: string
+              remoteId:
+                type: string
+              localSubnet:
+                type: string
+              remoteSubnet:
+                type: string
+              pfs:
+                type: integer
+              dpdInterval:
+                type: integer
+              dpdRetries:
+                type: integer
+              rekeyInterval:
+                type: integer
+              replayWindow:
+                type: integer
+              auto:
+                enum:
+                  - add
+                  - start
+                type: string
+        routes:
+          description: Static routes installed on this node
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              dest:
+                description: Destination CIDR
+                type: string
+              via:
+                description: Next-hop gateway IP
+                type: string
+              dev:
+                description: Egress interface or tunnel name
+                type: string
+              metric:
+                description: Route metric (lower is preferred)
+                type: number
+              description:
+                type: string
+        nats:
+          description: NAT rules (SNAT, DNAT, masquerade)
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              source:
+                description: Source CIDR the rule matches
+                type: string
+              dest:
+                description: Destination CIDR the rule matches
+                type: string
+              toSource:
+                description: Rewrite source to this address (SNAT)
+                type: string
+              toDest:
+                description: Rewrite destination to this address (DNAT)
+                type: string
+              masquerade:
+                description: When true, source is rewritten to the egress interface's address
+                type: boolean
+              description:
+                type: string
+        acls:
+          description: IP access control rules
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              line:
+                description: Rule ordering; lower values evaluate first
+                type: number
+              protocol:
+                description: Protocol (`tcp`, `udp`, `icmp`, `any`)
+                type: string
+              source:
+                description: Source CIDR the rule matches
+                type: string
+              dest:
+                description: Destination CIDR the rule matches
+                type: string
+              ports:
+                description: Destination port or port range (e.g. `443`, `1000-2000`)
+                type: string
+              action:
+                description: Rule action (`accept`, `drop`, `reject`)
+                type: string
+              description:
+                type: string
+        rules:
+          description: Advanced traffic shaping and policy-based forwarding rules
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              line:
+                description: Rule ordering; lower values evaluate first
+                type: number
+              in:
+                description: Ingress interface the rule matches
+                type: string
+              iface:
+                description: Egress interface override
+                type: string
+              vrf:
+                description: VRF the rule applies within
+                type: string
+              protocol:
+                type: string
+              source:
+                type: string
+              dest:
+                type: string
+              ports:
+                type: string
+              action:
+                type: string
+              snat:
+                description: When true, source-NAT matching traffic
+                type: boolean
+              dnat:
+                description: When set, destination-NAT matching traffic to this address
+                type: string
+              dmac:
+                description: When set, override destination MAC address for matching traffic
+                type: string
+              description:
+                type: string
+        vrfs:
+          description: VRF (Virtual Routing and Forwarding) instance definitions
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                description: VRF name
+                type: string
+              description:
+                type: string
+              forwarding:
+                description: Whether IP forwarding is enabled within this VRF
+                type: boolean
+              routes:
+                description: Static routes scoped to this VRF (same shape as top-level `routes`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              nats:
+                description: NAT rules scoped to this VRF (same shape as top-level `nats`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              acls:
+                description: ACLs scoped to this VRF (same shape as top-level `acls`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              rules:
+                description: Traffic rules scoped to this VRF (same shape as top-level `rules`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        darkMode:
+          description: When true the node ignores unsolicited inbound traffic (stealth mode)
+          type: boolean
+        forwarding:
+          description: Enable IP forwarding between interfaces
+          type: boolean
+        bridgeCIDR:
+          description: CIDR assigned to the bridge interface used by container networking
+          type: string
+    NodeServicesConfig:
+      description: Edge service (port-forwarding target) configuration
+      type: object
+      properties:
+        enabled:
+          description: Whether the services plugin is active on this node
+          type: boolean
+        version:
+          description: >-
+            Schema version — `2` means `items` is a UUID-keyed map;
+            absent means `services` is a legacy ordered array
+          type: integer
+          enum:
+            - 2
+        items:
+          description: Service definitions keyed by UUID (version 2 only)
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/EdgeService'
+        services:
+          description: Service definitions as an ordered array (legacy version 1 only)
+          type: array
+          items:
+            $ref: '#/components/schemas/EdgeService'
+    NodeVpnConfig:
+      description: Virtual network (overlay) membership and routing configuration
+      type: object
+      properties:
+        networks:
+          description: Per-virtual-network configuration entries for this node
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                description: Virtual network numeric ID
+                type: integer
+              name:
+                description: Virtual network name
+                type: string
+              ip:
+                description: Node's IP address within this virtual network
+                type: string
+              interfaces:
+                description: LAN-side interface bindings with inside/outside NAT rules
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      description: Local NIC or bridge bound into the virtual network
+                      type: string
+                    inDefaultRoute:
+                      description: When true, inbound traffic from the VPN uses this interface as its default route
+                      type: boolean
+                    outDefaultRoute:
+                      description: When true, outbound traffic to the VPN uses this interface as its default route
+                      type: boolean
+                    insideNats:
+                      description: NAT rules mapping local CIDRs to CIDRs on the VPN side (inbound)
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          localCidr:
+                            type: string
+                          networkCidr:
+                            type: string
+                          description:
+                            type: string
+                    outsideNats:
+                      description: NAT rules mapping VPN CIDRs to local CIDRs (outbound)
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          localCidr:
+                            type: string
+                          networkCidr:
+                            type: string
+                          networkGroup:
+                            type: string
+                          description:
+                            type: string
+              routes:
+                description: Routes exported into or imported from this virtual network
+                type: array
+                items:
+                  type: object
+                  properties:
+                    node:
+                      description: Node FQDN advertising this route
+                      type: string
+                    networkCidr:
+                      description: CIDR being advertised
+                      type: string
+                    metric:
+                      description: Route metric (lower is preferred)
+                      type: number
+                    path:
+                      description: Route path type (e.g. `primary`, `backup`)
+                      type: string
+                    description:
+                      type: string
+              services:
+                description: Services exposed through this virtual network
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      description: Service name
+                      type: string
+                    ip:
+                      description: IP address the service is advertised on within the VPN
+                      type: string
+                    port:
+                      description: TCP port the service listens on
+                      type: number
+              dns:
+                description: DNS settings for this virtual network membership
+                type: object
+                properties:
+                  enabled:
+                    description: Whether VPN-side DNS forwarding is enabled
+                    type: boolean
+                  upstream:
+                    description: Upstream DNS servers to forward VPN queries to
+                    type: array
+                    items:
+                      type: string
     NodeUpgrade:
       description: NodeUpgrade
       properties:
@@ -11186,6 +11735,16 @@ components:
         comments:
           items:
             type: object
+            properties:
+              body:
+                description: Comment text
+                type: string
+              author:
+                description: User ID of the commenter
+                type: string
+              timestamp:
+                description: Unix timestamp (seconds) when the comment was posted
+                type: integer
           type: array
         companyName:
           type: string
@@ -12094,6 +12653,45 @@ components:
               type: array
               items:
                 type: object
+                properties:
+                  name:
+                    description: Human-readable client name
+                    type: string
+                  publicKey:
+                    description: WireGuard peer public key
+                    type: string
+                  presharedKey:
+                    description: Optional pre-shared key for the WireGuard tunnel
+                    type: string
+                  defaultRouting:
+                    description: When true, the client uses this VPN as its default route
+                    type: boolean
+                  insideNats:
+                    description: NAT rules mapping local CIDRs to client-side CIDRs (inbound)
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        localCidr:
+                          type: string
+                        networkCidr:
+                          type: string
+                        description:
+                          type: string
+                  outsideNats:
+                    description: NAT rules mapping client-side CIDRs to local CIDRs (outbound)
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        localCidr:
+                          type: string
+                        networkCidr:
+                          type: string
+                        networkGroup:
+                          type: string
+                        description:
+                          type: string
       type: object
     VpnNodeNetworkModel:
       description: Summary of a VPN network attached to a node, as returned by the list endpoint
