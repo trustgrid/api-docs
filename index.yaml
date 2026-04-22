@@ -1581,6 +1581,12 @@ paths:
     get:
       operationId: getNodeLicense
       summary: Generate a license key for registering a new node to the organization
+      description: |-
+        Generates a license key that an appliance node uses to register with the organization.
+
+        ---
+
+        Requires `nodes::manage` permission.
       responses:
         '200':
           description: License body
