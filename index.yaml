@@ -12147,7 +12147,7 @@ components:
       type: object
     ServiceConfig:
       example:
-        connectors:
+        services:
           - description: nginx
             enabled: true
             host: 127.0.0.1
@@ -12156,7 +12156,7 @@ components:
             port: 80
             protocol: tcp
       properties:
-        connectors:
+        services:
           items:
             properties:
               description:
