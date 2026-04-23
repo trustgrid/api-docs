@@ -468,17 +468,17 @@ paths:
 
         Requires `audits::read:flows` permission.
       parameters:
-        - description: Unix timestamp for the start of the log window
+        - description: Unix timestamp lower bound for the flow start time
           in: query
           name: sTime
           schema:
             type: number
-        - description: Unix timestamp for the end of the log window
+        - description: Unix timestamp upper bound for the flow start time. This does not filter by flow end time.
           in: query
           name: eTime
           schema:
             type: number
-        - description: Comparison operator for the end of the log window
+        - description: Comparison operator for the `eTime` flow start time bound. There is no end-time query filter.
           in: query
           name: eTimeOp
           schema:
@@ -3480,17 +3480,17 @@ paths:
       summary: Retrieve network traffic flow logs with advanced filtering and pagination
       description: Requires `audits::read:flows` permission.
       parameters:
-        - description: Unix timestamp for the start of the log window
+        - description: Unix timestamp lower bound for the flow start time
           in: query
           name: sTime
           schema:
             type: number
-        - description: Unix timestamp for the end of the log window
+        - description: Unix timestamp upper bound for the flow start time. This does not filter by flow end time.
           in: query
           name: eTime
           schema:
             type: number
-        - description: Comparison operator for the end of the log window
+        - description: Comparison operator for the `eTime` flow start time bound. There is no end-time query filter.
           in: query
           name: eTimeOp
           schema:
