@@ -1602,6 +1602,12 @@ paths:
     get:
       operationId: getNodeLicense
       summary: Generate a license key for registering a new node to the organization
+      description: |-
+        Generates a license key that an appliance node uses to register with the organization.
+
+        ---
+
+        Requires `nodes::manage` permission.
       responses:
         '200':
           description: License body
@@ -2425,8 +2431,12 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
+              anyOf:
+                - $ref: '#/components/schemas/NodeTriggerContainerActionRequest'
+                - $ref: '#/components/schemas/NodeTriggerContainerImageRequest'
+                - $ref: '#/components/schemas/NodeTriggerContainerStatusRequest'
+                - type: object
+                  additionalProperties: true
               description: >-
                 Optional event-specific payload. The request body shape depends on
                 the `{event}` being executed.
@@ -11973,20 +11983,18 @@ components:
       properties:
         ne:
           type: object
-          properties:
-            additionalProperties:
-              description: Conditions to not match
-              type: array
-              items:
-                type: string
+          additionalProperties:
+            description: Conditions to not match
+            type: array
+            items:
+              type: string
         eq:
           type: object
-          properties:
-            additionalProperties:
-              description: Conditions to match
-              type: array
-              items:
-                type: string
+          additionalProperties:
+            description: Conditions to match
+            type: array
+            items:
+              type: string
     Policy:
       description: Policy
       properties:
@@ -12148,7 +12156,7 @@ components:
             port: 80
             protocol: tcp
       properties:
-        connectors:
+        services:
           items:
             properties:
               description:
