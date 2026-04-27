@@ -2008,12 +2008,11 @@ paths:
         groups. Each peer group has its own import and export policies. Import
         policies select which advertised routes are added to the local routing
         table. Export policies select which prefixes are advertised to peers,
-        and may match by prefix, by virtual network ID (the route is
-        automatically withdrawn when the matched VPN route becomes unhealthy
-        or its data plane is disconnected — see `BGPExportPolicy.match.network`
-        for the full list of withdraw triggers), or both. When the node is
-        part of a cluster, an export policy with `match.cluster: true` is
-        only advertised by the active cluster member.
+        and may match by prefix, by virtual network ID, or both — see
+        `BGPExportPolicy.match.network` for the full list of triggers that
+        cause an exported route to be withdrawn. When the node is part of a
+        cluster, an export policy with `match.cluster: true` is only
+        advertised by the active cluster member.
 
         BGP timers (hold time, keepalive, connect-retry), address families,
         and eBGP-multihop / TTL are not user-configurable through this API;
@@ -2041,6 +2040,8 @@ paths:
       description: |-
         Clear the BGP plugin configuration on a node (appliance), stopping
         the BGP server and removing all peer groups, peers, and policies.
+        Idempotent: returns `200` whether or not BGP was previously
+        configured.
 
         ---
 
@@ -9780,14 +9781,14 @@ components:
               type: string
             prefixes:
               description: |-
-                Optional list of prefixes that the action applies to in
-                addition to those in `match.prefixes`. The effective set of
-                advertised (or denied) prefixes is the union of
-                `match.prefixes` and `action.prefixes`. New configurations
-                should put all prefixes in `match.prefixes`; this list is
-                retained primarily for backwards compatibility with policies
-                that were authored before the two lists were unified in the
-                portal.
+                Optional list of prefixes that the action applies to, in
+                addition to those listed under `match.prefixes`. New
+                configurations should put all prefixes in `match.prefixes`
+                and leave this empty; the field is retained for backwards
+                compatibility with policies authored before the two lists
+                were unified in the portal. The exact merge semantics
+                between `match.prefixes` and `action.prefixes` are
+                determined by the BGP plugin on the node.
               items:
                 $ref: '#/components/schemas/BGPExportPrefix'
               type: array
