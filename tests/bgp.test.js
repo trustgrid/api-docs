@@ -1,30 +1,47 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
-const spec = parse(fs.readFileSync("index.yaml", "utf8"));
+const specPath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "index.yaml"
+);
+const spec = parse(fs.readFileSync(specPath, "utf8"));
 
 describe("BGP plugin paths", () => {
-  it("defines the node BGP config endpoint", () => {
-    const path = spec.paths["/v2/node/{nodeID}/config/network/bgp"];
+  const path = spec.paths["/v2/node/{nodeID}/config/network/bgp"];
+
+  it("defines GET, PUT, and DELETE on the node BGP path", () => {
     assert.ok(path, "/v2/node/{nodeID}/config/network/bgp should exist");
-    assert.ok(path.put, "PUT should be defined on the node BGP path");
+    assert.ok(path.get, "GET should be defined for round-tripping config");
+    assert.ok(path.put, "PUT should be defined to replace config");
+    assert.ok(path.delete, "DELETE should be defined to clear config");
+    assert.equal(path.get.operationId, "getNodeBGPConfig");
     assert.equal(path.put.operationId, "updateNodeBGPConfig");
+    assert.equal(path.delete.operationId, "deleteNodeBGPConfig");
   });
 
-  it("references the BGPConfig request body", () => {
-    const node = spec.paths["/v2/node/{nodeID}/config/network/bgp"].put;
+  it("returns BGPConfig from GET so it round-trips with PUT", () => {
     assert.equal(
-      node.requestBody.$ref,
+      path.get.responses["200"].content["application/json"].schema.$ref,
+      "#/components/schemas/BGPConfig"
+    );
+  });
+
+  it("references the BGPConfig request body on PUT", () => {
+    assert.equal(
+      path.put.requestBody.$ref,
       "#/components/requestBodies/BGPConfig"
     );
   });
 
-  it("documents the 422 validation response", () => {
-    const resp =
-      spec.paths["/v2/node/{nodeID}/config/network/bgp"].put.responses["422"];
-    assert.ok(resp, "node BGP path should have a 422 response");
+  it("documents the 422 validation response on PUT", () => {
+    const resp = path.put.responses["422"];
+    assert.ok(resp, "PUT should have a 422 response");
     assert.match(resp.description, /validation/i);
     assert.equal(
       resp.content["application/json"].schema.$ref,
@@ -32,11 +49,25 @@ describe("BGP plugin paths", () => {
     );
   });
 
-  it("tags the node endpoint as Appliance", () => {
-    assert.deepEqual(
-      spec.paths["/v2/node/{nodeID}/config/network/bgp"].put.tags,
-      ["Appliance"]
-    );
+  it("uses the plural `nodes::` permission token everywhere", () => {
+    for (const op of [path.get, path.put, path.delete]) {
+      assert.match(
+        op.description,
+        /nodes::/,
+        "BGP operations should use plural `nodes::` permission strings"
+      );
+      assert.doesNotMatch(
+        op.description,
+        /\bnode::configure/,
+        "BGP operations should not use singular `node::configure`"
+      );
+    }
+  });
+
+  it("tags every operation as Appliance", () => {
+    assert.deepEqual(path.get.tags, ["Appliance"]);
+    assert.deepEqual(path.put.tags, ["Appliance"]);
+    assert.deepEqual(path.delete.tags, ["Appliance"]);
   });
 });
 
@@ -100,6 +131,11 @@ describe("BGPPeerGroup schema", () => {
     assert.ok(schema.required.includes("name"));
   });
 
+  it("exposes a description field for UI annotation", () => {
+    assert.ok(schema.properties.description);
+    assert.equal(schema.properties.description.type, "string");
+  });
+
   it("references BGPPeer, BGPImportPolicy, and BGPExportPolicy", () => {
     assert.equal(
       schema.properties.peers.items.$ref,
@@ -133,6 +169,11 @@ describe("BGPPeer schema", () => {
       "secret should not be required"
     );
   });
+
+  it("exposes a description field for UI annotation", () => {
+    assert.ok(schema.properties.description);
+    assert.equal(schema.properties.description.type, "string");
+  });
 });
 
 describe("BGPImportPolicy schema", () => {
@@ -150,7 +191,7 @@ describe("BGPImportPolicy schema", () => {
 
   it("constrains action.action to allow or deny", () => {
     const enumVals = schema.properties.action.properties.action.enum;
-    assert.deepEqual(enumVals.sort(), ["allow", "deny"]);
+    assert.deepEqual([...enumVals].sort(), ["allow", "deny"]);
   });
 
   it("references BGPImportPrefix in match.prefixes", () => {
@@ -159,19 +200,28 @@ describe("BGPImportPolicy schema", () => {
       "#/components/schemas/BGPImportPrefix"
     );
   });
+
+  it("exposes a description field for UI annotation", () => {
+    assert.ok(schema.properties.description);
+    assert.equal(schema.properties.description.type, "string");
+  });
 });
 
 describe("BGPImportPrefix schema", () => {
   const schema = spec.components.schemas.BGPImportPrefix;
 
-  it("requires _id, prefix, and exact", () => {
+  it("requires _id and prefix; exact is optional and matches export shape", () => {
     assert.ok(schema, "BGPImportPrefix schema should exist");
-    for (const f of ["_id", "prefix", "exact"]) {
+    for (const f of ["_id", "prefix"]) {
       assert.ok(
         schema.required.includes(f),
         `BGPImportPrefix should require ${f}`
       );
     }
+    assert.ok(
+      !schema.required.includes("exact"),
+      "exact should be optional to match BGPExportPrefix"
+    );
     assert.equal(schema.properties.exact.type, "boolean");
   });
 });
@@ -204,14 +254,39 @@ describe("BGPExportPolicy schema", () => {
     );
   });
 
-  it("describes auto-withdraw behaviour for match.network", () => {
+  it("enumerates the auto-withdraw triggers for match.network", () => {
     const desc = schema.properties.match.properties.network.description;
     assert.match(desc, /withdraw/i);
+    // The triggers documented for WOR-9737: data-plane disconnect, no
+    // learned vnet route, route-monitor failure, and inactive cluster member.
+    for (const trigger of [
+      /data.plane/i,
+      /learned route/i,
+      /route monitor/i,
+      /active member/i
+    ]) {
+      assert.match(
+        desc,
+        trigger,
+        `match.network description should document ${trigger}`
+      );
+    }
   });
 
   it("constrains action.action to allow or deny", () => {
     const enumVals = schema.properties.action.properties.action.enum;
-    assert.deepEqual(enumVals.sort(), ["allow", "deny"]);
+    assert.deepEqual([...enumVals].sort(), ["allow", "deny"]);
+  });
+
+  it("exposes a description field for UI annotation", () => {
+    assert.ok(schema.properties.description);
+    assert.equal(schema.properties.description.type, "string");
+  });
+
+  it("documents action.prefixes as a backwards-compatibility list", () => {
+    const desc = schema.properties.action.properties.prefixes.description;
+    assert.match(desc, /match\.prefixes/i);
+    assert.match(desc, /backwards compat|legacy|union/i);
   });
 });
 

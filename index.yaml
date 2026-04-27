@@ -1977,6 +1977,27 @@ paths:
   /v2/node/{nodeID}/config/network/bgp:
     parameters:
       - $ref: '#/components/parameters/nodeID'
+    get:
+      summary: Get the BGP routing plugin configuration on an appliance
+      operationId: getNodeBGPConfig
+      description: |-
+        Returns the current BGP plugin configuration for a node (appliance),
+        suitable for round-tripping back to the corresponding `PUT`.
+
+        ---
+
+        Requires `nodes::read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BGPConfig'
+        '404':
+          description: BGP plugin not found on this node
+      tags:
+        - Appliance
     put:
       summary: Configure the BGP routing plugin on an appliance
       operationId: updateNodeBGPConfig
@@ -1987,15 +2008,20 @@ paths:
         groups. Each peer group has its own import and export policies. Import
         policies select which advertised routes are added to the local routing
         table. Export policies select which prefixes are advertised to peers,
-        and may match by prefix, by virtual network ID (in which case the
-        route is automatically withdrawn when the matched VPN route becomes
-        unhealthy or its data plane is disconnected), or both. When the node
-        is part of a cluster, an export policy with `match.cluster: true` is
+        and may match by prefix, by virtual network ID (the route is
+        automatically withdrawn when the matched VPN route becomes unhealthy
+        or its data plane is disconnected — see `BGPExportPolicy.match.network`
+        for the full list of withdraw triggers), or both. When the node is
+        part of a cluster, an export policy with `match.cluster: true` is
         only advertised by the active cluster member.
+
+        BGP timers (hold time, keepalive, connect-retry), address families,
+        and eBGP-multihop / TTL are not user-configurable through this API;
+        the platform sets BGP defaults and only IPv4 unicast is supported.
 
         ---
 
-        Requires `node::configure:network` permissions
+        Requires `nodes::configure:network` permission.
       requestBody:
         $ref: '#/components/requestBodies/BGPConfig'
       responses:
@@ -2007,6 +2033,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+    delete:
+      summary: Remove the BGP routing plugin configuration from an appliance
+      operationId: deleteNodeBGPConfig
+      description: |-
+        Clear the BGP plugin configuration on a node (appliance), stopping
+        the BGP server and removing all peer groups, peers, and policies.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      responses:
+        '200':
+          description: OK
       tags:
         - Appliance
   /node/{nodeID}/config/services:
@@ -9506,7 +9547,11 @@ components:
           minimum: 1
           type: integer
         client:
-          description: Whether this BGP speaker runs in client mode
+          description: |-
+            When `true`, this speaker behaves as a route-reflector client:
+            it relies on its iBGP peer to reflect learned routes rather than
+            full-meshing with every other internal peer. Leave `false` for
+            standard eBGP/iBGP roles.
           type: boolean
         groups:
           description: Peer groups configured on this BGP speaker
@@ -9530,6 +9575,9 @@ components:
         name:
           description: User-friendly name for the peer group
           example: upstream-isp
+          type: string
+        description:
+          description: Free-form note about this peer group, shown in the UI
           type: string
         peers:
           description: Remote BGP routers in this peer group
@@ -9583,6 +9631,9 @@ components:
             Optional MD5 passphrase used to authenticate the BGP session with
             this peer. When omitted the session is unauthenticated.
           type: string
+        description:
+          description: Free-form note about this peer, shown in the UI
+          type: string
       required:
         - _id
         - name
@@ -9603,6 +9654,9 @@ components:
         name:
           description: User-friendly name for the policy
           example: accept-defaults
+          type: string
+        description:
+          description: Free-form note about this policy, shown in the UI
           type: string
         match:
           description: Criteria used to match advertised routes
@@ -9649,16 +9703,15 @@ components:
         exact:
           description: |-
             When `true`, the advertised route's prefix length must equal the
-            prefix length configured here. When `false`, routes for the same
-            network with a different prefix length also match.
+            prefix length configured here. When omitted or `false`, routes
+            for the same network with a different prefix length also match.
           type: boolean
         description:
-          description: Optional description
+          description: Free-form note about this prefix entry, shown in the UI
           type: string
       required:
         - _id
         - prefix
-        - exact
       title: BGPImportPrefix
       type: object
     BGPExportPolicy:
@@ -9674,6 +9727,9 @@ components:
           description: User-friendly name for the policy
           example: vpn-exports
           type: string
+        description:
+          description: Free-form note about this policy, shown in the UI
+          type: string
         match:
           description: Criteria used to select which prefixes are exported
           properties:
@@ -9685,10 +9741,23 @@ components:
               type: boolean
             network:
               description: |-
-                Optional virtual network ID. When set, the policy matches the
-                node's route into that virtual network. The route is
-                automatically withdrawn when the virtual network route is
-                unhealthy or its data plane is disconnected.
+                Optional virtual network ID. When set, the policy matches
+                the node's route into that virtual network and the route is
+                automatically withdrawn (sent as a BGP `WITHDRAWN ROUTES`
+                update) when any of the following becomes true:
+
+                * the node has no learned route into the virtual network
+                  (the data plane has not converged or has lost the route)
+                * the node has lost data-plane connectivity to the virtual
+                  network's gateway / mesh peer
+                * route monitors attached to the VPN route fail their
+                  health check (e.g. ICMP / TCP probe to a configured
+                  destination)
+                * on a cluster, the node is not the active member (combined
+                  with `match.cluster: true`)
+
+                The route is re-advertised automatically once the underlying
+                vnet route becomes healthy again.
               example: 1955
               type: integer
             prefixes:
@@ -9711,8 +9780,14 @@ components:
               type: string
             prefixes:
               description: |-
-                Optional additional prefixes that the action applies to,
-                beyond those listed in `match.prefixes`.
+                Optional list of prefixes that the action applies to in
+                addition to those in `match.prefixes`. The effective set of
+                advertised (or denied) prefixes is the union of
+                `match.prefixes` and `action.prefixes`. New configurations
+                should put all prefixes in `match.prefixes`; this list is
+                retained primarily for backwards compatibility with policies
+                that were authored before the two lists were unified in the
+                portal.
               items:
                 $ref: '#/components/schemas/BGPExportPrefix'
               type: array
@@ -9744,7 +9819,7 @@ components:
             may also be advertised.
           type: boolean
         description:
-          description: Optional description
+          description: Free-form note about this prefix entry, shown in the UI
           type: string
       required:
         - _id
