@@ -1018,39 +1018,6 @@ paths:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Cluster
-  /v2/cluster/{clusterFQDN}/config/network/bgp:
-    parameters:
-      - $ref: '#/components/parameters/clusterFQDN'
-    put:
-      summary: Configure the BGP routing plugin for a cluster
-      operationId: updateClusterBGPConfig
-      description: |-
-        Replace the BGP plugin configuration on a cluster.
-
-        BGP runs on the active cluster member and exchanges routes with one or
-        more external peers grouped into peer groups. Each peer group has its
-        own import and export policies. Export policies may match by prefix,
-        by virtual network ID (the route is automatically withdrawn when the
-        matched VPN route becomes unhealthy or its data plane is disconnected),
-        or both, and may be restricted to advertise only when this node is the
-        active cluster member.
-
-        ---
-
-        Requires `node::configure:network` permissions.
-      requestBody:
-        $ref: '#/components/requestBodies/BGPConfig'
-      responses:
-        '200':
-          description: OK
-        '422':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationFailed'
-      tags:
-        - Cluster
   /cluster/{clusterFQDN}/config/services:
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
@@ -2028,7 +1995,7 @@ paths:
 
         ---
 
-        Requires `node::configure:network` permissions.
+        Requires `node::configure:network` permissions
       requestBody:
         $ref: '#/components/requestBodies/BGPConfig'
       responses:
@@ -9530,6 +9497,7 @@ components:
             Router ID for the local BGP speaker, in IPv4 dotted-quad form.
             Typically the IP of the interface used for BGP communication.
           example: 10.0.0.1
+          format: ipv4
           type: string
         asn:
           description: Autonomous System Number identifying the local router
@@ -9608,6 +9576,7 @@ components:
         ip:
           description: IP address that the peer can be reached at
           example: 10.0.0.254
+          format: ipv4
           type: string
         secret:
           description: |-

@@ -13,50 +13,29 @@ describe("BGP plugin paths", () => {
     assert.equal(path.put.operationId, "updateNodeBGPConfig");
   });
 
-  it("defines the cluster BGP config endpoint", () => {
-    const path = spec.paths["/v2/cluster/{clusterFQDN}/config/network/bgp"];
-    assert.ok(path, "/v2/cluster/{clusterFQDN}/config/network/bgp should exist");
-    assert.ok(path.put, "PUT should be defined on the cluster BGP path");
-    assert.equal(path.put.operationId, "updateClusterBGPConfig");
-  });
-
-  it("references the BGPConfig request body on both endpoints", () => {
+  it("references the BGPConfig request body", () => {
     const node = spec.paths["/v2/node/{nodeID}/config/network/bgp"].put;
-    const cluster =
-      spec.paths["/v2/cluster/{clusterFQDN}/config/network/bgp"].put;
     assert.equal(
       node.requestBody.$ref,
       "#/components/requestBodies/BGPConfig"
     );
+  });
+
+  it("documents the 422 validation response", () => {
+    const resp =
+      spec.paths["/v2/node/{nodeID}/config/network/bgp"].put.responses["422"];
+    assert.ok(resp, "node BGP path should have a 422 response");
+    assert.match(resp.description, /validation/i);
     assert.equal(
-      cluster.requestBody.$ref,
-      "#/components/requestBodies/BGPConfig"
+      resp.content["application/json"].schema.$ref,
+      "#/components/schemas/ValidationFailed"
     );
   });
 
-  it("documents 422 validation responses", () => {
-    for (const p of [
-      "/v2/node/{nodeID}/config/network/bgp",
-      "/v2/cluster/{clusterFQDN}/config/network/bgp"
-    ]) {
-      const resp = spec.paths[p].put.responses["422"];
-      assert.ok(resp, `${p} should have a 422 response`);
-      assert.match(resp.description, /validation/i);
-      assert.equal(
-        resp.content["application/json"].schema.$ref,
-        "#/components/schemas/ValidationFailed"
-      );
-    }
-  });
-
-  it("tags the node endpoint as Appliance and the cluster endpoint as Cluster", () => {
+  it("tags the node endpoint as Appliance", () => {
     assert.deepEqual(
       spec.paths["/v2/node/{nodeID}/config/network/bgp"].put.tags,
       ["Appliance"]
-    );
-    assert.deepEqual(
-      spec.paths["/v2/cluster/{clusterFQDN}/config/network/bgp"].put.tags,
-      ["Cluster"]
     );
   });
 });
