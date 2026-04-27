@@ -1018,6 +1018,39 @@ paths:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Cluster
+  /v2/cluster/{clusterFQDN}/config/network/bgp:
+    parameters:
+      - $ref: '#/components/parameters/clusterFQDN'
+    put:
+      summary: Configure the BGP routing plugin for a cluster
+      operationId: updateClusterBGPConfig
+      description: |-
+        Replace the BGP plugin configuration on a cluster.
+
+        BGP runs on the active cluster member and exchanges routes with one or
+        more external peers grouped into peer groups. Each peer group has its
+        own import and export policies. Export policies may match by prefix,
+        by virtual network ID (the route is automatically withdrawn when the
+        matched VPN route becomes unhealthy or its data plane is disconnected),
+        or both, and may be restricted to advertise only when this node is the
+        active cluster member.
+
+        ---
+
+        Requires `node::configure:network` permissions.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPConfig'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Cluster
   /cluster/{clusterFQDN}/config/services:
     parameters:
       - $ref: '#/components/parameters/clusterFQDN'
@@ -1972,6 +2005,41 @@ paths:
       responses:
         '200':
           description: OK
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    put:
+      summary: Configure the BGP routing plugin on an appliance
+      operationId: updateNodeBGPConfig
+      description: |-
+        Replace the BGP plugin configuration on a node (appliance).
+
+        BGP exchanges routes with one or more external peers grouped into peer
+        groups. Each peer group has its own import and export policies. Import
+        policies select which advertised routes are added to the local routing
+        table. Export policies select which prefixes are advertised to peers,
+        and may match by prefix, by virtual network ID (in which case the
+        route is automatically withdrawn when the matched VPN route becomes
+        unhealthy or its data plane is disconnected), or both. When the node
+        is part of a cluster, an export policy with `match.cluster: true` is
+        only advertised by the active cluster member.
+
+        ---
+
+        Requires `node::configure:network` permissions.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPConfig'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Appliance
   /node/{nodeID}/config/services:
@@ -8491,6 +8559,13 @@ components:
             $ref: '#/components/schemas/AlarmModel'
       description: Alarm body
       required: true
+    BGPConfig:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPConfig'
+      description: BGP plugin configuration
+      required: true
     TagValueModel:
       content:
         application/json:
@@ -9404,6 +9479,308 @@ components:
           example: 2DqxLdknjWxEkGt474d2Cstsa1O
           type: string
       title: Alert V2
+      type: object
+    BGPConfig:
+      description: |-
+        BGP plugin configuration for an appliance or cluster. The full BGP
+        config is replaced on each PUT.
+      example:
+        enabled: true
+        id: 10.0.0.1
+        asn: 65001
+        client: false
+        groups:
+          - _id: 8b4f2c9e-4d2a-4b8f-9a7c-1e2d3c4b5a6f
+            name: upstream-isp
+            peers:
+              - _id: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+                name: isp-router-1
+                asn: 65000
+                ip: 10.0.0.254
+                secret: shared-md5-secret
+            imports:
+              - _id: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+                name: accept-defaults
+                match:
+                  prefixes:
+                    - _id: 3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f
+                      prefix: 0.0.0.0/0
+                      exact: true
+                action:
+                  action: allow
+            exports:
+              - _id: 105bee71-5312-4c39-a1de-1dcf348e3f42
+                name: vpn-exports
+                match:
+                  cluster: true
+                  network: 1955
+                  prefixes:
+                    - _id: ed5d9187-4270-44db-892d-e2dc8b847a81
+                      prefix: 10.0.200.0/24
+                      exact: true
+                action:
+                  action: allow
+                  prefixes: []
+      properties:
+        enabled:
+          description: Whether the BGP server is running on the node
+          type: boolean
+        id:
+          description: |-
+            Router ID for the local BGP speaker, in IPv4 dotted-quad form.
+            Typically the IP of the interface used for BGP communication.
+          example: 10.0.0.1
+          type: string
+        asn:
+          description: Autonomous System Number identifying the local router
+          example: 65001
+          maximum: 4294967295
+          minimum: 1
+          type: integer
+        client:
+          description: Whether this BGP speaker runs in client mode
+          type: boolean
+        groups:
+          description: Peer groups configured on this BGP speaker
+          items:
+            $ref: '#/components/schemas/BGPPeerGroup'
+          type: array
+      required:
+        - enabled
+        - id
+        - asn
+      title: BGPConfig
+      type: object
+    BGPPeerGroup:
+      description: |-
+        A group of BGP peers that share import and export policies.
+      properties:
+        _id:
+          description: Unique ID of the peer group
+          example: 8b4f2c9e-4d2a-4b8f-9a7c-1e2d3c4b5a6f
+          type: string
+        name:
+          description: User-friendly name for the peer group
+          example: upstream-isp
+          type: string
+        peers:
+          description: Remote BGP routers in this peer group
+          items:
+            $ref: '#/components/schemas/BGPPeer'
+          type: array
+        imports:
+          description: |-
+            Policies controlling which routes advertised by peers in this
+            group are accepted into the local routing table.
+          items:
+            $ref: '#/components/schemas/BGPImportPolicy'
+          type: array
+        exports:
+          description: |-
+            Policies controlling which prefixes are advertised to peers in
+            this group.
+          items:
+            $ref: '#/components/schemas/BGPExportPolicy'
+          type: array
+      required:
+        - _id
+        - name
+      title: BGPPeerGroup
+      type: object
+    BGPPeer:
+      description: A single remote BGP peer
+      properties:
+        _id:
+          description: Unique ID of the peer
+          example: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+          type: string
+        name:
+          description: User-friendly name for the peer
+          example: isp-router-1
+          type: string
+        asn:
+          description: |-
+            Autonomous System Number that the peer identifies itself with
+          example: 65000
+          maximum: 4294967295
+          minimum: 1
+          type: integer
+        ip:
+          description: IP address that the peer can be reached at
+          example: 10.0.0.254
+          type: string
+        secret:
+          description: |-
+            Optional MD5 passphrase used to authenticate the BGP session with
+            this peer. When omitted the session is unauthenticated.
+          type: string
+      required:
+        - _id
+        - name
+        - asn
+        - ip
+      title: BGPPeer
+      type: object
+    BGPImportPolicy:
+      description: |-
+        Policy controlling which routes advertised by peers in a group are
+        accepted. Routes that match the listed prefixes follow `action.action`;
+        routes that don't match any policy are rejected.
+      properties:
+        _id:
+          description: Unique ID of the policy
+          example: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+          type: string
+        name:
+          description: User-friendly name for the policy
+          example: accept-defaults
+          type: string
+        match:
+          description: Criteria used to match advertised routes
+          properties:
+            prefixes:
+              description: Prefixes this policy applies to
+              items:
+                $ref: '#/components/schemas/BGPImportPrefix'
+              type: array
+          type: object
+        action:
+          description: Action to take when a route matches
+          properties:
+            action:
+              description: |-
+                * `allow` — matching advertised routes are added to the local
+                  routing table
+                * `deny` — matching advertised routes are rejected
+              enum:
+                - allow
+                - deny
+              type: string
+          required:
+            - action
+          type: object
+      required:
+        - _id
+        - name
+        - match
+        - action
+      title: BGPImportPolicy
+      type: object
+    BGPImportPrefix:
+      description: A prefix entry inside a BGP import policy match
+      properties:
+        _id:
+          description: Unique ID of the prefix entry
+          example: 3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f
+          type: string
+        prefix:
+          description: CIDR network used to match advertised routes
+          example: 10.0.0.0/8
+          type: string
+        exact:
+          description: |-
+            When `true`, the advertised route's prefix length must equal the
+            prefix length configured here. When `false`, routes for the same
+            network with a different prefix length also match.
+          type: boolean
+        description:
+          description: Optional description
+          type: string
+      required:
+        - _id
+        - prefix
+        - exact
+      title: BGPImportPrefix
+      type: object
+    BGPExportPolicy:
+      description: |-
+        Policy controlling which prefixes the local router advertises to
+        peers in a group. Prefixes that match `match` follow `action.action`.
+      properties:
+        _id:
+          description: Unique ID of the policy
+          example: 105bee71-5312-4c39-a1de-1dcf348e3f42
+          type: string
+        name:
+          description: User-friendly name for the policy
+          example: vpn-exports
+          type: string
+        match:
+          description: Criteria used to select which prefixes are exported
+          properties:
+            cluster:
+              description: |-
+                When `true`, prefixes are advertised only when this node is
+                the active member of its cluster. When `false`, prefixes are
+                advertised regardless of cluster state.
+              type: boolean
+            network:
+              description: |-
+                Optional virtual network ID. When set, the policy matches the
+                node's route into that virtual network. The route is
+                automatically withdrawn when the virtual network route is
+                unhealthy or its data plane is disconnected.
+              example: 1955
+              type: integer
+            prefixes:
+              description: Prefixes this policy applies to
+              items:
+                $ref: '#/components/schemas/BGPExportPrefix'
+              type: array
+          type: object
+        action:
+          description: Action to take for matching prefixes
+          properties:
+            action:
+              description: |-
+                * `allow` — matching prefixes are advertised to peers in the
+                  group
+                * `deny` — matching prefixes are explicitly not advertised
+              enum:
+                - allow
+                - deny
+              type: string
+            prefixes:
+              description: |-
+                Optional additional prefixes that the action applies to,
+                beyond those listed in `match.prefixes`.
+              items:
+                $ref: '#/components/schemas/BGPExportPrefix'
+              type: array
+          required:
+            - action
+          type: object
+      required:
+        - _id
+        - name
+        - match
+        - action
+      title: BGPExportPolicy
+      type: object
+    BGPExportPrefix:
+      description: A prefix entry inside a BGP export policy
+      properties:
+        _id:
+          description: Unique ID of the prefix entry
+          example: ed5d9187-4270-44db-892d-e2dc8b847a81
+          type: string
+        prefix:
+          description: CIDR network to be advertised
+          example: 10.0.200.0/24
+          type: string
+        exact:
+          description: |-
+            When `true`, only the exact prefix length is advertised. When
+            omitted or `false`, more-specific prefixes within this network
+            may also be advertised.
+          type: boolean
+        description:
+          description: Optional description
+          type: string
+      required:
+        - _id
+        - prefix
+      title: BGPExportPrefix
       type: object
     Certificate:
       description: TLS certificate managed by the Trustgrid platform
