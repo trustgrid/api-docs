@@ -286,7 +286,7 @@ describe("BGPExportPolicy schema", () => {
   it("documents action.prefixes as a backwards-compatibility list", () => {
     const desc = schema.properties.action.properties.prefixes.description;
     assert.match(desc, /match\.prefixes/i);
-    assert.match(desc, /backwards compat|legacy/i);
+    assert.match(desc, /backwards[\s-]compat|legacy/i);
   });
 });
 
