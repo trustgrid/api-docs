@@ -3484,6 +3484,29 @@ paths:
             type: array
             items:
               type: number
+        - description: >-
+            If provided, a flow must match at least one of the flow flags
+            provided. Decimal encoded. Known flag values: 65536 (no ACL match),
+            131072 (no rule match), 262144 (no route), 524288 (invalid TCP),
+            67108864 (TLS cert expired), 134217728 (TLS name mismatch),
+            268435456 (TLS self-signed), 536870912 (TLS mutual auth required).
+          in: query
+          name: flags
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: number
+        - description: >-
+            When true, returns only flows blocked or rejected by security
+            controls — equivalent to filtering by the union of all defunct flow
+            flags (no ACL, no rule, no route, invalid TCP, and all TLS error
+            flags). Cannot be combined with `flags`.
+          in: query
+          name: defunct
+          schema:
+            type: boolean
       responses:
         '200':
           description: OK
