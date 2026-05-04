@@ -14,6 +14,7 @@ apis:
 rules:
   operation-operationId: off
   operation-4xx-response: off
+  no-ambiguous-paths: off
 
 reunite:
   ignoreLint:
