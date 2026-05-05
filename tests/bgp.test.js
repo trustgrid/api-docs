@@ -299,3 +299,57 @@ describe("BGPExportPrefix schema", () => {
     assert.ok(schema.required.includes("prefix"));
   });
 });
+
+describe("BGP cluster plugin paths", () => {
+  const path = spec.paths["/v2/cluster/{clusterFQDN}/config/network/bgp"];
+
+  it("defines GET, PUT, and DELETE on the cluster BGP path", () => {
+    assert.ok(path, "/v2/cluster/{clusterFQDN}/config/network/bgp should exist");
+    assert.ok(path.get, "GET should be defined for round-tripping config");
+    assert.ok(path.put, "PUT should be defined to replace config");
+    assert.ok(path.delete, "DELETE should be defined to clear config");
+    assert.equal(path.get.operationId, "getClusterBGPConfig");
+    assert.equal(path.put.operationId, "updateClusterBGPConfig");
+    assert.equal(path.delete.operationId, "deleteClusterBGPConfig");
+  });
+
+  it("returns BGPConfig from GET so it round-trips with PUT", () => {
+    assert.equal(
+      path.get.responses["200"].content["application/json"].schema.$ref,
+      "#/components/schemas/BGPConfig"
+    );
+  });
+
+  it("references the BGPConfig request body on PUT", () => {
+    assert.equal(
+      path.put.requestBody.$ref,
+      "#/components/requestBodies/BGPConfig"
+    );
+  });
+
+  it("documents the 422 validation response on PUT", () => {
+    const resp = path.put.responses["422"];
+    assert.ok(resp, "PUT should have a 422 response");
+    assert.match(resp.description, /validation/i);
+    assert.equal(
+      resp.content["application/json"].schema.$ref,
+      "#/components/schemas/ValidationFailed"
+    );
+  });
+
+  it("uses the plural `nodes::` permission token everywhere", () => {
+    for (const op of [path.get, path.put, path.delete]) {
+      assert.match(
+        op.description,
+        /nodes::/,
+        "BGP cluster operations should use plural `nodes::` permission strings"
+      );
+    }
+  });
+
+  it("tags every operation as Cluster", () => {
+    assert.deepEqual(path.get.tags, ["Cluster"]);
+    assert.deepEqual(path.put.tags, ["Cluster"]);
+    assert.deepEqual(path.delete.tags, ["Cluster"]);
+  });
+});
