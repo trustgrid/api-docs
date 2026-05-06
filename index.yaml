@@ -6149,7 +6149,7 @@ paths:
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/export-route:
     get:
       operationId: listClusterVpnExportRoutes
-      summary: Get a VPN's dynamic export routes
+      summary: Get dynamic routes exported by a cluster
       responses:
         '200':
           description: OK
@@ -6224,7 +6224,7 @@ paths:
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/import-route:
     get:
       operationId: listClusterVpnImportRoutes
-      summary: Get a VPN's dynamic import routes
+      summary: Get dynamic routes imported by a cluster
       responses:
         '200':
           description: OK
@@ -6393,7 +6393,7 @@ paths:
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/route:
     get:
       operationId: listClusterVpnRoutes
-      summary: Get a VPN's routes
+      summary: Get local vpn routes for a customer
       responses:
         '200':
           description: OK
@@ -7783,7 +7783,7 @@ paths:
   /v2/domain/{domainName}/network/{networkName}/route:
     get:
       operationId: listNetworkRoutes
-      summary: List a network's routes
+      summary: Get default global vpn routes for a virtual network
       description: Requires `virtual-networks::read` permission.
       responses:
         '200':
@@ -9232,7 +9232,7 @@ paths:
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/export-route:
     get:
       operationId: listNodeVpnExportRoutes
-      summary: Get a VPN's dynamic export routes
+      summary: Get dynamic routes exported by a node
       responses:
         '200':
           description: OK
@@ -9307,7 +9307,7 @@ paths:
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/import-route:
     get:
       operationId: listNodeVpnImportRoutes
-      summary: Get a VPN's dynamic import routes
+      summary: Get dynamic routes imported by a node
       responses:
         '200':
           description: OK
@@ -9476,7 +9476,7 @@ paths:
   /v2/node/{nodeID}/vpn/{networkName}/route:
     get:
       operationId: listNodeVpnRoutes
-      summary: Get a VPN's routes
+      summary: Get local vpn routes for a node
       responses:
         '200':
           description: OK
