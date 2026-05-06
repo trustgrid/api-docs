@@ -1134,82 +1134,6 @@ paths:
           description: OK
       tags:
         - Cluster
-  /v2/cluster/{clusterFQDN}/config/network/bgp:
-    parameters:
-      - $ref: '#/components/parameters/clusterFQDN'
-    get:
-      summary: Get the BGP routing plugin configuration on a cluster
-      operationId: getClusterBGPConfig
-      description: |-
-        Returns the current BGP plugin configuration for a cluster,
-        suitable for round-tripping back to the corresponding `PUT`.
-
-        ---
-
-        Requires `nodes::read` permission.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BGPConfig'
-        '404':
-          description: BGP plugin not found on this cluster
-      tags:
-        - Cluster
-    put:
-      summary: Configure the BGP routing plugin on a cluster
-      operationId: updateClusterBGPConfig
-      description: |-
-        Replace the BGP plugin configuration on a cluster.
-
-        BGP exchanges routes with one or more external peers grouped into peer
-        groups. Each peer group has its own import and export policies. Import
-        policies select which advertised routes are added to the local routing
-        table. Export policies select which prefixes are advertised to peers,
-        and may match by prefix, by virtual network ID, or both — see
-        `BGPExportPolicy.match.network` for the full list of triggers that
-        cause an exported route to be withdrawn. An export policy with
-        `match.cluster: true` is only advertised by the active cluster member.
-
-        BGP timers (hold time, keepalive, connect-retry), address families,
-        and eBGP-multihop / TTL are not user-configurable through this API;
-        the platform sets BGP defaults and only IPv4 unicast is supported.
-
-        ---
-
-        Requires `nodes::configure:network` permission.
-      requestBody:
-        $ref: '#/components/requestBodies/BGPConfig'
-      responses:
-        '200':
-          description: OK
-        '422':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationFailed'
-      tags:
-        - Cluster
-    delete:
-      summary: Remove the BGP routing plugin configuration from a cluster
-      operationId: deleteClusterBGPConfig
-      description: |-
-        Clear the BGP plugin configuration on a cluster, stopping the BGP
-        server and removing all peer groups, peers, and policies.
-        Idempotent: returns `200` whether or not BGP was previously
-        configured.
-
-        ---
-
-        Requires `nodes::configure:network` permission.
-      responses:
-        '200':
-          description: OK
-      tags:
-        - Cluster
   /cluster/{clusterFQDN}/tag/{tagName}:
     delete:
       summary: Delete a tag from a cluster
@@ -2053,32 +1977,18 @@ paths:
   /v2/node/{nodeID}/config/network/bgp:
     parameters:
       - $ref: '#/components/parameters/nodeID'
-    get:
-      summary: Get the BGP routing plugin configuration on an appliance
-      operationId: getNodeBGPConfig
-      description: |-
-        Returns the current BGP plugin configuration for a node (appliance),
-        suitable for round-tripping back to the corresponding `PUT`.
-
-        ---
-
-        Requires `nodes::read` permission.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BGPConfig'
-        '404':
-          description: BGP plugin not found on this node
-      tags:
-        - Appliance
     put:
       summary: Configure the BGP routing plugin on an appliance
       operationId: updateNodeBGPConfig
       description: |-
-        Replace the BGP plugin configuration on a node (appliance).
+        Replace the BGP plugin configuration on a node (appliance). The full
+        BGP config is replaced on each PUT — to add, change, or remove an
+        individual peer group, peer, or policy, send the new full config.
+        To turn BGP off, PUT a config with `enabled: false`.
+
+        There is no dedicated GET or DELETE: the current BGP config is read
+        from the node's config blob (e.g. `getNode` with a `config.bgp`
+        projection), and "deleting" BGP is just PUTing a disabled config.
 
         BGP exchanges routes with one or more external peers grouped into peer
         groups. Each peer group has its own import and export policies. Import
@@ -2086,9 +1996,17 @@ paths:
         table. Export policies select which prefixes are advertised to peers,
         and may match by prefix, by virtual network ID, or both — see
         `BGPExportPolicy.match.network` for the full list of triggers that
-        cause an exported route to be withdrawn. When the node is part of a
-        cluster, an export policy with `match.cluster: true` is only
-        advertised by the active cluster member.
+        cause an exported route to be withdrawn.
+
+        There is no cluster-level BGP endpoint: BGP runs independently on
+        each cluster member, so cluster BGP is configured by PUTing the same
+        config to each member's node ID. Each member opens its own TCP peer
+        sessions to the configured peers, so the peers must be reachable
+        from every member. An export policy with `match.cluster: true` is
+        only advertised by the active cluster member; standby members keep
+        their BGP sessions up but withdraw the marked routes until they
+        become master. On a standalone (non-clustered) node `match.cluster`
+        has no effect.
 
         BGP timers (hold time, keepalive, connect-retry), address families,
         and eBGP-multihop / TTL are not user-configurable through this API;
@@ -2108,23 +2026,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
-      tags:
-        - Appliance
-    delete:
-      summary: Remove the BGP routing plugin configuration from an appliance
-      operationId: deleteNodeBGPConfig
-      description: |-
-        Clear the BGP plugin configuration on a node (appliance), stopping
-        the BGP server and removing all peer groups, peers, and policies.
-        Idempotent: returns `200` whether or not BGP was previously
-        configured.
-
-        ---
-
-        Requires `nodes::configure:network` permission.
-      responses:
-        '200':
-          description: OK
       tags:
         - Appliance
   /node/{nodeID}/config/services:
@@ -9662,6 +9563,7 @@ components:
         - enabled
         - id
         - asn
+        - client
       title: BGPConfig
       type: object
     BGPPeerGroup:

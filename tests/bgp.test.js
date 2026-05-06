@@ -15,21 +15,15 @@ const spec = parse(fs.readFileSync(specPath, "utf8"));
 describe("BGP plugin paths", () => {
   const path = spec.paths["/v2/node/{nodeID}/config/network/bgp"];
 
-  it("defines GET, PUT, and DELETE on the node BGP path", () => {
+  it("defines PUT on the node BGP path", () => {
     assert.ok(path, "/v2/node/{nodeID}/config/network/bgp should exist");
-    assert.ok(path.get, "GET should be defined for round-tripping config");
     assert.ok(path.put, "PUT should be defined to replace config");
-    assert.ok(path.delete, "DELETE should be defined to clear config");
-    assert.equal(path.get.operationId, "getNodeBGPConfig");
     assert.equal(path.put.operationId, "updateNodeBGPConfig");
-    assert.equal(path.delete.operationId, "deleteNodeBGPConfig");
   });
 
-  it("returns BGPConfig from GET so it round-trips with PUT", () => {
-    assert.equal(
-      path.get.responses["200"].content["application/json"].schema.$ref,
-      "#/components/schemas/BGPConfig"
-    );
+  it("does not define GET or DELETE — BGP is read via the node config and disabled by PUTing enabled:false", () => {
+    assert.equal(path.get, undefined, "GET is not implemented");
+    assert.equal(path.delete, undefined, "DELETE is not implemented");
   });
 
   it("references the BGPConfig request body on PUT", () => {
@@ -49,25 +43,34 @@ describe("BGP plugin paths", () => {
     );
   });
 
-  it("uses the plural `nodes::` permission token everywhere", () => {
-    for (const op of [path.get, path.put, path.delete]) {
-      assert.match(
-        op.description,
-        /nodes::/,
-        "BGP operations should use plural `nodes::` permission strings"
-      );
-      assert.doesNotMatch(
-        op.description,
-        /\bnode::configure/,
-        "BGP operations should not use singular `node::configure`"
-      );
-    }
+  it("uses the plural `nodes::` permission token", () => {
+    assert.match(
+      path.put.description,
+      /nodes::/,
+      "BGP PUT should use plural `nodes::` permission strings"
+    );
+    assert.doesNotMatch(
+      path.put.description,
+      /\bnode::configure/,
+      "BGP PUT should not use singular `node::configure`"
+    );
   });
 
-  it("tags every operation as Appliance", () => {
-    assert.deepEqual(path.get.tags, ["Appliance"]);
+  it("tags PUT as Appliance", () => {
     assert.deepEqual(path.put.tags, ["Appliance"]);
-    assert.deepEqual(path.delete.tags, ["Appliance"]);
+  });
+
+  it("explains how cluster BGP is configured (per-member PUTs)", () => {
+    assert.match(
+      path.put.description,
+      /cluster/i,
+      "PUT description should explain cluster BGP semantics"
+    );
+    assert.match(
+      path.put.description,
+      /match\.cluster/,
+      "PUT description should mention match.cluster gating"
+    );
   });
 });
 
@@ -89,7 +92,8 @@ describe("BGPConfig schema", () => {
 
   it("requires the core router fields", () => {
     assert.ok(schema, "BGPConfig schema should exist");
-    for (const field of ["enabled", "id", "asn"]) {
+    // `client` is enforced by the server validator — omitting it returns 422.
+    for (const field of ["enabled", "id", "asn", "client"]) {
       assert.ok(
         schema.required.includes(field),
         `BGPConfig should require ${field}`
@@ -301,55 +305,12 @@ describe("BGPExportPrefix schema", () => {
 });
 
 describe("BGP cluster plugin paths", () => {
-  const path = spec.paths["/v2/cluster/{clusterFQDN}/config/network/bgp"];
-
-  it("defines GET, PUT, and DELETE on the cluster BGP path", () => {
-    assert.ok(path, "/v2/cluster/{clusterFQDN}/config/network/bgp should exist");
-    assert.ok(path.get, "GET should be defined for round-tripping config");
-    assert.ok(path.put, "PUT should be defined to replace config");
-    assert.ok(path.delete, "DELETE should be defined to clear config");
-    assert.equal(path.get.operationId, "getClusterBGPConfig");
-    assert.equal(path.put.operationId, "updateClusterBGPConfig");
-    assert.equal(path.delete.operationId, "deleteClusterBGPConfig");
-  });
-
-  it("returns BGPConfig from GET so it round-trips with PUT", () => {
+  it("does not define a cluster-level BGP endpoint", () => {
+    // Cluster BGP is configured by PUTing the same config to each member's
+    // node ID, not via a single cluster endpoint. See the node PUT description.
     assert.equal(
-      path.get.responses["200"].content["application/json"].schema.$ref,
-      "#/components/schemas/BGPConfig"
+      spec.paths["/v2/cluster/{clusterFQDN}/config/network/bgp"],
+      undefined
     );
-  });
-
-  it("references the BGPConfig request body on PUT", () => {
-    assert.equal(
-      path.put.requestBody.$ref,
-      "#/components/requestBodies/BGPConfig"
-    );
-  });
-
-  it("documents the 422 validation response on PUT", () => {
-    const resp = path.put.responses["422"];
-    assert.ok(resp, "PUT should have a 422 response");
-    assert.match(resp.description, /validation/i);
-    assert.equal(
-      resp.content["application/json"].schema.$ref,
-      "#/components/schemas/ValidationFailed"
-    );
-  });
-
-  it("uses the plural `nodes::` permission token everywhere", () => {
-    for (const op of [path.get, path.put, path.delete]) {
-      assert.match(
-        op.description,
-        /nodes::/,
-        "BGP cluster operations should use plural `nodes::` permission strings"
-      );
-    }
-  });
-
-  it("tags every operation as Cluster", () => {
-    assert.deepEqual(path.get.tags, ["Cluster"]);
-    assert.deepEqual(path.put.tags, ["Cluster"]);
-    assert.deepEqual(path.delete.tags, ["Cluster"]);
   });
 });
