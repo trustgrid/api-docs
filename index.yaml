@@ -54,15 +54,12 @@ tags:
   - name: User
     description: |
       [User](https://docs.trustgrid.io/docs/user-management/) accounts for portal and API access. Authenticated via SSO (IDP) or local credentials and assigned permissions via policies. Requires `users::read` permission.
-  - name: Group
-    description: |
-      [Groups](https://docs.trustgrid.io/docs/user-management/groups/) control which users can access ZTNA applications exposed through virtual networks. Can be synchronized from identity providers. Requires `groups::read` permission.
   - name: Appliance
     description: |
       [Appliances](https://docs.trustgrid.io/docs/nodes/appliances/) are physical or virtual machine Trustgrid nodes providing full network, VPN, edge compute, and monitoring capabilities. Requires `nodes::read` permission.
   - name: Agent
     description: |
-      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) are lightweight software clients installed on user devices or servers, supporting VPN/ZTNA connectivity. Requires `nodes::read` permission.
+      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) are lightweight software clients installed on user devices or servers, supporting VPN connectivity. Requires `nodes::read` permission.
   - name: Org
     description: |
       Organization-level settings including [support requests](https://docs.trustgrid.io/docs/support/), notification preferences, and [shared documents](https://docs.trustgrid.io/docs/support/documents/). Requires `orgs::read` permission.
@@ -148,9 +145,6 @@ tags:
   - name: Change Management
     description: |
       Tracked network configuration changes with approval workflows. Requires `virtual-networks::read` to view changes, `virtual-networks::modify` to stage and commit changes.
-  - name: Auth Group
-    description: |
-      Authentication groups that map identity provider groups to Trustgrid access groups, controlling ZTNA application access. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   
 x-tagGroups:
   - name: Alerts
@@ -2084,7 +2078,7 @@ paths:
     put:
       summary: Configure Zero Trust Network Access gateway settings for secure remote access
       description: >
-        Update ZTNA gateway configuration for a node (appliance)
+        Update APIGW gateway configuration for a node (appliance)
 
 
         Note that this endpoint used to be `apigw`. The config section is still
@@ -2111,16 +2105,16 @@ paths:
                 wireguardPort: 9926
               properties:
                 cert:
-                  description: ZTNA gateway certificate (FQDN)
+                  description: APIGW gateway certificate (FQDN)
                   type: string
                 enabled:
                   description: Enable this plugin
                   type: boolean
                 host:
-                  description: ZTNA gateway host
+                  description: APIGW gateway host
                   type: string
                 port:
-                  description: ZTNA gateway port
+                  description: APIGW gateway port
                   maximum: 65535
                   minimum: 1
                   type: number
@@ -2143,9 +2137,9 @@ paths:
       tags:
         - Appliance
     delete:
-      summary: Remove ZTNA gateway configuration and disable secure remote access
+      summary: Remove APIGW gateway configuration and disable secure remote access
       description: |
-        Delete the ZTNA gateway configuration for a node (appliance)
+        Delete the APIGW gateway configuration for a node (appliance)
 
         ---
 
@@ -2422,7 +2416,7 @@ paths:
                           additionalProperties: true
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/bgp:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2506,7 +2500,7 @@ paths:
                                 additionalProperties: true
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/datastore-manager:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2552,7 +2546,7 @@ paths:
                 additionalProperties: true
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/flows:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2561,8 +2555,8 @@ paths:
       summary: View or delete active network flows on the node
       description: |-
         Returns the node's active network flow table, optionally filtered by protocol,
-        source/destination IP and port, container, virtual network, or ZTNA session.
-        Setting `action` to `delete` terminates matching flows instead of returning them.
+        source/destination IP and port, container, or virtual network. Setting `action` 
+        to `delete` terminates matching flows instead of returning them.
 
         ---
 
@@ -2613,12 +2607,6 @@ paths:
                 networkId:
                   type: integer
                   description: Filter flows on a specific virtual network ID
-                ztnaAppId:
-                  type: string
-                  description: Filter ZTNA flows by application ID
-                ztnaSessionId:
-                  type: string
-                  description: Filter ZTNA flows by session ID
       responses:
         '200':
           description: OK
@@ -2649,7 +2637,7 @@ paths:
                         description: Returned when action=delete
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/gateway-perf:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2711,6 +2699,7 @@ paths:
       tags:
         - Appliance
         - Agent
+
   /node/{nodeID}/trigger/gateway-ping:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2879,7 +2868,7 @@ paths:
                                     description: True if this peer is the cluster master
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/ipsec-restart:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2910,7 +2899,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/ipsec-statusall:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2941,7 +2930,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/nat-hits:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3008,7 +2997,7 @@ paths:
                 additionalProperties: true
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/node-debug:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3054,6 +3043,7 @@ paths:
       tags:
         - Appliance
         - Agent
+
   /node/{nodeID}/trigger/node-reboot:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3092,7 +3082,7 @@ paths:
                         example: Node host will restart
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/node-restart-service:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3130,7 +3120,7 @@ paths:
                         example: Node service will restart
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/node-upgrade:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3182,7 +3172,7 @@ paths:
                           - Existing upgrade is already in progress
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/speed-test:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3231,7 +3221,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-arping:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3280,7 +3270,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-mtr:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3333,7 +3323,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-nc:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3397,7 +3387,7 @@ paths:
                         description: Process exit code. `0` indicates success.
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-net-nc:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3460,7 +3450,7 @@ paths:
                         description: Process exit code. `0` indicates success.
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-net-ping:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3510,7 +3500,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-ping:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3558,7 +3548,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-tcpdump:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3597,7 +3587,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/tg-traceroute:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3648,7 +3638,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/vpn-dump:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3705,9 +3695,6 @@ paths:
                     TCP flag filter. Combine flag letters: `S` (SYN), `P` (PSH),
                     `U` (URG), `F` (FIN), `R` (RST), `.` (ACK). Use `any` to match all.
                   example: S
-                session:
-                  type: string
-                  description: ZTNA session ID filter
       responses:
         '200':
           description: OK
@@ -3717,7 +3704,7 @@ paths:
                 type: boolean
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/vpn-key:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3788,7 +3775,7 @@ paths:
                         description: Base64-encoded public key value
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/vpn-nats:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3858,7 +3845,7 @@ paths:
                               description: TCP flag bits when the flow became defunct
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/vpn-routes:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -3963,85 +3950,7 @@ paths:
                                           enum: [ok, fail]
       tags:
         - Appliance
-        - Agent
-  /node/{nodeID}/trigger/web-sessions:
-    parameters:
-      - $ref: '#/components/parameters/nodeID'
-    post:
-      operationId: triggerNodeWebSessions
-      summary: List or terminate active API gateway web sessions on the node
-      description: |-
-        Returns active web application user sessions proxied through the node's API
-        gateway, or terminates a specific session by application ID.
 
-        ---
-
-        Requires `nodes::service:web-sessions` or `nodes::remote-execute` permission.
-      parameters:
-        - description: Pass `1` to block until the node responds and return its output.
-          in: query
-          name: wait
-          required: false
-          schema:
-            type: integer
-            enum: [1]
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                action:
-                  type: string
-                  enum: [get, kill]
-                  default: get
-                  description: |-
-                    - `get` — return active sessions
-                    - `kill` — terminate matching sessions
-                app:
-                  type: string
-                  description: Filter sessions by application ID. Use `all` or omit for all apps.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  output:
-                    type: object
-                    properties:
-                      sessions:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            sid:
-                              type: string
-                              description: Session ID
-                            usr:
-                              type: string
-                              description: Authenticated username
-                            ip:
-                              type: string
-                              description: Client IP address
-                            req:
-                              type: integer
-                              description: Number of requests made in this session
-                            bs:
-                              type: integer
-                              description: Bytes sent to the client
-                            br:
-                              type: integer
-                              description: Bytes received from the client
-                            conn:
-                              type: integer
-                              description: Seconds since the session connected
-      tags:
-        - Appliance
-        - Agent
   /node/{nodeID}/trigger/wg-clients:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -4139,7 +4048,7 @@ paths:
                             example: Killed 1 sessions
       tags:
         - Appliance
-        - Agent
+
   /node/{nodeID}/trigger/{event}:
     parameters:
       - $ref: '#/components/parameters/nodeID'
