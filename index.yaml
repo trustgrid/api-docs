@@ -54,15 +54,12 @@ tags:
   - name: User
     description: |
       [User](https://docs.trustgrid.io/docs/user-management/) accounts for portal and API access. Authenticated via SSO (IDP) or local credentials and assigned permissions via policies. Requires `users::read` permission.
-  - name: Group
-    description: |
-      [Groups](https://docs.trustgrid.io/docs/user-management/groups/) control which users can access ZTNA applications exposed through virtual networks. Can be synchronized from identity providers. Requires `groups::read` permission.
   - name: Appliance
     description: |
       [Appliances](https://docs.trustgrid.io/docs/nodes/appliances/) are physical or virtual machine Trustgrid nodes providing full network, VPN, edge compute, and monitoring capabilities. Requires `nodes::read` permission.
   - name: Agent
     description: |
-      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) are lightweight software clients installed on user devices or servers, supporting VPN/ZTNA connectivity. Requires `nodes::read` permission.
+      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) are lightweight software clients installed on user devices or servers, supporting VPN connectivity. Requires `nodes::read` permission.
   - name: Org
     description: |
       Organization-level settings including [support requests](https://docs.trustgrid.io/docs/support/), notification preferences, and [shared documents](https://docs.trustgrid.io/docs/support/documents/). Requires `orgs::read` permission.
@@ -148,9 +145,6 @@ tags:
   - name: Change Management
     description: |
       Tracked network configuration changes with approval workflows. Requires `virtual-networks::read` to view changes, `virtual-networks::modify` to stage and commit changes.
-  - name: Auth Group
-    description: |
-      Authentication groups that map identity provider groups to Trustgrid access groups, controlling ZTNA application access. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   
 x-tagGroups:
   - name: Alerts
@@ -2084,7 +2078,7 @@ paths:
     put:
       summary: Configure Zero Trust Network Access gateway settings for secure remote access
       description: >
-        Update ZTNA gateway configuration for a node (appliance)
+        Update APIGW gateway configuration for a node (appliance)
 
 
         Note that this endpoint used to be `apigw`. The config section is still
@@ -2111,16 +2105,16 @@ paths:
                 wireguardPort: 9926
               properties:
                 cert:
-                  description: ZTNA gateway certificate (FQDN)
+                  description: APIGW gateway certificate (FQDN)
                   type: string
                 enabled:
                   description: Enable this plugin
                   type: boolean
                 host:
-                  description: ZTNA gateway host
+                  description: APIGW gateway host
                   type: string
                 port:
-                  description: ZTNA gateway port
+                  description: APIGW gateway port
                   maximum: 65535
                   minimum: 1
                   type: number
@@ -2143,9 +2137,9 @@ paths:
       tags:
         - Appliance
     delete:
-      summary: Remove ZTNA gateway configuration and disable secure remote access
+      summary: Remove APIGW gateway configuration and disable secure remote access
       description: |
-        Delete the ZTNA gateway configuration for a node (appliance)
+        Delete the APIGW gateway configuration for a node (appliance)
 
         ---
 
@@ -2371,6 +2365,1690 @@ paths:
       tags:
         - Appliance
         - Agent
+  /node/{nodeID}/trigger/aws-route-tables:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeAwsRouteTables
+      summary: List AWS route tables attached to the node host
+      description: |-
+        Retrieves the AWS EC2 route tables associated with the node's network interfaces.
+        Optionally filters by a specific network interface card (NIC). Available on
+        AWS-hosted nodes only.
+
+        ---
+
+        Requires `nodes::service:aws-route-tables` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nic:
+                  type: string
+                  description: Network interface name to filter route tables. Omit to return all.
+                  example: eth0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      tables:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/bgp:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeBgp
+      summary: Retrieve BGP peer routes or restart the BGP router
+      description: |-
+        Query the current BGP routing table (peers, routes, and rejected routes) or
+        restart the BGP router process. Returns an error payload if BGP is not enabled.
+
+        ---
+
+        Requires `nodes::service:bgp` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [get, restart]
+                  default: get
+                  description: |-
+                    - `get` — return BGP routing table
+                    - `restart` — restart the BGP router process
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      router:
+                        type: string
+                        description: BGP router identifier (IP address)
+                        example: 10.1.0.1
+                      peers:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ip:
+                              type: string
+                              description: Peer IP address
+                            asn:
+                              type: integer
+                              description: Peer autonomous system number
+                            connected:
+                              type: boolean
+                            connectTime:
+                              type: integer
+                              description: Seconds since peer connected (only present when connected)
+                            routes:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  dest:
+                                    type: string
+                                    description: Destination CIDR
+                                  metric:
+                                    type: integer
+                            rejectedRoutes:
+                              type: array
+                              items:
+                                type: object
+                                additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/datastore-manager:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeDatastoreManager
+      summary: Manage the node's local datastore files
+      description: |-
+        List or manage files in the node's local datastore directory.
+
+        ---
+
+        Requires `nodes::service:datastore-manager` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [LIST]
+                  default: LIST
+                  description: Action to perform on the datastore
+                filename:
+                  type: string
+                  description: File or directory name for operations that target a specific entry
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/flows:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeFlows
+      summary: View or delete active network flows on the node
+      description: |-
+        Returns the node's active network flow table, optionally filtered by protocol,
+        source/destination IP and port, container, or virtual network. Setting `action` 
+        to `delete` terminates matching flows instead of returning them.
+
+        ---
+
+        Requires `nodes::service:flows` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [read, delete]
+                  default: read
+                  description: |-
+                    - `read` — return matching flows
+                    - `delete` — terminate matching flows
+                protocol:
+                  type: string
+                  enum: [icmp, tcp, udp, any]
+                  description: Protocol filter. Omit or use `any` to match all.
+                source:
+                  type: string
+                  description: Source IP or CIDR filter
+                  example: 10.0.0.0/24
+                sourcePort:
+                  type: integer
+                  description: Source port filter
+                dest:
+                  type: string
+                  description: Destination IP or CIDR filter
+                  example: 192.168.1.5
+                destPort:
+                  type: integer
+                  description: Destination port filter
+                containerId:
+                  type: string
+                  description: Filter flows belonging to a specific container
+                networkId:
+                  type: integer
+                  description: Filter flows on a specific virtual network ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    oneOf:
+                      - type: object
+                        description: Map of protocol to flow list (action=read)
+                        properties:
+                          icmp:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/NodeFlowEntry'
+                          tcp:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/NodeFlowEntry'
+                          udp:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/NodeFlowEntry'
+                      - type: string
+                        enum: [success]
+                        description: Returned when action=delete
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/gateway-perf:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeGatewayPerf
+      summary: Run a throughput performance test to a peer gateway node
+      description: |-
+        Opens a streaming session that sends a configurable amount of data to the
+        destination node and measures throughput. Progress is streamed as text while
+        the test runs; a summary line with rate in Mbps is emitted at the end.
+
+        Use `?wait=1` to block until the test completes and receive the full output.
+
+        ---
+
+        Requires `nodes::service:gateway-perf` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dest]
+              properties:
+                dest:
+                  type: string
+                  description: Destination node FQDN to send data to
+                  example: edge-node.example.trustgrid.io
+                gwPath:
+                  type: string
+                  description: Gateway path ID to use. Omit for default path.
+                bytes:
+                  type: integer
+                  description: Number of bytes to send
+                  default: 10000000
+                messageSize:
+                  type: integer
+                  description: Size of each message chunk in bytes
+                  default: 50000
+                windowSize:
+                  type: integer
+                  description: Flow-control window size in bytes
+                  default: 1000000
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+        - Agent
+
+  /node/{nodeID}/trigger/gateway-ping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeGatewayPing
+      summary: Ping a peer gateway node over the Trustgrid overlay
+      description: |-
+        Sends echo packets to the specified destination node through the Trustgrid
+        gateway overlay and reports round-trip latency. Results stream as JSON objects
+        with RTT measurements.
+
+        Use `?wait=1` to block until the session ends and receive buffered output.
+
+        ---
+
+        Requires `nodes::service:gateway-ping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dest]
+              properties:
+                dest:
+                  type: string
+                  description: Destination node FQDN to ping
+                  example: gateway.example.trustgrid.io
+                gwPath:
+                  type: string
+                  description: Gateway path ID to use. Omit for default path.
+                interval:
+                  type: integer
+                  description: Interval between echo packets in seconds
+                  default: 5
+                size:
+                  type: integer
+                  description: Echo payload size in bytes
+                  default: 64
+                sendJson:
+                  type: boolean
+                  description: If true, the node accepts JSON-formatted echo data
+                  default: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+        - Agent
+  /node/{nodeID}/trigger/gateway-routes:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeGatewayRoutes
+      summary: Retrieve the node's active gateway routing table
+      description: |-
+        Returns the gateway peer routing table showing which nodes the gateway is
+        connected to, their RTT, throughput, and path details.
+
+        ---
+
+        Requires `nodes::service:gateway-routes` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                showClusterRoutes:
+                  type: boolean
+                  description: Include cluster-level routes in the output
+                  default: false
+                enableLog:
+                  type: boolean
+                  description: Enable debug logging during route collection
+                  default: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      available:
+                        type: integer
+                        description: Total number of available paths
+                      connected:
+                        type: integer
+                        description: Number of connected peers in the node's domain
+                      domains:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Domain FQDN
+                            routes:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                    description: Peer node name
+                                  path:
+                                    type: string
+                                    description: Gateway path ID in use
+                                  rtt:
+                                    type: number
+                                    description: Mean round-trip time in milliseconds
+                                  connected:
+                                    type: boolean
+                                    description: Whether the peer is currently connected
+                                  client:
+                                    type: boolean
+                                    description: True if the peer is a hub or management node
+                                  udp:
+                                    type: boolean
+                                    description: Whether the connection uses UDP tunneling
+                                  udpPort:
+                                    type: integer
+                                    description: UDP port in use (when udp=true)
+                                  ip:
+                                    type: string
+                                    description: Remote IP address
+                                  port:
+                                    type: integer
+                                    description: Remote port
+                                  receivedMbps:
+                                    type: number
+                                    description: Average receive throughput in Mbps since last reset
+                                  sentMbps:
+                                    type: number
+                                    description: Average transmit throughput in Mbps since last reset
+                                  clusterName:
+                                    type: string
+                                    description: Cluster name if the peer belongs to a cluster
+                                  clusterMaster:
+                                    type: boolean
+                                    description: True if this peer is the cluster master
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/ipsec-restart:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeIpsecRestart
+      summary: Restart the IPsec daemon on the node
+      description: |-
+        Executes `ipsec restart` on the node and streams the output. Use `?wait=1`
+        to block until the command completes.
+
+        ---
+
+        Requires `nodes::service:ipsec-restart` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/ipsec-statusall:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeIpsecStatusall
+      summary: Retrieve the full IPsec daemon status
+      description: |-
+        Executes `ipsec statusall` on the node and streams the output.
+        Use `?wait=1` to block and receive the full status text.
+
+        ---
+
+        Requires `nodes::service:ipsec-statusall` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/nat-hits:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeNatHits
+      summary: Retrieve or reset address-translation rule hit counts
+      description: |-
+        Returns hit counts for address translation (NAT) rules, or resets counters
+        for specific rules. Filter by tracker ID, network name, interface, or CIDR ranges.
+
+        ---
+
+        Requires `nodes::service:nat-hits` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [GET, RESET, RESET_ALL]
+                  description: |-
+                    - `GET` — return hit counts
+                    - `RESET` — reset counters for matching rules
+                    - `RESET_ALL` — reset all counters
+                trackerID:
+                  type: string
+                  description: Filter by specific tracker ID
+                networkName:
+                  type: string
+                  description: Filter by virtual network name
+                interfaceName:
+                  type: string
+                  description: Filter by interface name
+                insideCIDR:
+                  type: string
+                  description: Filter by inside (local) CIDR
+                  example: 10.0.0.0/24
+                outsideCIDR:
+                  type: string
+                  description: Filter by outside (translated) CIDR
+                  example: 172.16.0.0/16
+                networkGroup:
+                  type: string
+                  description: Filter by network group name
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/node-debug:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeDebug
+      summary: Stream plugin debug messages from the node
+      description: |-
+        Opens a streaming session that subscribes to internal plugin debug messages.
+        Optionally filter by plugin name. Messages arrive formatted as
+        `HH:MM:SS.mmm: {message}` lines.
+
+        Use `?wait=1` to buffer messages until the session ends.
+
+        ---
+
+        Requires `nodes::service:node-debug` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plugin:
+                  type: string
+                  description: Plugin name to filter. Use `any` or omit to receive all plugins.
+                  example: network
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+        - Agent
+
+  /node/{nodeID}/trigger/node-reboot:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeReboot
+      summary: Reboot the node's host operating system
+      description: |-
+        Schedules a host OS reboot (`shutdown -r now`) to execute 5 seconds after
+        this call is acknowledged. The node will disconnect and come back online
+        after completing its boot sequence.
+
+        ---
+
+        Requires `nodes::service:node-reboot` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Node host will restart
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/node-restart-service:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeRestartService
+      summary: Restart the Trustgrid node service process
+      description: |-
+        Causes the Trustgrid node agent process to exit and restart. The node will
+        briefly disconnect while the service restarts.
+
+        ---
+
+        Requires `nodes::service:node-restart-service` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Node service will restart
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/node-upgrade:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeUpgrade
+      summary: Trigger an immediate software upgrade of the node
+      description: |-
+        Forces the node to run its upgrade process immediately, bypassing the normal
+        scheduled unattended-upgrade window. If an upgrade is already in progress,
+        returns a status message indicating so.
+
+        ---
+
+        Requires `nodes::service:node-upgrade` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                skipUnattended:
+                  type: boolean
+                  description: If true, skip the unattended-upgrade step
+                  default: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - Upgrade in progress
+                          - Existing upgrade is already in progress
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/speed-test:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeSpeedTest
+      summary: Measure the node's internet bandwidth to the Trustgrid control plane
+      description: |-
+        Runs a download and/or upload throughput test between the node and the
+        Trustgrid control plane speed-test endpoints. Results stream as JSON objects
+        containing `downloadMbps`, `maxDownloadMbps`, `uploadMbps`, and `maxUploadMbps`.
+
+        Use `?wait=1` to block until the test completes and receive the full output.
+
+        ---
+
+        Requires `nodes::service:speed-test` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [download, upload, both]
+                  default: both
+                  description: |-
+                    - `download` — test download speed only
+                    - `upload` — test upload speed only
+                    - `both` — test download then upload
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-arping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgArping
+      summary: Send ARP ping to a host from the node
+      description: |-
+        Runs `arping -i {iface} {host}` on the node and streams the output.
+        Useful for verifying Layer 2 reachability on a given interface.
+
+        Use `?wait=1` to block and receive the command output.
+
+        ---
+
+        Requires `nodes::service:tg-arping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [iface, host]
+              properties:
+                iface:
+                  type: string
+                  description: Network interface to send ARP packets from
+                  example: eth0
+                host:
+                  type: string
+                  description: Target host IP address
+                  example: 192.168.1.1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-mtr:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgMtr
+      summary: Run an MTR network diagnostic from the node
+      description: |-
+        Starts an interactive MTR (Matt's Traceroute) session to the specified host.
+        Results stream as terminal output.
+
+        Use `?wait=1` to block and receive the buffered MTR output.
+
+        ---
+
+        Requires `nodes::service:tg-mtr` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hostname]
+              properties:
+                hostname:
+                  type: string
+                  description: Target host IP or hostname
+                  example: 8.8.8.8
+                options:
+                  type: string
+                  description: Additional MTR command-line options (space-separated)
+                  example: --report
+                cols:
+                  type: integer
+                  description: Terminal column width for MTR display
+                  default: 80
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-nc:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgNc
+      summary: Test TCP port connectivity from the node's local network
+      description: |-
+        Runs `nc -v -z {host} {port}` from the node, binding to the specified source
+        address. Returns the netcat output and exit code.
+
+        Use `?wait=1` to block and receive the result synchronously.
+
+        ---
+
+        Requires `nodes::service:tg-nc` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host, port]
+              properties:
+                source:
+                  type: string
+                  description: Source IP address to bind to
+                  default: 127.0.0.1
+                  example: 192.168.1.10
+                host:
+                  type: string
+                  description: Target host IP or hostname
+                  example: 10.0.0.1
+                port:
+                  type: integer
+                  description: Target TCP port
+                  example: 443
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        description: netcat standard output and error
+                      exitCode:
+                        type: string
+                        description: Process exit code. `0` indicates success.
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-net-nc:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgNetNc
+      summary: Test TCP port connectivity from inside a virtual network namespace
+      description: |-
+        Runs `nc -v -z {host} {port}` inside the management namespace for the specified
+        virtual network, testing connectivity as seen from that network context.
+
+        Use `?wait=1` to block and receive the result synchronously.
+
+        ---
+
+        Requires `nodes::service:tg-net-nc` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network, host, port]
+              properties:
+                network:
+                  type: string
+                  description: Virtual network name whose namespace to test from
+                  example: virtual-network
+                host:
+                  type: string
+                  description: Target host IP or hostname
+                  example: 10.0.0.1
+                port:
+                  type: integer
+                  description: Target TCP port
+                  example: 80
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        description: netcat standard output and error
+                      exitCode:
+                        type: string
+                        description: Process exit code. `0` indicates success.
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-net-ping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgNetPing
+      summary: Ping a host through a virtual network namespace on the node
+      description: |-
+        Runs `ip netns exec mgmt-{network} ping {host}` on the node, testing
+        reachability from inside the specified virtual network context.
+        Output streams as terminal text.
+
+        Use `?wait=1` to block and receive the output.
+
+        ---
+
+        Requires `nodes::service:tg-net-ping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host, network]
+              properties:
+                host:
+                  type: string
+                  description: Target IP or hostname to ping
+                  example: 10.0.0.1
+                network:
+                  type: string
+                  description: Virtual network name to use as the source namespace
+                  example: virtual-network
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-ping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgPing
+      summary: Ping a host from the node
+      description: |-
+        Runs `ping -O -I {source} {host}` on the node and streams the output.
+        Use `?wait=1` to block and receive the ping output.
+
+        ---
+
+        Requires `nodes::service:tg-ping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host]
+              properties:
+                source:
+                  type: string
+                  description: Source interface IP address
+                  default: 127.0.0.1
+                  example: 192.168.1.10
+                host:
+                  type: string
+                  description: Target IP or hostname to ping
+                  example: 8.8.8.8
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-tcpdump:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgTcpdump
+      summary: Capture packets on the node using tcpdump
+      description: |-
+        Starts a streaming tcpdump capture session on the node. Captured packet
+        details stream as text output. Use `?wait=1` to buffer until the capture ends.
+
+        ---
+
+        Requires `nodes::service:tg-tcpdump` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: tcpdump session parameters
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-traceroute:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgTraceroute
+      summary: Run a traceroute from the node
+      description: |-
+        Runs `traceroute` to the specified host from the node and streams the output.
+        Use `?wait=1` to block and receive the full traceroute output.
+
+        ---
+
+        Requires `nodes::service:tg-traceroute` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host]
+              properties:
+                host:
+                  type: string
+                  description: Target IP or hostname
+                  example: 8.8.8.8
+                filter:
+                  type: string
+                  description: Additional traceroute flags (space-separated)
+                  default: -n
+                iface:
+                  type: string
+                  description: Network interface to route through
+                  example: eth0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-dump:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnDump
+      summary: Stream virtual network packet captures from the node
+      description: |-
+        Opens a streaming session that outputs VPN packet details in a tcpdump-like
+        format. Filter by network, protocol, peer, host, port, TCP flags, or session ID.
+        The session stays open until closed by the client.
+
+        Use `?wait=1` to buffer output until the session ends.
+
+        ---
+
+        Requires `nodes::service:vpn-dump` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                network:
+                  type: string
+                  description: Virtual network name to capture. Use `any` or omit for all networks.
+                protocol:
+                  type: string
+                  enum: [icmp, tcp, udp, any]
+                  description: Protocol filter
+                peer:
+                  type: string
+                  description: Remote peer name filter
+                host:
+                  type: string
+                  description: Source or destination IP filter
+                  example: 10.0.0.1
+                port:
+                  type: string
+                  description: >-
+                    Port filter. Supports single port (`443`), range (`1024-2048`),
+                    or operator prefix (`lt:1024`, `gt:1024`, `ne:443`).
+                tcpflags:
+                  type: string
+                  description: >-
+                    TCP flag filter. Combine flag letters: `S` (SYN), `P` (PSH),
+                    `U` (URG), `F` (FIN), `R` (RST), `.` (ACK). Use `any` to match all.
+                  example: S
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-key:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnKey
+      summary: Get, generate, or save a Wireguard key for a virtual network
+      description: |-
+        Manages the X25519 Wireguard private key for a virtual network interface.
+        - `get` — returns the current public key as a JWK
+        - `generate` — generates a new private key, saves it, and returns the public key
+        - `save` — saves the provided base64-encoded 32-byte private key and returns the public key
+
+        ---
+
+        Requires `nodes::service:vpn-key` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network]
+              properties:
+                action:
+                  type: string
+                  enum: [get, generate, save]
+                  default: get
+                  description: Key operation to perform
+                network:
+                  type: string
+                  description: Virtual network name
+                  example: virtual-network
+                key:
+                  type: string
+                  description: Base64-encoded 32-byte X25519 private key. Required when action=save.
+                  example: dGhpcyBpcyBhIDMyLWJ5dGUgcHJpdmF0ZSBrZXk=
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    description: JWK (JSON Web Key) representing the X25519 public key
+                    properties:
+                      kid:
+                        type: string
+                        description: Key ID
+                      kty:
+                        type: string
+                        example: EC
+                      crv:
+                        type: string
+                        example: X25519
+                      x:
+                        type: string
+                        description: Base64-encoded public key value
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-nats:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnNats
+      summary: Retrieve the NAT translation table for a virtual network
+      description: |-
+        Returns the active network address translation (NAT) table for the specified
+        virtual network, showing TCP and UDP flow mappings.
+
+        ---
+
+        Requires `nodes::service:vpn-nats` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network]
+              properties:
+                network:
+                  type: string
+                  description: Virtual network name
+                  example: virtual-network
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      nats:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            proto:
+                              type: string
+                              enum: [tcp, udp]
+                            src:
+                              type: string
+                              description: Source translation mapping (`originalIp:port->translatedIp:port`)
+                            dest:
+                              type: string
+                              description: Destination translation mapping
+                            state:
+                              type: string
+                              description: TCP connection state (TCP flows only)
+                            def:
+                              type: boolean
+                              description: True if the flow is defunct
+                            flags:
+                              type: integer
+                              description: TCP flag bits when the flow became defunct
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-routes:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnRoutes
+      summary: Retrieve the virtual network routing table
+      description: |-
+        Returns routes for one or all virtual networks, with optional filtering by
+        network name, network ID, destination IP, or destination node name.
+
+        ---
+
+        Requires `nodes::service:vpn-routes` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                networkId:
+                  type: string
+                  description: Filter by virtual network ID (takes precedence over `network`)
+                network:
+                  type: string
+                  description: Virtual network name filter. Use `any` to return all networks.
+                  example: virtual-network
+                domain:
+                  type: string
+                  description: Domain filter when combined with `network`
+                ip:
+                  type: string
+                  description: Filter routes that cover this IP address
+                  example: 10.0.0.5
+                dest:
+                  type: string
+                  description: Filter by destination node name. Use `any` to return all.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      networks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Virtual network name
+                            routes:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  cidr:
+                                    type: string
+                                    description: Route destination CIDR
+                                    example: 10.0.0.0/24
+                                  dest:
+                                    type: string
+                                    description: Destination node FQDN
+                                  path:
+                                    type: string
+                                    description: Gateway path ID (if applicable)
+                                  metric:
+                                    type: integer
+                                    description: Route metric (lower is preferred)
+                                  available:
+                                    type: boolean
+                                    description: Whether the route is active and reachable
+                                  master:
+                                    type: string
+                                    description: Active cluster master node (cluster routes only)
+                                  nodeId:
+                                    type: string
+                                    description: Destination node ID
+                                  monitors:
+                                    type: array
+                                    description: Route monitor states
+                                    items:
+                                      type: object
+                                      properties:
+                                        name:
+                                          type: string
+                                        state:
+                                          type: string
+                                          enum: [ok, fail]
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/wg-clients:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeWgClients
+      summary: List or terminate active Wireguard ZTNA client sessions
+      description: |-
+        Returns active Wireguard client (ZTNA) sessions on the node's virtual networks,
+        optionally filtered by network, application ID, or session ID.
+        Setting `action` to `kill` terminates matching sessions instead.
+
+        ---
+
+        Requires `nodes::service:wg-clients` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [list, kill]
+                  default: list
+                  description: |-
+                    - `list` — return active Wireguard client sessions
+                    - `kill` — terminate matching sessions
+                network:
+                  type: string
+                  description: Virtual network name filter. Use `all` or omit for all networks.
+                app:
+                  type: string
+                  description: Application ID filter. Use `all` or omit for all apps.
+                session:
+                  type: string
+                  description: ZTNA session ID filter. Use `all` or omit for all sessions.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    oneOf:
+                      - type: object
+                        description: Client list (action=list)
+                        properties:
+                          network:
+                            type: string
+                          clients:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  description: Client peer name
+                                endpoint:
+                                  type: string
+                                  description: Remote endpoint address and port
+                                session:
+                                  type: string
+                                  description: ZTNA session ID
+                                state:
+                                  type: string
+                                  enum: [active]
+                                connected:
+                                  type: integer
+                                  description: Seconds since connected (only present when up)
+                                sent:
+                                  type: integer
+                                  description: Bytes sent
+                                recv:
+                                  type: integer
+                                  description: Bytes received
+                                lastHandshake:
+                                  type: integer
+                                  description: Seconds since last Wireguard handshake
+                      - type: object
+                        description: Kill result (action=kill)
+                        properties:
+                          message:
+                            type: string
+                            example: Killed 1 sessions
+      tags:
+        - Appliance
+
   /node/{nodeID}/trigger/{event}:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -2379,45 +4057,21 @@ paths:
         required: true
         description: |-
           Event name to trigger on the node. This parameter is open-ended; the backend
-          may support additional event names beyond those documented here.
-
-          Known values include: aws-route-tables, gateway-routes, tg-tcpdump,
-          datastore-manager, gateway-ping, gateway-perf, gateway-traceroute,
-          gateway-mtr, wg-clients, vpn-dump, vpn-key, vpn-nats, vpn-routes,
-          node-debug, tg-net-ping, tg-net-nc, nat-hits, ipsec-statusall,
-          ipsec-restart, tg-ping, tg-cluster-ping, speed-test, tg-nc,
-          tg-traceroute, flows, tg-mtr, bgp, tg-arping,
-          node-restart-service, node-reboot, node-upgrade, web-sessions.
-
-          Each requires either `nodes::remote-execute` or `nodes::service:{event}` permission.
+          may support additional event names beyond those with dedicated endpoints.
         schema:
           type: string
           example: gateway-routes
     post:
       summary: Execute a remote operation or command on a specific node
       description: |-
-        Sends an event to the node and optionally waits for its response.
+        Sends an event to the node and optionally waits for its response. Use the
+        dedicated event endpoints (e.g. `/node/{nodeID}/trigger/gateway-routes`) for
+        documented events with typed request and response schemas.
 
-        Common `event` values:
-        - `node-restart-service` — restart the Trustgrid node service (requires `nodes::service:node-restart-service`)
-        - `node-reboot` — reboot the host OS (requires `nodes::service:node-reboot`)
-        - `node-upgrade` — upgrade node software (requires `nodes::service:node-upgrade`)
-        - `gateway-routes` — fetch current gateway routes (requires `nodes::service:gateway-routes`)
-        - `vpn-routes` — fetch virtual network routing table (requires `nodes::service:vpn-routes`)
-        - `vpn-nats` — fetch virtual network NAT table (requires `nodes::service:vpn-nats`)
-        - `tg-ping` — run a ping via the Trustgrid overlay (requires `nodes::service:tg-ping`)
-        - `tg-traceroute` — run a traceroute via the overlay (requires `nodes::service:tg-traceroute`)
-        - `tg-net-ping` — ping through the virtual network (requires `nodes::service:tg-net-ping`)
-        - `speed-test` — measure internet bandwidth (requires `nodes::service:speed-test`)
-        - `flows` — manage active network flows (requires `nodes::service:flows`)
-        - `bgp` — interact with the BGP server (requires `nodes::service:bgp`)
-        - `ipsec-restart` — restart the IPSec service (requires `nodes::service:ipsec-restart`)
-        - `ipsec-statusall` — retrieve IPSec status (requires `nodes::service:ipsec-statusall`)
+        Add `?wait=1` to block until the node responds (useful for synchronous checks).
 
         All services require either `nodes::remote-execute` or `nodes::service:{event}`
         permission.
-
-        Add `?wait=1` to block until the node responds (useful for synchronous checks).
       parameters:
         - description: Pass `1` to block until the node responds and return its output. Omit for fire-and-forget.
           in: query
@@ -9662,6 +11316,53 @@ components:
         - port
         - protocol
         - service
+    NodeFlowEntry:
+      type: object
+      description: A single active network flow entry
+      properties:
+        sip:
+          type: string
+          description: Source IP address
+        dip:
+          type: string
+          description: Destination IP address
+        p:
+          type: string
+          description: Protocol (tcp, udp, icmp)
+        sport:
+          type: integer
+          description: Source port (TCP/UDP only)
+        dport:
+          type: integer
+          description: Destination port (TCP/UDP only)
+        lid:
+          type: integer
+          description: Local ICMP identifier (ICMP only)
+        nid:
+          type: integer
+          description: NAT ICMP identifier (ICMP only)
+        state:
+          type: string
+          description: TCP connection state or ESTABLISHED
+        br:
+          type: integer
+          description: Bytes read (received)
+        bw:
+          type: integer
+          description: Bytes written (sent)
+        con:
+          type: integer
+          description: Connection duration in seconds
+        def:
+          type: boolean
+          description: True if the flow is defunct
+        flg:
+          type: integer
+          description: TCP flag bits at time of becoming defunct
+        meta:
+          type: object
+          additionalProperties: true
+          description: Additional metadata if present
     NodeTriggerContainerActionRequest:
       description: >-
         Request body used when `{event}` is set to a container service name and
