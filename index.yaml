@@ -54,15 +54,12 @@ tags:
   - name: User
     description: |
       [User](https://docs.trustgrid.io/docs/user-management/) accounts for portal and API access. Authenticated via SSO (IDP) or local credentials and assigned permissions via policies. Requires `users::read` permission.
-  - name: Group
-    description: |
-      [Groups](https://docs.trustgrid.io/docs/user-management/groups/) control which users can access ZTNA applications exposed through virtual networks. Can be synchronized from identity providers. Requires `groups::read` permission.
   - name: Appliance
     description: |
       [Appliances](https://docs.trustgrid.io/docs/nodes/appliances/) are physical or virtual machine Trustgrid nodes providing full network, VPN, edge compute, and monitoring capabilities. Requires `nodes::read` permission.
   - name: Agent
     description: |
-      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) are lightweight software clients installed on user devices or servers, supporting VPN/ZTNA connectivity. Requires `nodes::read` permission.
+      [Agents](https://docs.trustgrid.io/docs/nodes/agents/) are lightweight software clients installed on user devices or servers, supporting VPN connectivity. Requires `nodes::read` permission.
   - name: Org
     description: |
       Organization-level settings including [support requests](https://docs.trustgrid.io/docs/support/), notification preferences, and [shared documents](https://docs.trustgrid.io/docs/support/documents/). Requires `orgs::read` permission.
@@ -148,9 +145,6 @@ tags:
   - name: Change Management
     description: |
       Tracked network configuration changes with approval workflows. Requires `virtual-networks::read` to view changes, `virtual-networks::modify` to stage and commit changes.
-  - name: Auth Group
-    description: |
-      Authentication groups that map identity provider groups to Trustgrid access groups, controlling ZTNA application access. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
   
 x-tagGroups:
   - name: Alerts
@@ -484,17 +478,17 @@ paths:
 
         Requires `audits::read:flows` permission.
       parameters:
-        - description: Unix timestamp for the start of the log window
+        - description: Unix timestamp lower bound for the flow start time
           in: query
           name: sTime
           schema:
             type: number
-        - description: Unix timestamp for the end of the log window
+        - description: Unix timestamp upper bound for the flow start time. This does not filter by flow end time.
           in: query
           name: eTime
           schema:
             type: number
-        - description: Comparison operator for the end of the log window
+        - description: Comparison operator for the `eTime` flow start time bound. There is no end-time query filter.
           in: query
           name: eTimeOp
           schema:
@@ -682,8 +676,12 @@ paths:
                       example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
                       type: string
                     meta:
-                      description: Additional metadata (nullable)
+                      description: >-
+                        Additional metadata about the flow event. Contents vary
+                        by event source and may include arbitrary string,
+                        numeric, or nested values. Nullable.
                       type: object
+                      additionalProperties: true
                       nullable: true
                   type: object
                 type: array
@@ -1226,8 +1224,11 @@ paths:
                         description: >-
                           Compiled firewall policy snapshot derived from virtual
                           network access policies. Read-only; updated automatically
-                          when network policies change.
+                          when network policies change. Shape mirrors the
+                          internal iptables-style rule set and is not part of
+                          the public API contract — treat as opaque.
                         type: object
+                        additionalProperties: true
                 type: object
         '404':
           description: Not found
@@ -1274,7 +1275,18 @@ paths:
                         description: Human-readable rule name
                         type: string
                       telemetry:
-                        description: Shadow `reported` key to evaluate (e.g. `memory`, `storage`)
+                        description: Telemetry metric to evaluate
+                        enum:
+                          - cpu
+                          - ram
+                          - disk
+                          - heap
+                          - embflows
+                          - latency
+                          - bandwidthIn
+                          - bandwidthOut
+                          - tcpResets
+                          - vpnFlows
                         type: string
                       max:
                         description: Upper bound — alert fires when the value exceeds this
@@ -1283,7 +1295,10 @@ paths:
                         description: Number of time units the value must continuously exceed `max`
                         type: number
                       exceededWindowUnit:
-                        description: Time unit for `exceededWindow` (e.g. `minutes`, `hours`)
+                        description: Time unit for `exceededWindow`
+                        enum:
+                          - minutes
+                          - hours
                         type: string
         description: Alert configuration
         required: true
@@ -1602,6 +1617,12 @@ paths:
     get:
       operationId: getNodeLicense
       summary: Generate a license key for registering a new node to the organization
+      description: |-
+        Generates a license key that an appliance node uses to register with the organization.
+
+        ---
+
+        Requires `nodes::manage` permission.
       responses:
         '200':
           description: License body
@@ -1741,7 +1762,56 @@ paths:
       description: |
         Applicable to appliances only.
       requestBody:
-        $ref: '#/components/requestBodies/Config2'
+        required: true
+        content:
+          application/json:
+            schema:
+              description: Node-level alert threshold configuration
+              type: object
+              properties:
+                enabled:
+                  description: Whether alert threshold evaluation is active on this node
+                  type: boolean
+                thresholds:
+                  description: Alert rules evaluated against shadow reported telemetry values
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        description: Rule ID (UUID)
+                        type: string
+                      name:
+                        description: Human-readable rule name
+                        type: string
+                      telemetry:
+                        description: Telemetry metric to evaluate
+                        enum:
+                          - cpu
+                          - ram
+                          - disk
+                          - heap
+                          - embflows
+                          - latency
+                          - bandwidthIn
+                          - bandwidthOut
+                          - tcpResets
+                          - vpnFlows
+                        type: string
+                      max:
+                        description: Upper bound — alert fires when the value exceeds this
+                        type: number
+                      exceededWindow:
+                        description: >-
+                          Number of time units the value must continuously exceed
+                          `max` before the alert fires
+                        type: number
+                      exceededWindowUnit:
+                        description: Time unit for `exceededWindow`
+                        enum:
+                          - minutes
+                          - hours
+                        type: string
       responses:
         '200':
           description: OK
@@ -1755,7 +1825,40 @@ paths:
       description: |
         Applicable to appliances only.
       requestBody:
-        $ref: '#/components/requestBodies/Config2'
+        required: true
+        content:
+          application/json:
+            schema:
+              description: HA cluster configuration for the node
+              type: object
+              properties:
+                enabled:
+                  description: Whether the node participates in an HA cluster
+                  type: boolean
+                host:
+                  description: Peer IP or hostname used for cluster heartbeat and state sync
+                  type: string
+                port:
+                  description: TCP port used for cluster heartbeat and state sync
+                  type: integer
+                statusHost:
+                  description: Optional dedicated host used for cluster status checks
+                  type: string
+                statusPort:
+                  description: Optional dedicated port used for cluster status checks
+                  type: integer
+                master:
+                  description: True when this node is currently the active master of the cluster pair
+                  type: boolean
+                updateTime:
+                  description: Unix timestamp of the last cluster config change
+                  type: integer
+                versionCounter:
+                  description: Monotonically increasing config version counter
+                  type: integer
+                masterVersion:
+                  description: Config version currently held by the cluster master
+                  type: integer
       responses:
         '200':
           description: OK
@@ -1886,6 +1989,60 @@ paths:
           description: OK
       tags:
         - Appliance
+  /v2/node/{nodeID}/config/network/bgp:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    put:
+      summary: Configure the BGP routing plugin on an appliance
+      operationId: updateNodeBGPConfig
+      description: |-
+        Replace the BGP plugin configuration on a node (appliance). The full
+        BGP config is replaced on each PUT — to add, change, or remove an
+        individual peer group, peer, or policy, send the new full config.
+        To turn BGP off, PUT a config with `enabled: false`.
+
+        There is no dedicated GET or DELETE: the current BGP config is read
+        from the node's config blob (e.g. `getNode` with a `config.bgp`
+        projection), and "deleting" BGP is just PUTing a disabled config.
+
+        BGP exchanges routes with one or more external peers grouped into peer
+        groups. Each peer group has its own import and export policies. Import
+        policies select which advertised routes are added to the local routing
+        table. Export policies select which prefixes are advertised to peers,
+        and may match by prefix, by virtual network ID, or both — see
+        `BGPExportPolicy.match.network` for the full list of triggers that
+        cause an exported route to be withdrawn.
+
+        There is no cluster-level BGP endpoint: BGP runs independently on
+        each cluster member, so cluster BGP is configured by PUTing the same
+        config to each member's node ID. Each member opens its own TCP peer
+        sessions to the configured peers, so the peers must be reachable
+        from every member. An export policy with `match.cluster: true` is
+        only advertised by the active cluster member; standby members keep
+        their BGP sessions up but withdraw the marked routes until they
+        become master. On a standalone (non-clustered) node `match.cluster`
+        has no effect.
+
+        BGP timers (hold time, keepalive, connect-retry), address families,
+        and eBGP-multihop / TTL are not user-configurable through this API;
+        the platform sets BGP defaults and only IPv4 unicast is supported.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPConfig'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
   /node/{nodeID}/config/services:
     parameters:
       - $ref: '#/components/parameters/nodeID'
@@ -1996,7 +2153,7 @@ paths:
     put:
       summary: Configure Zero Trust Network Access gateway settings for secure remote access
       description: >
-        Update ZTNA gateway configuration for a node (appliance)
+        Update APIGW gateway configuration for a node (appliance)
 
 
         Note that this endpoint used to be `apigw`. The config section is still
@@ -2023,16 +2180,16 @@ paths:
                 wireguardPort: 9926
               properties:
                 cert:
-                  description: ZTNA gateway certificate (FQDN)
+                  description: APIGW gateway certificate (FQDN)
                   type: string
                 enabled:
                   description: Enable this plugin
                   type: boolean
                 host:
-                  description: ZTNA gateway host
+                  description: APIGW gateway host
                   type: string
                 port:
-                  description: ZTNA gateway port
+                  description: APIGW gateway port
                   maximum: 65535
                   minimum: 1
                   type: number
@@ -2055,9 +2212,9 @@ paths:
       tags:
         - Appliance
     delete:
-      summary: Remove ZTNA gateway configuration and disable secure remote access
+      summary: Remove APIGW gateway configuration and disable secure remote access
       description: |
-        Delete the ZTNA gateway configuration for a node (appliance)
+        Delete the APIGW gateway configuration for a node (appliance)
 
         ---
 
@@ -2283,55 +2440,1205 @@ paths:
       tags:
         - Appliance
         - Agent
-  /node/{nodeID}/trigger/{event}:
+  /node/{nodeID}/trigger/aws-route-tables:
     parameters:
       - $ref: '#/components/parameters/nodeID'
-      - in: path
-        name: event
-        required: true
-        description: |-
-          Event name to trigger on the node. This parameter is open-ended; the backend
-          may support additional event names beyond those documented here.
-
-          Known values include: aws-route-tables, gateway-routes, tg-tcpdump,
-          datastore-manager, gateway-ping, gateway-perf, gateway-traceroute,
-          gateway-mtr, wg-clients, vpn-dump, vpn-key, vpn-nats, vpn-routes,
-          node-debug, tg-net-ping, tg-net-nc, nat-hits, ipsec-statusall,
-          ipsec-restart, tg-ping, tg-cluster-ping, speed-test, tg-nc,
-          tg-traceroute, flows, tg-mtr, bgp, tg-arping,
-          node-restart-service, node-reboot, node-upgrade, web-sessions.
-
-          Each requires either `nodes::remote-execute` or `nodes::service:{event}` permission.
-        schema:
-          type: string
-          example: gateway-routes
     post:
-      summary: Execute a remote operation or command on a specific node
+      operationId: triggerNodeAwsRouteTables
+      summary: List AWS route tables attached to the node host
       description: |-
-        Sends an event to the node and optionally waits for its response.
+        Retrieves the AWS EC2 route tables associated with the node's network interfaces.
+        Optionally filters by a specific network interface card (NIC). Available on
+        AWS-hosted nodes only.
 
-        Common `event` values:
-        - `node-restart-service` — restart the Trustgrid node service (requires `nodes::service:node-restart-service`)
-        - `node-reboot` — reboot the host OS (requires `nodes::service:node-reboot`)
-        - `node-upgrade` — upgrade node software (requires `nodes::service:node-upgrade`)
-        - `gateway-routes` — fetch current gateway routes (requires `nodes::service:gateway-routes`)
-        - `vpn-routes` — fetch virtual network routing table (requires `nodes::service:vpn-routes`)
-        - `vpn-nats` — fetch virtual network NAT table (requires `nodes::service:vpn-nats`)
-        - `tg-ping` — run a ping via the Trustgrid overlay (requires `nodes::service:tg-ping`)
-        - `tg-traceroute` — run a traceroute via the overlay (requires `nodes::service:tg-traceroute`)
-        - `tg-net-ping` — ping through the virtual network (requires `nodes::service:tg-net-ping`)
-        - `speed-test` — measure internet bandwidth (requires `nodes::service:speed-test`)
-        - `flows` — manage active network flows (requires `nodes::service:flows`)
-        - `bgp` — interact with the BGP server (requires `nodes::service:bgp`)
-        - `ipsec-restart` — restart the IPSec service (requires `nodes::service:ipsec-restart`)
-        - `ipsec-statusall` — retrieve IPSec status (requires `nodes::service:ipsec-statusall`)
+        ---
 
-        All services require either `nodes::remote-execute` or `nodes::service:{event}`
-        permission.
-
-        Add `?wait=1` to block until the node responds (useful for synchronous checks).
+        Requires `nodes::service:aws-route-tables` or `nodes::remote-execute` permission.
       parameters:
-        - description: Pass `1` to block until the node responds and return its output. Omit for fire-and-forget.
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nic:
+                  type: string
+                  description: Network interface name to filter route tables. Omit to return all.
+                  example: eth0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      tables:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/bgp:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeBgp
+      summary: Retrieve BGP peer routes or restart the BGP router
+      description: |-
+        Query the current BGP routing table (peers, routes, and rejected routes) or
+        restart the BGP router process. Returns an error payload if BGP is not enabled.
+
+        ---
+
+        Requires `nodes::service:bgp` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [get, restart]
+                  default: get
+                  description: |-
+                    - `get` — return BGP routing table
+                    - `restart` — restart the BGP router process
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      router:
+                        type: string
+                        description: BGP router identifier (IP address)
+                        example: 10.1.0.1
+                      peers:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ip:
+                              type: string
+                              description: Peer IP address
+                            asn:
+                              type: integer
+                              description: Peer autonomous system number
+                            connected:
+                              type: boolean
+                            connectTime:
+                              type: integer
+                              description: Seconds since peer connected (only present when connected)
+                            routes:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  dest:
+                                    type: string
+                                    description: Destination CIDR
+                                  metric:
+                                    type: integer
+                            rejectedRoutes:
+                              type: array
+                              items:
+                                type: object
+                                additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/datastore-manager:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeDatastoreManager
+      summary: Manage the node's local datastore files
+      description: |-
+        List or manage files in the node's local datastore directory.
+
+        ---
+
+        Requires `nodes::service:datastore-manager` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [LIST]
+                  default: LIST
+                  description: Action to perform on the datastore
+                filename:
+                  type: string
+                  description: File or directory name for operations that target a specific entry
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/flows:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeFlows
+      summary: View or delete active network flows on the node
+      description: |-
+        Returns the node's active network flow table, optionally filtered by protocol,
+        source/destination IP and port, container, or virtual network. Setting `action` 
+        to `delete` terminates matching flows instead of returning them.
+
+        ---
+
+        Requires `nodes::service:flows` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [read, delete]
+                  default: read
+                  description: |-
+                    - `read` — return matching flows
+                    - `delete` — terminate matching flows
+                protocol:
+                  type: string
+                  enum: [icmp, tcp, udp, any]
+                  description: Protocol filter. Omit or use `any` to match all.
+                source:
+                  type: string
+                  description: Source IP or CIDR filter
+                  example: 10.0.0.0/24
+                sourcePort:
+                  type: integer
+                  description: Source port filter
+                dest:
+                  type: string
+                  description: Destination IP or CIDR filter
+                  example: 192.168.1.5
+                destPort:
+                  type: integer
+                  description: Destination port filter
+                containerId:
+                  type: string
+                  description: Filter flows belonging to a specific container
+                networkId:
+                  type: integer
+                  description: Filter flows on a specific virtual network ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    oneOf:
+                      - type: object
+                        description: Map of protocol to flow list (action=read)
+                        properties:
+                          icmp:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/NodeFlowEntry'
+                          tcp:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/NodeFlowEntry'
+                          udp:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/NodeFlowEntry'
+                      - type: string
+                        enum: [success]
+                        description: Returned when action=delete
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/gateway-perf:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeGatewayPerf
+      summary: Run a throughput performance test to a peer gateway node
+      description: |-
+        Opens a streaming session that sends a configurable amount of data to the
+        destination node and measures throughput. Progress is streamed as text while
+        the test runs; a summary line with rate in Mbps is emitted at the end.
+
+        Use `?wait=1` to block until the test completes and receive the full output.
+
+        ---
+
+        Requires `nodes::service:gateway-perf` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dest]
+              properties:
+                dest:
+                  type: string
+                  description: Destination node FQDN to send data to
+                  example: edge-node.example.trustgrid.io
+                gwPath:
+                  type: string
+                  description: Gateway path ID to use. Omit for default path.
+                bytes:
+                  type: integer
+                  description: Number of bytes to send
+                  default: 10000000
+                messageSize:
+                  type: integer
+                  description: Size of each message chunk in bytes
+                  default: 50000
+                windowSize:
+                  type: integer
+                  description: Flow-control window size in bytes
+                  default: 1000000
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+        - Agent
+
+  /node/{nodeID}/trigger/gateway-ping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeGatewayPing
+      summary: Ping a peer gateway node over the Trustgrid overlay
+      description: |-
+        Sends echo packets to the specified destination node through the Trustgrid
+        gateway overlay and reports round-trip latency. Results stream as JSON objects
+        with RTT measurements.
+
+        Use `?wait=1` to block until the session ends and receive buffered output.
+
+        ---
+
+        Requires `nodes::service:gateway-ping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dest]
+              properties:
+                dest:
+                  type: string
+                  description: Destination node FQDN to ping
+                  example: gateway.example.trustgrid.io
+                gwPath:
+                  type: string
+                  description: Gateway path ID to use. Omit for default path.
+                interval:
+                  type: integer
+                  description: Interval between echo packets in seconds
+                  default: 5
+                size:
+                  type: integer
+                  description: Echo payload size in bytes
+                  default: 64
+                sendJson:
+                  type: boolean
+                  description: If true, the node accepts JSON-formatted echo data
+                  default: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+        - Agent
+  /node/{nodeID}/trigger/gateway-routes:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeGatewayRoutes
+      summary: Retrieve the node's active gateway routing table
+      description: |-
+        Returns the gateway peer routing table showing which nodes the gateway is
+        connected to, their RTT, throughput, and path details.
+
+        ---
+
+        Requires `nodes::service:gateway-routes` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                showClusterRoutes:
+                  type: boolean
+                  description: Include cluster-level routes in the output
+                  default: false
+                enableLog:
+                  type: boolean
+                  description: Enable debug logging during route collection
+                  default: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      available:
+                        type: integer
+                        description: Total number of available paths
+                      connected:
+                        type: integer
+                        description: Number of connected peers in the node's domain
+                      domains:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Domain FQDN
+                            routes:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                    description: Peer node name
+                                  path:
+                                    type: string
+                                    description: Gateway path ID in use
+                                  rtt:
+                                    type: number
+                                    description: Mean round-trip time in milliseconds
+                                  connected:
+                                    type: boolean
+                                    description: Whether the peer is currently connected
+                                  client:
+                                    type: boolean
+                                    description: True if the peer is a hub or management node
+                                  udp:
+                                    type: boolean
+                                    description: Whether the connection uses UDP tunneling
+                                  udpPort:
+                                    type: integer
+                                    description: UDP port in use (when udp=true)
+                                  ip:
+                                    type: string
+                                    description: Remote IP address
+                                  port:
+                                    type: integer
+                                    description: Remote port
+                                  receivedMbps:
+                                    type: number
+                                    description: Average receive throughput in Mbps since last reset
+                                  sentMbps:
+                                    type: number
+                                    description: Average transmit throughput in Mbps since last reset
+                                  clusterName:
+                                    type: string
+                                    description: Cluster name if the peer belongs to a cluster
+                                  clusterMaster:
+                                    type: boolean
+                                    description: True if this peer is the cluster master
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/ipsec-restart:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeIpsecRestart
+      summary: Restart the IPsec daemon on the node
+      description: |-
+        Executes `ipsec restart` on the node and streams the output. Use `?wait=1`
+        to block until the command completes.
+
+        ---
+
+        Requires `nodes::service:ipsec-restart` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/ipsec-statusall:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeIpsecStatusall
+      summary: Retrieve the full IPsec daemon status
+      description: |-
+        Executes `ipsec statusall` on the node and streams the output.
+        Use `?wait=1` to block and receive the full status text.
+
+        ---
+
+        Requires `nodes::service:ipsec-statusall` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/nat-hits:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeNatHits
+      summary: Retrieve or reset address-translation rule hit counts
+      description: |-
+        Returns hit counts for address translation (NAT) rules, or resets counters
+        for specific rules. Filter by tracker ID, network name, interface, or CIDR ranges.
+
+        ---
+
+        Requires `nodes::service:nat-hits` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [GET, RESET, RESET_ALL]
+                  description: |-
+                    - `GET` — return hit counts
+                    - `RESET` — reset counters for matching rules
+                    - `RESET_ALL` — reset all counters
+                trackerID:
+                  type: string
+                  description: Filter by specific tracker ID
+                networkName:
+                  type: string
+                  description: Filter by virtual network name
+                interfaceName:
+                  type: string
+                  description: Filter by interface name
+                insideCIDR:
+                  type: string
+                  description: Filter by inside (local) CIDR
+                  example: 10.0.0.0/24
+                outsideCIDR:
+                  type: string
+                  description: Filter by outside (translated) CIDR
+                  example: 172.16.0.0/16
+                networkGroup:
+                  type: string
+                  description: Filter by network group name
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/node-debug:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeDebug
+      summary: Stream plugin debug messages from the node
+      description: |-
+        Opens a streaming session that subscribes to internal plugin debug messages.
+        Optionally filter by plugin name. Messages arrive formatted as
+        `HH:MM:SS.mmm: {message}` lines.
+
+        Use `?wait=1` to buffer messages until the session ends.
+
+        ---
+
+        Requires `nodes::service:node-debug` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plugin:
+                  type: string
+                  description: Plugin name to filter. Use `any` or omit to receive all plugins.
+                  example: network
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+        - Agent
+
+  /node/{nodeID}/trigger/node-reboot:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeReboot
+      summary: Reboot the node's host operating system
+      description: |-
+        Schedules a host OS reboot (`shutdown -r now`) to execute 5 seconds after
+        this call is acknowledged. The node will disconnect and come back online
+        after completing its boot sequence.
+
+        ---
+
+        Requires `nodes::service:node-reboot` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Node host will restart
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/node-restart-service:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeRestartService
+      summary: Restart the Trustgrid node service process
+      description: |-
+        Causes the Trustgrid node agent process to exit and restart. The node will
+        briefly disconnect while the service restarts.
+
+        ---
+
+        Requires `nodes::service:node-restart-service` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Node service will restart
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/node-upgrade:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeUpgrade
+      summary: Trigger an immediate software upgrade of the node
+      description: |-
+        Forces the node to run its upgrade process immediately, bypassing the normal
+        scheduled unattended-upgrade window. If an upgrade is already in progress,
+        returns a status message indicating so.
+
+        ---
+
+        Requires `nodes::service:node-upgrade` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                skipUnattended:
+                  type: boolean
+                  description: If true, skip the unattended-upgrade step
+                  default: false
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - Upgrade in progress
+                          - Existing upgrade is already in progress
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/speed-test:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeSpeedTest
+      summary: Measure the node's internet bandwidth to the Trustgrid control plane
+      description: |-
+        Runs a download and/or upload throughput test between the node and the
+        Trustgrid control plane speed-test endpoints. Results stream as JSON objects
+        containing `downloadMbps`, `maxDownloadMbps`, `uploadMbps`, and `maxUploadMbps`.
+
+        Use `?wait=1` to block until the test completes and receive the full output.
+
+        ---
+
+        Requires `nodes::service:speed-test` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [download, upload, both]
+                  default: both
+                  description: |-
+                    - `download` — test download speed only
+                    - `upload` — test upload speed only
+                    - `both` — test download then upload
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-arping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgArping
+      summary: Send ARP ping to a host from the node
+      description: |-
+        Runs `arping -i {iface} {host}` on the node and streams the output.
+        Useful for verifying Layer 2 reachability on a given interface.
+
+        Use `?wait=1` to block and receive the command output.
+
+        ---
+
+        Requires `nodes::service:tg-arping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [iface, host]
+              properties:
+                iface:
+                  type: string
+                  description: Network interface to send ARP packets from
+                  example: eth0
+                host:
+                  type: string
+                  description: Target host IP address
+                  example: 192.168.1.1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-mtr:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgMtr
+      summary: Run an MTR network diagnostic from the node
+      description: |-
+        Starts an interactive MTR (Matt's Traceroute) session to the specified host.
+        Results stream as terminal output.
+
+        Use `?wait=1` to block and receive the buffered MTR output.
+
+        ---
+
+        Requires `nodes::service:tg-mtr` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hostname]
+              properties:
+                hostname:
+                  type: string
+                  description: Target host IP or hostname
+                  example: 8.8.8.8
+                options:
+                  type: string
+                  description: Additional MTR command-line options (space-separated)
+                  example: --report
+                cols:
+                  type: integer
+                  description: Terminal column width for MTR display
+                  default: 80
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-nc:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgNc
+      summary: Test TCP port connectivity from the node's local network
+      description: |-
+        Runs `nc -v -z {host} {port}` from the node, binding to the specified source
+        address. Returns the netcat output and exit code.
+
+        Use `?wait=1` to block and receive the result synchronously.
+
+        ---
+
+        Requires `nodes::service:tg-nc` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host, port]
+              properties:
+                source:
+                  type: string
+                  description: Source IP address to bind to
+                  default: 127.0.0.1
+                  example: 192.168.1.10
+                host:
+                  type: string
+                  description: Target host IP or hostname
+                  example: 10.0.0.1
+                port:
+                  type: integer
+                  description: Target TCP port
+                  example: 443
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        description: netcat standard output and error
+                      exitCode:
+                        type: string
+                        description: Process exit code. `0` indicates success.
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-net-nc:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgNetNc
+      summary: Test TCP port connectivity from inside a virtual network namespace
+      description: |-
+        Runs `nc -v -z {host} {port}` inside the management namespace for the specified
+        virtual network, testing connectivity as seen from that network context.
+
+        Use `?wait=1` to block and receive the result synchronously.
+
+        ---
+
+        Requires `nodes::service:tg-net-nc` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network, host, port]
+              properties:
+                network:
+                  type: string
+                  description: Virtual network name whose namespace to test from
+                  example: virtual-network
+                host:
+                  type: string
+                  description: Target host IP or hostname
+                  example: 10.0.0.1
+                port:
+                  type: integer
+                  description: Target TCP port
+                  example: 80
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        description: netcat standard output and error
+                      exitCode:
+                        type: string
+                        description: Process exit code. `0` indicates success.
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-net-ping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgNetPing
+      summary: Ping a host through a virtual network namespace on the node
+      description: |-
+        Runs `ip netns exec mgmt-{network} ping {host}` on the node, testing
+        reachability from inside the specified virtual network context.
+        Output streams as terminal text.
+
+        Use `?wait=1` to block and receive the output.
+
+        ---
+
+        Requires `nodes::service:tg-net-ping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host, network]
+              properties:
+                host:
+                  type: string
+                  description: Target IP or hostname to ping
+                  example: 10.0.0.1
+                network:
+                  type: string
+                  description: Virtual network name to use as the source namespace
+                  example: virtual-network
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-ping:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgPing
+      summary: Ping a host from the node
+      description: |-
+        Runs `ping -O -I {source} {host}` on the node and streams the output.
+        Use `?wait=1` to block and receive the ping output.
+
+        ---
+
+        Requires `nodes::service:tg-ping` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host]
+              properties:
+                source:
+                  type: string
+                  description: Source interface IP address
+                  default: 127.0.0.1
+                  example: 192.168.1.10
+                host:
+                  type: string
+                  description: Target IP or hostname to ping
+                  example: 8.8.8.8
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-tcpdump:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgTcpdump
+      summary: Capture packets on the node using tcpdump
+      description: |-
+        Starts a streaming tcpdump capture session on the node. Captured packet
+        details stream as text output. Use `?wait=1` to buffer until the capture ends.
+
+        ---
+
+        Requires `nodes::service:tg-tcpdump` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
           in: query
           name: wait
           required: false
@@ -2345,6 +3652,520 @@ paths:
             schema:
               type: object
               additionalProperties: true
+              description: tcpdump session parameters
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/tg-traceroute:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeTgTraceroute
+      summary: Run a traceroute from the node
+      description: |-
+        Runs `traceroute` to the specified host from the node and streams the output.
+        Use `?wait=1` to block and receive the full traceroute output.
+
+        ---
+
+        Requires `nodes::service:tg-traceroute` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host]
+              properties:
+                host:
+                  type: string
+                  description: Target IP or hostname
+                  example: 8.8.8.8
+                filter:
+                  type: string
+                  description: Additional traceroute flags (space-separated)
+                  default: -n
+                iface:
+                  type: string
+                  description: Network interface to route through
+                  example: eth0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-dump:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnDump
+      summary: Stream virtual network packet captures from the node
+      description: |-
+        Opens a streaming session that outputs VPN packet details in a tcpdump-like
+        format. Filter by network, protocol, peer, host, port, TCP flags, or session ID.
+        The session stays open until closed by the client.
+
+        Use `?wait=1` to buffer output until the session ends.
+
+        ---
+
+        Requires `nodes::service:vpn-dump` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                network:
+                  type: string
+                  description: Virtual network name to capture. Use `any` or omit for all networks.
+                protocol:
+                  type: string
+                  enum: [icmp, tcp, udp, any]
+                  description: Protocol filter
+                peer:
+                  type: string
+                  description: Remote peer name filter
+                host:
+                  type: string
+                  description: Source or destination IP filter
+                  example: 10.0.0.1
+                port:
+                  type: string
+                  description: >-
+                    Port filter. Supports single port (`443`), range (`1024-2048`),
+                    or operator prefix (`lt:1024`, `gt:1024`, `ne:443`).
+                tcpflags:
+                  type: string
+                  description: >-
+                    TCP flag filter. Combine flag letters: `S` (SYN), `P` (PSH),
+                    `U` (URG), `F` (FIN), `R` (RST), `.` (ACK). Use `any` to match all.
+                  example: S
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-key:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnKey
+      summary: Get, generate, or save a Wireguard key for a virtual network
+      description: |-
+        Manages the X25519 Wireguard private key for a virtual network interface.
+        - `get` — returns the current public key as a JWK
+        - `generate` — generates a new private key, saves it, and returns the public key
+        - `save` — saves the provided base64-encoded 32-byte private key and returns the public key
+
+        ---
+
+        Requires `nodes::service:vpn-key` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network]
+              properties:
+                action:
+                  type: string
+                  enum: [get, generate, save]
+                  default: get
+                  description: Key operation to perform
+                network:
+                  type: string
+                  description: Virtual network name
+                  example: virtual-network
+                key:
+                  type: string
+                  description: Base64-encoded 32-byte X25519 private key. Required when action=save.
+                  example: dGhpcyBpcyBhIDMyLWJ5dGUgcHJpdmF0ZSBrZXk=
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    description: JWK (JSON Web Key) representing the X25519 public key
+                    properties:
+                      kid:
+                        type: string
+                        description: Key ID
+                      kty:
+                        type: string
+                        example: EC
+                      crv:
+                        type: string
+                        example: X25519
+                      x:
+                        type: string
+                        description: Base64-encoded public key value
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-nats:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnNats
+      summary: Retrieve the NAT translation table for a virtual network
+      description: |-
+        Returns the active network address translation (NAT) table for the specified
+        virtual network, showing TCP and UDP flow mappings.
+
+        ---
+
+        Requires `nodes::service:vpn-nats` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [network]
+              properties:
+                network:
+                  type: string
+                  description: Virtual network name
+                  example: virtual-network
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      nats:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            proto:
+                              type: string
+                              enum: [tcp, udp]
+                            src:
+                              type: string
+                              description: Source translation mapping (`originalIp:port->translatedIp:port`)
+                            dest:
+                              type: string
+                              description: Destination translation mapping
+                            state:
+                              type: string
+                              description: TCP connection state (TCP flows only)
+                            def:
+                              type: boolean
+                              description: True if the flow is defunct
+                            flags:
+                              type: integer
+                              description: TCP flag bits when the flow became defunct
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/vpn-routes:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeVpnRoutes
+      summary: Retrieve the virtual network routing table
+      description: |-
+        Returns routes for one or all virtual networks, with optional filtering by
+        network name, network ID, destination IP, or destination node name.
+
+        ---
+
+        Requires `nodes::service:vpn-routes` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                networkId:
+                  type: string
+                  description: Filter by virtual network ID (takes precedence over `network`)
+                network:
+                  type: string
+                  description: Virtual network name filter. Use `any` to return all networks.
+                  example: virtual-network
+                domain:
+                  type: string
+                  description: Domain filter when combined with `network`
+                ip:
+                  type: string
+                  description: Filter routes that cover this IP address
+                  example: 10.0.0.5
+                dest:
+                  type: string
+                  description: Filter by destination node name. Use `any` to return all.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: object
+                    properties:
+                      networks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              description: Virtual network name
+                            routes:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  cidr:
+                                    type: string
+                                    description: Route destination CIDR
+                                    example: 10.0.0.0/24
+                                  dest:
+                                    type: string
+                                    description: Destination node FQDN
+                                  path:
+                                    type: string
+                                    description: Gateway path ID (if applicable)
+                                  metric:
+                                    type: integer
+                                    description: Route metric (lower is preferred)
+                                  available:
+                                    type: boolean
+                                    description: Whether the route is active and reachable
+                                  master:
+                                    type: string
+                                    description: Active cluster master node (cluster routes only)
+                                  nodeId:
+                                    type: string
+                                    description: Destination node ID
+                                  monitors:
+                                    type: array
+                                    description: Route monitor states
+                                    items:
+                                      type: object
+                                      properties:
+                                        name:
+                                          type: string
+                                        state:
+                                          type: string
+                                          enum: [ok, fail]
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/wg-clients:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      operationId: triggerNodeWgClients
+      summary: List or terminate active Wireguard ZTNA client sessions
+      description: |-
+        Returns active Wireguard client (ZTNA) sessions on the node's virtual networks,
+        optionally filtered by network, application ID, or session ID.
+        Setting `action` to `kill` terminates matching sessions instead.
+
+        ---
+
+        Requires `nodes::service:wg-clients` or `nodes::remote-execute` permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [list, kill]
+                  default: list
+                  description: |-
+                    - `list` — return active Wireguard client sessions
+                    - `kill` — terminate matching sessions
+                network:
+                  type: string
+                  description: Virtual network name filter. Use `all` or omit for all networks.
+                app:
+                  type: string
+                  description: Application ID filter. Use `all` or omit for all apps.
+                session:
+                  type: string
+                  description: ZTNA session ID filter. Use `all` or omit for all sessions.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    oneOf:
+                      - type: object
+                        description: Client list (action=list)
+                        properties:
+                          network:
+                            type: string
+                          clients:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  description: Client peer name
+                                endpoint:
+                                  type: string
+                                  description: Remote endpoint address and port
+                                session:
+                                  type: string
+                                  description: ZTNA session ID
+                                state:
+                                  type: string
+                                  enum: [active]
+                                connected:
+                                  type: integer
+                                  description: Seconds since connected (only present when up)
+                                sent:
+                                  type: integer
+                                  description: Bytes sent
+                                recv:
+                                  type: integer
+                                  description: Bytes received
+                                lastHandshake:
+                                  type: integer
+                                  description: Seconds since last Wireguard handshake
+                      - type: object
+                        description: Kill result (action=kill)
+                        properties:
+                          message:
+                            type: string
+                            example: Killed 1 sessions
+      tags:
+        - Appliance
+
+  /node/{nodeID}/trigger/{event}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - in: path
+        name: event
+        required: true
+        description: |-
+          Event name to trigger on the node. This parameter is open-ended; the backend
+          may support additional event names beyond those with dedicated endpoints.
+        schema:
+          type: string
+          example: gateway-routes
+    post:
+      summary: Execute a remote operation or command on a specific node
+      description: |-
+        Sends an event to the node and optionally waits for its response. Use the
+        dedicated event endpoints (e.g. `/node/{nodeID}/trigger/gateway-routes`) for
+        documented events with typed request and response schemas.
+
+        Add `?wait=1` to block until the node responds (useful for synchronous checks).
+
+        All services require either `nodes::remote-execute` or `nodes::service:{event}`
+        permission.
+      parameters:
+        - description: Pass `1` to block until the node responds and return its output. Omit for fire-and-forget.
+          in: query
+          name: wait
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: '#/components/schemas/NodeTriggerContainerActionRequest'
+                - $ref: '#/components/schemas/NodeTriggerContainerImageRequest'
+                - $ref: '#/components/schemas/NodeTriggerContainerStatusRequest'
+                - type: object
+                  additionalProperties: true
               description: >-
                 Optional event-specific payload. The request body shape depends on
                 the `{event}` being executed.
@@ -3388,17 +5209,17 @@ paths:
       summary: Retrieve network traffic flow logs with advanced filtering and pagination
       description: Requires `audits::read:flows` permission.
       parameters:
-        - description: Unix timestamp for the start of the log window
+        - description: Unix timestamp lower bound for the flow start time
           in: query
           name: sTime
           schema:
             type: number
-        - description: Unix timestamp for the end of the log window
+        - description: Unix timestamp upper bound for the flow start time. This does not filter by flow end time.
           in: query
           name: eTime
           schema:
             type: number
-        - description: Comparison operator for the end of the log window
+        - description: Comparison operator for the `eTime` flow start time bound. There is no end-time query filter.
           in: query
           name: eTimeOp
           schema:
@@ -3505,6 +5326,29 @@ paths:
             type: array
             items:
               type: number
+        - description: >-
+            If provided, a flow must match at least one of the flow flags
+            provided. Decimal encoded. Known flag values: 65536 (no ACL match),
+            131072 (no rule match), 262144 (no route), 524288 (invalid TCP),
+            67108864 (TLS cert expired), 134217728 (TLS name mismatch),
+            268435456 (TLS self-signed), 536870912 (TLS mutual auth required).
+          in: query
+          name: flags
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: number
+        - description: >-
+            When true, returns only flows blocked or rejected by security
+            controls — equivalent to filtering by the union of all defunct flow
+            flags (no ACL, no rule, no route, invalid TCP, and all TLS error
+            flags). Cannot be combined with `flags`.
+          in: query
+          name: defunct
+          schema:
+            type: boolean
       responses:
         '200':
           description: OK
@@ -3591,8 +5435,12 @@ paths:
                       example: 9aa2bbc3-4265-475b-b977-c94b1ee25a1f
                       type: string
                     meta:
-                      description: Additional metadata (nullable)
+                      description: >-
+                        Additional metadata about the flow event. Contents vary
+                        by event source and may include arbitrary string,
+                        numeric, or nested values. Nullable.
                       type: object
+                      additionalProperties: true
                       nullable: true
                   type: object
                 type: array
@@ -4811,7 +6659,7 @@ paths:
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/export-route:
     get:
       operationId: listClusterVpnExportRoutes
-      summary: Get a VPN's dynamic export routes
+      summary: Get dynamic routes exported by a cluster
       responses:
         '200':
           description: OK
@@ -4886,7 +6734,7 @@ paths:
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/dynamic/import-route:
     get:
       operationId: listClusterVpnImportRoutes
-      summary: Get a VPN's dynamic import routes
+      summary: Get dynamic routes imported by a cluster
       responses:
         '200':
           description: OK
@@ -5055,7 +6903,7 @@ paths:
   /v2/cluster/{clusterFQDN}/vpn/{networkName}/route:
     get:
       operationId: listClusterVpnRoutes
-      summary: Get a VPN's routes
+      summary: Get local vpn routes for a customer
       responses:
         '200':
           description: OK
@@ -6445,7 +8293,7 @@ paths:
   /v2/domain/{domainName}/network/{networkName}/route:
     get:
       operationId: listNetworkRoutes
-      summary: List a network's routes
+      summary: Get default global vpn routes for a virtual network
       description: Requires `virtual-networks::read` permission.
       responses:
         '200':
@@ -7894,7 +9742,7 @@ paths:
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/export-route:
     get:
       operationId: listNodeVpnExportRoutes
-      summary: Get a VPN's dynamic export routes
+      summary: Get dynamic routes exported by a node
       responses:
         '200':
           description: OK
@@ -7969,7 +9817,7 @@ paths:
   /v2/node/{nodeID}/vpn/{networkName}/dynamic/import-route:
     get:
       operationId: listNodeVpnImportRoutes
-      summary: Get a VPN's dynamic import routes
+      summary: Get dynamic routes imported by a node
       responses:
         '200':
           description: OK
@@ -8138,7 +9986,7 @@ paths:
   /v2/node/{nodeID}/vpn/{networkName}/route:
     get:
       operationId: listNodeVpnRoutes
-      summary: Get a VPN's routes
+      summary: Get local vpn routes for a node
       responses:
         '200':
           description: OK
@@ -8884,6 +10732,13 @@ components:
             $ref: '#/components/schemas/AlarmModel'
       description: Alarm body
       required: true
+    BGPConfig:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPConfig'
+      description: BGP plugin configuration
+      required: true
     TagValueModel:
       content:
         application/json:
@@ -9513,13 +11368,6 @@ components:
             type: object
       description: Network Config
       required: true
-    Config2:
-      content:
-        application/json:
-          schema:
-            type: object
-      description: Config body
-      required: true
     AlarmChannelModel:
       content:
         application/json:
@@ -9805,6 +11653,345 @@ components:
           type: string
       title: Alert V2
       type: object
+    BGPConfig:
+      description: |-
+        BGP plugin configuration for an appliance or cluster. The full BGP
+        config is replaced on each PUT.
+      example:
+        enabled: true
+        id: 10.0.0.1
+        asn: 65001
+        client: false
+        groups:
+          - _id: 8b4f2c9e-4d2a-4b8f-9a7c-1e2d3c4b5a6f
+            name: upstream-isp
+            peers:
+              - _id: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+                name: isp-router-1
+                asn: 65000
+                ip: 10.0.0.254
+                secret: shared-md5-secret
+            imports:
+              - _id: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+                name: accept-defaults
+                match:
+                  prefixes:
+                    - _id: 3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f
+                      prefix: 0.0.0.0/0
+                      exact: true
+                action:
+                  action: allow
+            exports:
+              - _id: 105bee71-5312-4c39-a1de-1dcf348e3f42
+                name: vpn-exports
+                match:
+                  cluster: true
+                  network: 1955
+                  prefixes:
+                    - _id: ed5d9187-4270-44db-892d-e2dc8b847a81
+                      prefix: 10.0.200.0/24
+                      exact: true
+                action:
+                  action: allow
+                  prefixes: []
+      properties:
+        enabled:
+          description: Whether the BGP server is running on the node
+          type: boolean
+        id:
+          description: |-
+            Router ID for the local BGP speaker, in IPv4 dotted-quad form.
+            Typically the IP of the interface used for BGP communication.
+          example: 10.0.0.1
+          format: ipv4
+          type: string
+        asn:
+          description: Autonomous System Number identifying the local router
+          example: 65001
+          maximum: 4294967295
+          minimum: 1
+          type: integer
+        client:
+          description: |-
+            When `true`, this speaker behaves as a route-reflector client:
+            it relies on its iBGP peer to reflect learned routes rather than
+            full-meshing with every other internal peer. Leave `false` for
+            standard eBGP/iBGP roles.
+          type: boolean
+        groups:
+          description: Peer groups configured on this BGP speaker
+          items:
+            $ref: '#/components/schemas/BGPPeerGroup'
+          type: array
+      required:
+        - enabled
+        - id
+        - asn
+        - client
+      title: BGPConfig
+      type: object
+    BGPPeerGroup:
+      description: |-
+        A group of BGP peers that share import and export policies.
+      properties:
+        _id:
+          description: Unique ID of the peer group
+          example: 8b4f2c9e-4d2a-4b8f-9a7c-1e2d3c4b5a6f
+          type: string
+        name:
+          description: User-friendly name for the peer group
+          example: upstream-isp
+          type: string
+        description:
+          description: Free-form note about this peer group, shown in the UI
+          type: string
+        peers:
+          description: Remote BGP routers in this peer group
+          items:
+            $ref: '#/components/schemas/BGPPeer'
+          type: array
+        imports:
+          description: |-
+            Policies controlling which routes advertised by peers in this
+            group are accepted into the local routing table.
+          items:
+            $ref: '#/components/schemas/BGPImportPolicy'
+          type: array
+        exports:
+          description: |-
+            Policies controlling which prefixes are advertised to peers in
+            this group.
+          items:
+            $ref: '#/components/schemas/BGPExportPolicy'
+          type: array
+      required:
+        - _id
+        - name
+      title: BGPPeerGroup
+      type: object
+    BGPPeer:
+      description: A single remote BGP peer
+      properties:
+        _id:
+          description: Unique ID of the peer
+          example: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+          type: string
+        name:
+          description: User-friendly name for the peer
+          example: isp-router-1
+          type: string
+        asn:
+          description: |-
+            Autonomous System Number that the peer identifies itself with
+          example: 65000
+          maximum: 4294967295
+          minimum: 1
+          type: integer
+        ip:
+          description: IP address that the peer can be reached at
+          example: 10.0.0.254
+          format: ipv4
+          type: string
+        secret:
+          description: |-
+            Optional MD5 passphrase used to authenticate the BGP session with
+            this peer. When omitted the session is unauthenticated.
+          type: string
+        description:
+          description: Free-form note about this peer, shown in the UI
+          type: string
+      required:
+        - _id
+        - name
+        - asn
+        - ip
+      title: BGPPeer
+      type: object
+    BGPImportPolicy:
+      description: |-
+        Policy controlling which routes advertised by peers in a group are
+        accepted. Routes that match the listed prefixes follow `action.action`;
+        routes that don't match any policy are rejected.
+      properties:
+        _id:
+          description: Unique ID of the policy
+          example: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+          type: string
+        name:
+          description: User-friendly name for the policy
+          example: accept-defaults
+          type: string
+        description:
+          description: Free-form note about this policy, shown in the UI
+          type: string
+        match:
+          description: Criteria used to match advertised routes
+          properties:
+            prefixes:
+              description: Prefixes this policy applies to
+              items:
+                $ref: '#/components/schemas/BGPImportPrefix'
+              type: array
+          type: object
+        action:
+          description: Action to take when a route matches
+          properties:
+            action:
+              description: |-
+                * `allow` — matching advertised routes are added to the local
+                  routing table
+                * `deny` — matching advertised routes are rejected
+              enum:
+                - allow
+                - deny
+              type: string
+          required:
+            - action
+          type: object
+      required:
+        - _id
+        - name
+        - match
+        - action
+      title: BGPImportPolicy
+      type: object
+    BGPImportPrefix:
+      description: A prefix entry inside a BGP import policy match
+      properties:
+        _id:
+          description: Unique ID of the prefix entry
+          example: 3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f
+          type: string
+        prefix:
+          description: CIDR network used to match advertised routes
+          example: 10.0.0.0/8
+          type: string
+        exact:
+          description: |-
+            When `true`, the advertised route's prefix length must equal the
+            prefix length configured here. When omitted or `false`, routes
+            for the same network with a different prefix length also match.
+          type: boolean
+        description:
+          description: Free-form note about this prefix entry, shown in the UI
+          type: string
+      required:
+        - _id
+        - prefix
+      title: BGPImportPrefix
+      type: object
+    BGPExportPolicy:
+      description: |-
+        Policy controlling which prefixes the local router advertises to
+        peers in a group. Prefixes that match `match` follow `action.action`.
+      properties:
+        _id:
+          description: Unique ID of the policy
+          example: 105bee71-5312-4c39-a1de-1dcf348e3f42
+          type: string
+        name:
+          description: User-friendly name for the policy
+          example: vpn-exports
+          type: string
+        description:
+          description: Free-form note about this policy, shown in the UI
+          type: string
+        match:
+          description: Criteria used to select which prefixes are exported
+          properties:
+            cluster:
+              description: |-
+                When `true`, prefixes are advertised only when this node is
+                the active member of its cluster. When `false`, prefixes are
+                advertised regardless of cluster state.
+              type: boolean
+            network:
+              description: |-
+                Optional virtual network ID. When set, the policy matches
+                the node's route into that virtual network and the route is
+                automatically withdrawn (sent as a BGP `WITHDRAWN ROUTES`
+                update) when any of the following becomes true:
+
+                * the node has no learned route into the virtual network
+                  (the data plane has not converged or has lost the route)
+                * the node has lost data-plane connectivity to the virtual
+                  network's gateway / mesh peer
+                * route monitors attached to the VPN route fail their
+                  health check (e.g. ICMP / TCP probe to a configured
+                  destination)
+                * on a cluster, the node is not the active member (combined
+                  with `match.cluster: true`)
+
+                The route is re-advertised automatically once the underlying
+                vnet route becomes healthy again.
+              example: 1955
+              type: integer
+            prefixes:
+              description: Prefixes this policy applies to
+              items:
+                $ref: '#/components/schemas/BGPExportPrefix'
+              type: array
+          type: object
+        action:
+          description: Action to take for matching prefixes
+          properties:
+            action:
+              description: |-
+                * `allow` — matching prefixes are advertised to peers in the
+                  group
+                * `deny` — matching prefixes are explicitly not advertised
+              enum:
+                - allow
+                - deny
+              type: string
+            prefixes:
+              description: |-
+                Optional list of prefixes that the action applies to, in
+                addition to those listed under `match.prefixes`. New
+                configurations should put all prefixes in `match.prefixes`
+                and leave this empty; the field is retained for backwards
+                compatibility with policies authored before the two lists
+                were unified in the portal. The exact merge semantics
+                between `match.prefixes` and `action.prefixes` are
+                determined by the BGP plugin on the node.
+              items:
+                $ref: '#/components/schemas/BGPExportPrefix'
+              type: array
+          required:
+            - action
+          type: object
+      required:
+        - _id
+        - name
+        - match
+        - action
+      title: BGPExportPolicy
+      type: object
+    BGPExportPrefix:
+      description: A prefix entry inside a BGP export policy
+      properties:
+        _id:
+          description: Unique ID of the prefix entry
+          example: ed5d9187-4270-44db-892d-e2dc8b847a81
+          type: string
+        prefix:
+          description: CIDR network to be advertised
+          example: 10.0.200.0/24
+          type: string
+        exact:
+          description: |-
+            When `true`, only the exact prefix length is advertised. When
+            omitted or `false`, more-specific prefixes within this network
+            may also be advertised.
+          type: boolean
+        description:
+          description: Free-form note about this prefix entry, shown in the UI
+          type: string
+      required:
+        - _id
+        - prefix
+      title: BGPExportPrefix
+      type: object
     Certificate:
       description: TLS certificate managed by the Trustgrid platform
       properties:
@@ -9880,8 +12067,31 @@ components:
     ClusterModel:
       properties:
         config:
-          description: Cluster Configuration
+          description: >-
+            Cluster-wide configuration. Mirrors the subset of node configuration
+            sections that are shared across cluster members. Use the
+            `/cluster/{clusterFQDN}/config/*` endpoints to modify individual
+            sections rather than editing this object directly.
           type: object
+          properties:
+            exec:
+              $ref: '#/components/schemas/NodeExecConfig'
+            vpn:
+              $ref: '#/components/schemas/NodeVpnConfig'
+            network:
+              $ref: '#/components/schemas/NodeNetworkConfig'
+            services:
+              $ref: '#/components/schemas/NodeServicesConfig'
+            connectors:
+              $ref: '#/components/schemas/NodeConnectorsConfig'
+            apigw:
+              description: API gateway configuration
+              type: object
+              additionalProperties: true
+            core:
+              description: Opaque core platform configuration — a free-form map of string keys to values
+              type: object
+              additionalProperties: true
         domain:
           description: Cluster domain
           type: string
@@ -10016,6 +12226,53 @@ components:
         - port
         - protocol
         - service
+    NodeFlowEntry:
+      type: object
+      description: A single active network flow entry
+      properties:
+        sip:
+          type: string
+          description: Source IP address
+        dip:
+          type: string
+          description: Destination IP address
+        p:
+          type: string
+          description: Protocol (tcp, udp, icmp)
+        sport:
+          type: integer
+          description: Source port (TCP/UDP only)
+        dport:
+          type: integer
+          description: Destination port (TCP/UDP only)
+        lid:
+          type: integer
+          description: Local ICMP identifier (ICMP only)
+        nid:
+          type: integer
+          description: NAT ICMP identifier (ICMP only)
+        state:
+          type: string
+          description: TCP connection state or ESTABLISHED
+        br:
+          type: integer
+          description: Bytes read (received)
+        bw:
+          type: integer
+          description: Bytes written (sent)
+        con:
+          type: integer
+          description: Connection duration in seconds
+        def:
+          type: boolean
+          description: True if the flow is defunct
+        flg:
+          type: integer
+          description: TCP flag bits at time of becoming defunct
+        meta:
+          type: object
+          additionalProperties: true
+          description: Additional metadata if present
     NodeTriggerContainerActionRequest:
       description: >-
         Request body used when `{event}` is set to a container service name and
@@ -11237,22 +13494,7 @@ components:
                   description: Config version currently held by the cluster master
                   type: integer
             exec:
-              description: Edge compute (container runtime) configuration
-              type: object
-              properties:
-                commands:
-                  description: Container definitions managed by this node
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/ContainerConfig'
-                volumes:
-                  description: Named volumes available to containers on this node
-                  type: array
-                  items:
-                    type: object
-                limits:
-                  description: Global resource limits applied across all containers
-                  type: object
+              $ref: '#/components/schemas/NodeExecConfig'
             snmp:
               description: SNMPv3 monitoring agent configuration
               type: object
@@ -11312,7 +13554,18 @@ components:
                         description: Human-readable rule name
                         type: string
                       telemetry:
-                        description: Shadow `reported` key to evaluate (e.g. `memory`, `storage`)
+                        description: Telemetry metric to evaluate
+                        enum:
+                          - cpu
+                          - ram
+                          - disk
+                          - heap
+                          - embflows
+                          - latency
+                          - bandwidthIn
+                          - bandwidthOut
+                          - tcpResets
+                          - vpnFlows
                         type: string
                       max:
                         description: Upper bound — alert fires when the value exceeds this
@@ -11323,45 +13576,13 @@ components:
                           `max` before the alert fires
                         type: number
                       exceededWindowUnit:
-                        description: Time unit for `exceededWindow` (e.g. `minutes`, `hours`)
+                        description: Time unit for `exceededWindow`
+                        enum:
+                          - minutes
+                          - hours
                         type: string
             vpn:
-              description: Virtual network (overlay) membership and routing configuration
-              type: object
-              properties:
-                networks:
-                  description: Per-virtual-network configuration entries for this node
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        description: Virtual network numeric ID
-                        type: integer
-                      name:
-                        description: Virtual network name
-                        type: string
-                      ip:
-                        description: Node's IP address within this virtual network
-                        type: string
-                      interfaces:
-                        description: LAN-side interface bindings with inside/outside NAT rules
-                        type: array
-                        items:
-                          type: object
-                      routes:
-                        description: Routes exported into or imported from this virtual network
-                        type: array
-                        items:
-                          type: object
-                      services:
-                        description: Services exposed through this virtual network
-                        type: array
-                        items:
-                          type: object
-                      dns:
-                        description: DNS settings for this virtual network membership
-                        type: object
+              $ref: '#/components/schemas/NodeVpnConfig'
             dns:
               description: Local DNS resolver configuration on the node
               type: object
@@ -11384,103 +13605,11 @@ components:
                         description: Hostname for this record
                         type: string
             network:
-              description: >-
-                Layer-3 network configuration — physical interfaces, tunnels,
-                static routes, NAT rules, ACLs, traffic rules, and VRFs
-              type: object
-              properties:
-                interfaces:
-                  description: Physical and logical network interface configurations
-                  type: array
-                  items:
-                    type: object
-                tunnels:
-                  description: IPsec, GRE, WireGuard, and VNet tunnel definitions
-                  type: array
-                  items:
-                    type: object
-                routes:
-                  description: Static routes installed on this node
-                  type: array
-                  items:
-                    type: object
-                nats:
-                  description: NAT rules (SNAT, DNAT, masquerade)
-                  type: array
-                  items:
-                    type: object
-                acls:
-                  description: IP access control rules
-                  type: array
-                  items:
-                    type: object
-                rules:
-                  description: Advanced traffic shaping and policy-based forwarding rules
-                  type: array
-                  items:
-                    type: object
-                vrfs:
-                  description: VRF (Virtual Routing and Forwarding) instance definitions
-                  type: array
-                  items:
-                    type: object
-                darkMode:
-                  description: When true the node ignores unsolicited inbound traffic (stealth mode)
-                  type: boolean
-                forwarding:
-                  description: Enable IP forwarding between interfaces
-                  type: boolean
-                bridgeCIDR:
-                  description: CIDR assigned to the bridge interface used by container networking
-                  type: string
+              $ref: '#/components/schemas/NodeNetworkConfig'
             services:
-              description: Edge service (port-forwarding target) configuration
-              type: object
-              properties:
-                enabled:
-                  description: Whether the services plugin is active on this node
-                  type: boolean
-                version:
-                  description: >-
-                    Schema version — `2` means `items` is a UUID-keyed map;
-                    absent means `services` is a legacy ordered array
-                  type: integer
-                  enum:
-                    - 2
-                items:
-                  description: Service definitions keyed by UUID (version 2 only)
-                  type: object
-                  additionalProperties:
-                    type: object
-                services:
-                  description: Service definitions as an ordered array (legacy version 1 only)
-                  type: array
-                  items:
-                    type: object
+              $ref: '#/components/schemas/NodeServicesConfig'
             connectors:
-              description: Edge connector (outbound tunnel endpoint) configuration
-              type: object
-              properties:
-                enabled:
-                  description: Whether the connectors plugin is active on this node
-                  type: boolean
-                version:
-                  description: >-
-                    Schema version — `2` means `items` is a UUID-keyed map;
-                    absent means `connectors` is a legacy ordered array
-                  type: integer
-                  enum:
-                    - 2
-                items:
-                  description: Connector definitions keyed by UUID (version 2 only)
-                  type: object
-                  additionalProperties:
-                    type: object
-                connectors:
-                  description: Connector definitions as an ordered array (legacy version 1 only)
-                  type: array
-                  items:
-                    type: object
+              $ref: '#/components/schemas/NodeConnectorsConfig'
             jvm:
               description: JVM heap memory settings for embedded Java workloads
               type: object
@@ -11516,8 +13645,12 @@ components:
           type: object
           properties:
             desired:
-              description: Pending configuration changes the node has not yet applied. Typically empty.
+              description: >-
+                Pending configuration changes the node has not yet applied.
+                Typically empty; when populated, contents mirror the structure
+                of `reported` (flat dot-notation key-value map).
               type: object
+              additionalProperties: true
             reported:
               description: >-
                 Live telemetry reported by the node. Keys use dot-notation
@@ -11531,8 +13664,10 @@ components:
             - INACTIVE
           type: string
         tags:
-          description: Node tags
+          description: User-defined tags for organizing and filtering nodes
           type: object
+          additionalProperties:
+            type: string
         type:
           description: Device type
           enum:
@@ -11568,8 +13703,14 @@ components:
           additionalProperties:
             type: string
         keys:
-          description: Named cryptographic public keys used for node authentication and WireGuard tunneling. Always returned but rarely needed directly.
+          description: >-
+            Named cryptographic public keys used for node authentication and
+            WireGuard tunneling. Keyed by purpose (e.g. `wireguard`,
+            `identity`); values are opaque string-encoded public keys.
+            Always returned but rarely needed directly.
           type: object
+          additionalProperties:
+            type: string
         tgrn:
           description: "Trustgrid Resource Name \u2014 a globally unique identifier for this node across the platform. Format: `tgrn:tg::nodes:node/{uid}`. Always returned."
           example: tgrn:tg::nodes:node/19084f81-5668-41ee-adbe-295e4c65531a
@@ -11593,6 +13734,21 @@ components:
         location:
           description: IP geolocation derived from the node's last observed IP address. Omitted when projection[] is used without this field.
           type: object
+          properties:
+            latitude:
+              type: number
+            longitude:
+              type: number
+            city:
+              type: string
+            region:
+              description: State, province, or administrative region
+              type: string
+            country:
+              description: ISO country code
+              type: string
+            zipcode:
+              type: string
         heartbeat:
           description: Most recent heartbeat received from the node's control plane connection. Omitted when projection[] is used without this field.
           type: object
@@ -11625,6 +13781,533 @@ components:
           type: string
       title: Node
       type: object
+    NodeConnectorsConfig:
+      description: Edge connector (outbound tunnel endpoint) configuration
+      type: object
+      properties:
+        enabled:
+          description: Whether the connectors plugin is active on this node
+          type: boolean
+        version:
+          description: >-
+            Schema version — `2` means `items` is a UUID-keyed map;
+            absent means `connectors` is a legacy ordered array
+          type: integer
+          enum:
+            - 2
+        items:
+          description: Connector definitions keyed by UUID (version 2 only)
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/EdgeConnector'
+        connectors:
+          description: Connector definitions as an ordered array (legacy version 1 only)
+          type: array
+          items:
+            $ref: '#/components/schemas/EdgeConnector'
+    NodeExecConfig:
+      description: Edge compute (container runtime) configuration
+      type: object
+      properties:
+        commands:
+          description: Container definitions managed by this node
+          type: array
+          items:
+            $ref: '#/components/schemas/ContainerConfig'
+        volumes:
+          description: Named volumes available to containers on this node
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                description: Volume name (referenced by container mounts)
+                type: string
+              encrypted:
+                description: Whether the volume is stored encrypted on disk
+                type: boolean
+              location:
+                description: Optional filesystem path backing the volume
+                type: string
+        limits:
+          description: Global resource limits applied across all containers
+          type: object
+          properties:
+            cpuMax:
+              description: Maximum CPU utilization across all containers (percent of a single core, e.g. 200 for 2 cores)
+              type: number
+            memMax:
+              description: Hard memory limit in bytes
+              type: number
+            memHigh:
+              description: Soft memory limit in bytes (throttling threshold)
+              type: number
+            ioRbps:
+              description: Maximum aggregate read throughput in bytes per second
+              type: number
+            ioWbps:
+              description: Maximum aggregate write throughput in bytes per second
+              type: number
+            ioRiops:
+              description: Maximum aggregate read IOPS
+              type: number
+            ioWiops:
+              description: Maximum aggregate write IOPS
+              type: number
+    NodeNetworkConfig:
+      description: >-
+        Layer-3 network configuration — physical interfaces, tunnels,
+        static routes, NAT rules, ACLs, traffic rules, and VRFs
+      type: object
+      properties:
+        interfaces:
+          description: Physical and logical network interface configurations
+          type: array
+          items:
+            type: object
+            properties:
+              nic:
+                description: Physical or virtual NIC name (e.g. `eth0`)
+                type: string
+              vrf:
+                description: VRF this interface belongs to
+                type: string
+              virtual:
+                description: True when this is a virtual (bridge or bonded) interface rather than a physical NIC
+                type: boolean
+              dhcp:
+                description: Whether the interface gets its address via DHCP
+                type: boolean
+              ip:
+                description: Static IP address (with prefix length) when DHCP is disabled
+                type: string
+              subnet:
+                description: Subnet mask or CIDR
+                type: string
+              gateway:
+                description: Default gateway reachable through this interface
+                type: string
+              dns:
+                description: DNS server addresses configured on this interface
+                type: array
+                items:
+                  type: string
+              mtu:
+                description: Maximum transmission unit in bytes
+                type: integer
+              duplex:
+                description: Link duplex mode (`full`, `half`, `auto`)
+                type: string
+              speed:
+                description: Link speed in Mbps
+                type: number
+              mode:
+                description: Configuration mode
+                enum:
+                  - auto
+                  - manual
+                type: string
+              description:
+                type: string
+              subInterfaces:
+                description: VLAN sub-interfaces attached to this NIC
+                type: array
+                items:
+                  type: object
+                  properties:
+                    vlanID:
+                      type: integer
+                    vrf:
+                      type: string
+                    ip:
+                      type: string
+                    description:
+                      type: string
+              routes:
+                description: Per-interface static routes
+                type: array
+                items:
+                  type: object
+                  properties:
+                    route:
+                      type: string
+                    next:
+                      type: string
+                    description:
+                      type: string
+        tunnels:
+          description: IPsec, GRE, WireGuard, and VNet tunnel definitions
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                description: Tunnel type
+                enum:
+                  - ipsec
+                  - gre
+                  - vnet
+                  - wireguard
+                type: string
+              name:
+                description: Tunnel name (unique on the node)
+                type: string
+              enabled:
+                type: boolean
+              description:
+                type: string
+              ip:
+                description: Local tunnel endpoint IP
+                type: string
+              vrf:
+                description: VRF the tunnel terminates in
+                type: string
+              mtu:
+                type: integer
+              destination:
+                description: Remote tunnel endpoint (IPsec, GRE)
+                type: string
+              networkId:
+                description: Virtual network ID (vnet tunnels) or IPsec SA ID
+                type: integer
+              publicKey:
+                description: WireGuard peer public key (wireguard tunnels)
+                type: string
+              presharedKey:
+                description: WireGuard preshared key (wireguard tunnels)
+                type: string
+              ike:
+                description: IKE version (ipsec tunnels)
+                type: integer
+              ikeCipher:
+                description: IKE cipher suite (ipsec tunnels)
+                type: string
+              ikeGroup:
+                description: IKE Diffie-Hellman group (ipsec tunnels)
+                type: integer
+              ipsecCipher:
+                description: ESP cipher suite (ipsec tunnels)
+                type: string
+              psk:
+                description: Pre-shared key (ipsec tunnels)
+                type: string
+              localId:
+                type: string
+              remoteId:
+                type: string
+              localSubnet:
+                type: string
+              remoteSubnet:
+                type: string
+              pfs:
+                type: integer
+              dpdInterval:
+                type: integer
+              dpdRetries:
+                type: integer
+              rekeyInterval:
+                type: integer
+              replayWindow:
+                type: integer
+              auto:
+                enum:
+                  - add
+                  - start
+                type: string
+        routes:
+          description: Static routes installed on this node
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              dest:
+                description: Destination CIDR
+                type: string
+              via:
+                description: Next-hop gateway IP
+                type: string
+              dev:
+                description: Egress interface or tunnel name
+                type: string
+              metric:
+                description: Route metric (lower is preferred)
+                type: number
+              description:
+                type: string
+        nats:
+          description: NAT rules (SNAT, DNAT, masquerade)
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              source:
+                description: Source CIDR the rule matches
+                type: string
+              dest:
+                description: Destination CIDR the rule matches
+                type: string
+              toSource:
+                description: Rewrite source to this address (SNAT)
+                type: string
+              toDest:
+                description: Rewrite destination to this address (DNAT)
+                type: string
+              masquerade:
+                description: When true, source is rewritten to the egress interface's address
+                type: boolean
+              description:
+                type: string
+        acls:
+          description: IP access control rules
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              line:
+                description: Rule ordering; lower values evaluate first
+                type: number
+              protocol:
+                description: Protocol (`tcp`, `udp`, `icmp`, `any`)
+                type: string
+              source:
+                description: Source CIDR the rule matches
+                type: string
+              dest:
+                description: Destination CIDR the rule matches
+                type: string
+              ports:
+                description: Destination port or port range (e.g. `443`, `1000-2000`)
+                type: string
+              action:
+                description: Rule action (`accept`, `drop`, `reject`)
+                type: string
+              description:
+                type: string
+        rules:
+          description: Advanced traffic shaping and policy-based forwarding rules
+          type: array
+          items:
+            type: object
+            properties:
+              uid:
+                type: string
+              line:
+                description: Rule ordering; lower values evaluate first
+                type: number
+              in:
+                description: Ingress interface the rule matches
+                type: string
+              iface:
+                description: Egress interface override
+                type: string
+              vrf:
+                description: VRF the rule applies within
+                type: string
+              protocol:
+                type: string
+              source:
+                type: string
+              dest:
+                type: string
+              ports:
+                type: string
+              action:
+                type: string
+              snat:
+                description: When true, source-NAT matching traffic
+                type: boolean
+              dnat:
+                description: When set, destination-NAT matching traffic to this address
+                type: string
+              dmac:
+                description: When set, override destination MAC address for matching traffic
+                type: string
+              description:
+                type: string
+        vrfs:
+          description: VRF (Virtual Routing and Forwarding) instance definitions
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                description: VRF name
+                type: string
+              description:
+                type: string
+              forwarding:
+                description: Whether IP forwarding is enabled within this VRF
+                type: boolean
+              routes:
+                description: Static routes scoped to this VRF (same shape as top-level `routes`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              nats:
+                description: NAT rules scoped to this VRF (same shape as top-level `nats`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              acls:
+                description: ACLs scoped to this VRF (same shape as top-level `acls`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              rules:
+                description: Traffic rules scoped to this VRF (same shape as top-level `rules`)
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        darkMode:
+          description: When true the node ignores unsolicited inbound traffic (stealth mode)
+          type: boolean
+        forwarding:
+          description: Enable IP forwarding between interfaces
+          type: boolean
+        bridgeCIDR:
+          description: CIDR assigned to the bridge interface used by container networking
+          type: string
+    NodeServicesConfig:
+      description: Edge service (port-forwarding target) configuration
+      type: object
+      properties:
+        enabled:
+          description: Whether the services plugin is active on this node
+          type: boolean
+        version:
+          description: >-
+            Schema version — `2` means `items` is a UUID-keyed map;
+            absent means `services` is a legacy ordered array
+          type: integer
+          enum:
+            - 2
+        items:
+          description: Service definitions keyed by UUID (version 2 only)
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/EdgeService'
+        services:
+          description: Service definitions as an ordered array (legacy version 1 only)
+          type: array
+          items:
+            $ref: '#/components/schemas/EdgeService'
+    NodeVpnConfig:
+      description: Virtual network (overlay) membership and routing configuration
+      type: object
+      properties:
+        networks:
+          description: Per-virtual-network configuration entries for this node
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                description: Virtual network numeric ID
+                type: integer
+              name:
+                description: Virtual network name
+                type: string
+              ip:
+                description: Node's IP address within this virtual network
+                type: string
+              interfaces:
+                description: LAN-side interface bindings with inside/outside NAT rules
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      description: Local NIC or bridge bound into the virtual network
+                      type: string
+                    inDefaultRoute:
+                      description: When true, inbound traffic from the VPN uses this interface as its default route
+                      type: boolean
+                    outDefaultRoute:
+                      description: When true, outbound traffic to the VPN uses this interface as its default route
+                      type: boolean
+                    insideNats:
+                      description: NAT rules mapping local CIDRs to CIDRs on the VPN side (inbound)
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          localCidr:
+                            type: string
+                          networkCidr:
+                            type: string
+                          description:
+                            type: string
+                    outsideNats:
+                      description: NAT rules mapping VPN CIDRs to local CIDRs (outbound)
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          localCidr:
+                            type: string
+                          networkCidr:
+                            type: string
+                          networkGroup:
+                            type: string
+                          description:
+                            type: string
+              routes:
+                description: Routes exported into or imported from this virtual network
+                type: array
+                items:
+                  type: object
+                  properties:
+                    node:
+                      description: Node FQDN advertising this route
+                      type: string
+                    networkCidr:
+                      description: CIDR being advertised
+                      type: string
+                    metric:
+                      description: Route metric (lower is preferred)
+                      type: number
+                    path:
+                      description: Route path type (e.g. `primary`, `backup`)
+                      type: string
+                    description:
+                      type: string
+              services:
+                description: Services exposed through this virtual network
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      description: Service name
+                      type: string
+                    ip:
+                      description: IP address the service is advertised on within the VPN
+                      type: string
+                    port:
+                      description: TCP port the service listens on
+                      type: number
+              dns:
+                description: DNS settings for this virtual network membership
+                type: object
+                properties:
+                  enabled:
+                    description: Whether VPN-side DNS forwarding is enabled
+                    type: boolean
+                  upstream:
+                    description: Upstream DNS servers to forward VPN queries to
+                    type: array
+                    items:
+                      type: string
     NodeUpgrade:
       description: NodeUpgrade
       properties:
@@ -11696,6 +14379,16 @@ components:
         comments:
           items:
             type: object
+            properties:
+              body:
+                description: Comment text
+                type: string
+              author:
+                description: User ID of the commenter
+                type: string
+              timestamp:
+                description: Unix timestamp (seconds) when the comment was posted
+                type: integer
           type: array
         companyName:
           type: string
@@ -11924,20 +14617,18 @@ components:
       properties:
         ne:
           type: object
-          properties:
-            additionalProperties:
-              description: Conditions to not match
-              type: array
-              items:
-                type: string
+          additionalProperties:
+            description: Conditions to not match
+            type: array
+            items:
+              type: string
         eq:
           type: object
-          properties:
-            additionalProperties:
-              description: Conditions to match
-              type: array
-              items:
-                type: string
+          additionalProperties:
+            description: Conditions to match
+            type: array
+            items:
+              type: string
     Policy:
       description: Policy
       properties:
@@ -12099,7 +14790,7 @@ components:
             port: 80
             protocol: tcp
       properties:
-        connectors:
+        services:
           items:
             properties:
               description:
@@ -12604,6 +15295,45 @@ components:
               type: array
               items:
                 type: object
+                properties:
+                  name:
+                    description: Human-readable client name
+                    type: string
+                  publicKey:
+                    description: WireGuard peer public key
+                    type: string
+                  presharedKey:
+                    description: Optional pre-shared key for the WireGuard tunnel
+                    type: string
+                  defaultRouting:
+                    description: When true, the client uses this VPN as its default route
+                    type: boolean
+                  insideNats:
+                    description: NAT rules mapping local CIDRs to client-side CIDRs (inbound)
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        localCidr:
+                          type: string
+                        networkCidr:
+                          type: string
+                        description:
+                          type: string
+                  outsideNats:
+                    description: NAT rules mapping client-side CIDRs to local CIDRs (outbound)
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        localCidr:
+                          type: string
+                        networkCidr:
+                          type: string
+                        networkGroup:
+                          type: string
+                        description:
+                          type: string
       type: object
     VpnNodeNetworkModel:
       description: Summary of a VPN network attached to a node, as returned by the list endpoint

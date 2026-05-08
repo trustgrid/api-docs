@@ -19,23 +19,6 @@ make lint
 npx @redocly/cli lint index.yaml
 ```
 
-### Run all tests
-```sh
-make test
-# equivalent:
-npm test
-```
-
-### Run a single test file
-```sh
-node --test tests/lifecycle-state.test.js
-```
-
-### Run a single test by name (grep)
-```sh
-node --test --test-name-pattern "LifecycleStateRequest" tests/lifecycle-state.test.js
-```
-
 ### Validate OpenAPI with kin-openapi (CI also runs this)
 ```sh
 go run github.com/getkin/kin-openapi/cmd/validate@latest --defaults -- index.yaml
@@ -48,7 +31,6 @@ go run github.com/getkin/kin-openapi/cmd/validate@latest --defaults -- index.yam
 ```
 index.yaml          # The canonical OpenAPI 3.0 spec — the only file you edit
 redocly.yaml        # Redocly lint config (extends recommended; a few rules disabled)
-tests/              # Node.js test files (*.test.js)
 Legacy Swagger/     # Read-only legacy Swagger 2.0 spec, not modified
 docs/               # Internal docs (PRDs, review notes) — not published
 ```
@@ -134,29 +116,7 @@ This is one big OpenAPI 3.0 file (~12k lines). All additions go here.
 
 ## Tests
 
-Tests live in `tests/*.test.js`. They use the **built-in Node.js test runner**
-(`node:test`) — no Jest, no Vitest.
-
-### Test file conventions
-- ES module syntax (`import`/`export`) — `package.json` has `"type": "module"`.
-- Import: `import { describe, it } from 'node:test'` and
-  `import assert from 'node:assert/strict'`.
-- Load the spec once at module level by parsing `index.yaml` with the `yaml`
-  package.
-- Use `describe` blocks per logical group (path definition, schema, responses,
-  request body).
-- Test names are human-readable sentences; they state what *should* be true.
-- Prefer `assert.ok(condition, message)` for existence checks, `assert.equal`
-  for exact matches, `assert.deepEqual` for arrays/objects.
-- Guard dependent assertions: if a path might not exist, assert its existence
-  first so failures are meaningful rather than throwing `TypeError`.
-- Tests validate the spec against the *actual backend behaviour* — the comments
-  in the existing test file (e.g. "backend returns no body", "not in backend")
-  are load-bearing; keep that pattern.
-
-### Adding a new test file
-Name it `tests/<feature>.test.js`. It will be picked up automatically by
-`node --test` (which globs `**/*.test.js` by default).
+**DO NOT WRITE TESTS FOR THIS REPO**
 
 ---
 
@@ -168,9 +128,6 @@ Three jobs in `.github/workflows/ci.yml`, all run on pull requests:
 |-----|------|---------|
 | `go-openapi` | kin-openapi | `go run .../validate -- index.yaml` |
 | `redocly-lint` | Redocly CLI | `redocly lint index.yaml --format=github-actions` |
-| `tests` | Node.js test runner | `npm ci && npm test` |
-
-All three must pass before merging.
 
 ---
 
