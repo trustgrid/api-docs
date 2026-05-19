@@ -1975,42 +1975,19 @@ paths:
       summary: Configure the BGP routing plugin on an appliance
       operationId: updateNodeBGPConfig
       description: |-
-        Replace the BGP plugin configuration on a node (appliance). The full
-        BGP config is replaced on each PUT — to add, change, or remove an
-        individual peer group, peer, or policy, send the new full config.
-        To turn BGP off, PUT a config with `enabled: false`.
+        Update the base BGP settings stored in `config._bgp` for a node. This
+        endpoint only updates the top-level BGP fields: `enabled`, `id`, `asn`,
+        and `client`.
 
-        There is no dedicated GET or DELETE: the current BGP config is read
-        from the node's config blob (e.g. `getNode` with a `config.bgp`
-        projection), and "deleting" BGP is just PUTing a disabled config.
-
-        BGP exchanges routes with one or more external peers grouped into peer
-        groups. Each peer group has its own import and export policies. Import
-        policies select which advertised routes are added to the local routing
-        table. Export policies select which prefixes are advertised to peers,
-        and may match by prefix, by virtual network ID, or both — see
-        `BGPExportPolicy.match.network` for the full list of triggers that
-        cause an exported route to be withdrawn.
-
-        There is no cluster-level BGP endpoint: BGP runs independently on
-        each cluster member, so cluster BGP is configured by PUTing the same
-        config to each member's node ID. Each member opens its own TCP peer
-        sessions to the configured peers, so the peers must be reachable
-        from every member. An export policy with `match.cluster: true` is
-        only advertised by the active cluster member; standby members keep
-        their BGP sessions up but withdraw the marked routes until they
-        become master. On a standalone (non-clustered) node `match.cluster`
-        has no effect.
-
-        BGP timers (hold time, keepalive, connect-retry), address families,
-        and eBGP-multihop / TTL are not user-configurable through this API;
-        the platform sets BGP defaults and only IPv4 unicast is supported.
+        Use the peer-group and policy endpoints under `/v2/node/{nodeID}/config/network/bgp/...`
+        to manage nested BGP objects without replacing the full structure.
+        Read the current BGP config from `GET /node/{nodeID}`.
 
         ---
 
         Requires `nodes::configure:network` permission.
       requestBody:
-        $ref: '#/components/requestBodies/BGPConfig'
+        $ref: '#/components/requestBodies/BGPConfigUpdate'
       responses:
         '200':
           description: OK
@@ -2020,6 +1997,428 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-groups:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+    post:
+      summary: Create a BGP peer group on a node
+      operationId: createNodeBGPPeerGroup
+      description: |-
+        Add a peer group to `config._bgp.groups` for the specified node.
+
+        Peer group names must be unique within the node's BGP configuration.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPPeerGroupCreate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+    delete:
+      summary: Delete a BGP peer group from a node
+      operationId: deleteNodeBGPPeerGroup
+      description: |-
+        Remove a peer group and all peers and policies nested under it from the
+        node's BGP configuration.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/peers:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+    post:
+      summary: Create a BGP peer in a peer group
+      operationId: createNodeBGPPeer
+      description: |-
+        Add a remote BGP peer to the specified peer group.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPPeerCreate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/peers/{peerId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpPeerId'
+    put:
+      summary: Update a BGP peer in a peer group
+      operationId: updateNodeBGPPeer
+      description: |-
+        Update a remote BGP peer in the specified peer group.
+
+        If `secret` is omitted, the existing secret is preserved.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPPeerUpdate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/peer/{peerId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpPeerId'
+    delete:
+      summary: Delete a BGP peer from a peer group
+      operationId: deleteNodeBGPPeer
+      description: |-
+        Remove a remote BGP peer from the specified peer group.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policies:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+    post:
+      summary: Create an import policy in a BGP peer group
+      operationId: createNodeBGPImportPolicy
+      description: |-
+        Add an import policy to the specified peer group.
+
+        New import policies start with an empty `match.prefixes` list.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPImportPolicyCreate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policies/{policyId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpPolicyId'
+    put:
+      summary: Update an import policy in a BGP peer group
+      operationId: updateNodeBGPImportPolicy
+      description: |-
+        Update an import policy in the specified peer group.
+
+        Updating the policy preserves the existing `match.prefixes` entries.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPImportPolicyUpdate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpImportPolicyId'
+    delete:
+      summary: Delete an import policy from a BGP peer group
+      operationId: deleteNodeBGPImportPolicy
+      description: |-
+        Remove an import policy from the specified peer group.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}/match/prefixes:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpImportPolicyId'
+    post:
+      summary: Create an import policy prefix match
+      operationId: createNodeBGPImportPolicyPrefix
+      description: |-
+        Add a prefix matcher to an import policy.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPImportPrefixCreate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}/match/prefixes/{prefixId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpImportPolicyId'
+      - $ref: '#/components/parameters/bgpPrefixId'
+    put:
+      summary: Update an import policy prefix match
+      operationId: updateNodeBGPImportPolicyPrefix
+      description: |-
+        Update a prefix matcher in an import policy.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPImportPrefixUpdate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}/match/prefix/{prefixId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpImportPolicyId'
+      - $ref: '#/components/parameters/bgpPrefixId'
+    delete:
+      summary: Delete an import policy prefix match
+      operationId: deleteNodeBGPImportPolicyPrefix
+      description: |-
+        Remove a prefix matcher from an import policy.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policies:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+    post:
+      summary: Create an export policy in a BGP peer group
+      operationId: createNodeBGPExportPolicy
+      description: |-
+        Add an export policy to the specified peer group.
+
+        New export policies always start with an empty `action.prefixes` list.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPExportPolicyCreate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policies/{policyId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpPolicyId'
+    put:
+      summary: Update an export policy in a BGP peer group
+      operationId: updateNodeBGPExportPolicy
+      description: |-
+        Update an export policy in the specified peer group.
+
+        Updating the policy preserves the existing `action.prefixes` entries.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPExportPolicyUpdate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpExportPolicyId'
+    delete:
+      summary: Delete an export policy from a BGP peer group
+      operationId: deleteNodeBGPExportPolicy
+      description: |-
+        Remove an export policy from the specified peer group.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}/match/prefixes:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpExportPolicyId'
+    post:
+      summary: Create an export policy prefix
+      operationId: createNodeBGPExportPolicyPrefix
+      description: |-
+        Add an exported prefix entry to an export policy.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPExportPrefixCreate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}/match/prefixes/{prefixId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpExportPolicyId'
+      - $ref: '#/components/parameters/bgpPrefixId'
+    put:
+      summary: Update an export policy prefix
+      operationId: updateNodeBGPExportPolicyPrefix
+      description: |-
+        Update an exported prefix entry in an export policy.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/BGPExportPrefixUpdate'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Appliance
+  /v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}/match/prefix/{prefixId}:
+    parameters:
+      - $ref: '#/components/parameters/nodeID'
+      - $ref: '#/components/parameters/bgpPeerGroupId'
+      - $ref: '#/components/parameters/bgpExportPolicyId'
+      - $ref: '#/components/parameters/bgpPrefixId'
+    delete:
+      summary: Delete an export policy prefix
+      operationId: deleteNodeBGPExportPolicyPrefix
+      description: |-
+        Remove an exported prefix entry from an export policy.
+
+        ---
+
+        Requires `nodes::configure:network` permission.
+      responses:
+        '200':
+          description: OK
       tags:
         - Appliance
   /node/{nodeID}/config/services:
@@ -2468,90 +2867,6 @@ paths:
                         items:
                           type: object
                           additionalProperties: true
-      tags:
-        - Appliance
-
-  /node/{nodeID}/trigger/bgp:
-    parameters:
-      - $ref: '#/components/parameters/nodeID'
-    post:
-      operationId: triggerNodeBgp
-      summary: Retrieve BGP peer routes or restart the BGP router
-      description: |-
-        Query the current BGP routing table (peers, routes, and rejected routes) or
-        restart the BGP router process. Returns an error payload if BGP is not enabled.
-
-        ---
-
-        Requires `nodes::service:bgp` or `nodes::remote-execute` permission.
-      parameters:
-        - description: Pass `1` to block until the node responds and return its output.
-          in: query
-          name: wait
-          required: false
-          schema:
-            type: integer
-            enum: [1]
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                action:
-                  type: string
-                  enum: [get, restart]
-                  default: get
-                  description: |-
-                    - `get` — return BGP routing table
-                    - `restart` — restart the BGP router process
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  output:
-                    type: object
-                    properties:
-                      router:
-                        type: string
-                        description: BGP router identifier (IP address)
-                        example: 10.1.0.1
-                      peers:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            ip:
-                              type: string
-                              description: Peer IP address
-                            asn:
-                              type: integer
-                              description: Peer autonomous system number
-                            connected:
-                              type: boolean
-                            connectTime:
-                              type: integer
-                              description: Seconds since peer connected (only present when connected)
-                            routes:
-                              type: array
-                              items:
-                                type: object
-                                properties:
-                                  dest:
-                                    type: string
-                                    description: Destination CIDR
-                                  metric:
-                                    type: integer
-                            rejectedRoutes:
-                              type: array
-                              items:
-                                type: object
-                                additionalProperties: true
       tags:
         - Appliance
 
@@ -4122,6 +4437,11 @@ paths:
         dedicated event endpoints (e.g. `/node/{nodeID}/trigger/gateway-routes`) for
         documented events with typed request and response schemas.
 
+        For `event=bgp`, the backend currently supports:
+        - `action: get` — return BGP runtime status, peer sessions, learned routes,
+          rejected routes, and advertised prefixes
+        - `action: restart` — restart the BGP service on the node
+
         Add `?wait=1` to block until the node responds (useful for synchronous checks).
 
         All services require either `nodes::remote-execute` or `nodes::service:{event}`
@@ -4143,6 +4463,7 @@ paths:
                 - $ref: '#/components/schemas/NodeTriggerContainerActionRequest'
                 - $ref: '#/components/schemas/NodeTriggerContainerImageRequest'
                 - $ref: '#/components/schemas/NodeTriggerContainerStatusRequest'
+                - $ref: '#/components/schemas/NodeTriggerBGPRequest'
                 - type: object
                   additionalProperties: true
               description: >-
@@ -4160,6 +4481,8 @@ paths:
                   - $ref: '#/components/schemas/NodeTriggerContainerStatusResponse'
                   - $ref: '#/components/schemas/NodeTriggerContainerImageListResponse'
                   - $ref: '#/components/schemas/NodeTriggerContainerImageDeleteResponse'
+                  - $ref: '#/components/schemas/NodeTriggerBGPGetResponse'
+                  - $ref: '#/components/schemas/NodeTriggerBGPRestartResponse'
       tags:
         - Appliance
         - Agent
@@ -10144,6 +10467,48 @@ components:
       required: true
       schema:
         type: string
+    bgpPeerGroupId:
+      description: BGP peer group ID
+      in: path
+      name: peerGroupId
+      required: true
+      schema:
+        type: string
+    bgpPeerId:
+      description: BGP peer ID
+      in: path
+      name: peerId
+      required: true
+      schema:
+        type: string
+    bgpPolicyId:
+      description: BGP policy ID
+      in: path
+      name: policyId
+      required: true
+      schema:
+        type: string
+    bgpImportPolicyId:
+      description: BGP import policy ID
+      in: path
+      name: importPolicyId
+      required: true
+      schema:
+        type: string
+    bgpExportPolicyId:
+      description: BGP export policy ID
+      in: path
+      name: exportPolicyId
+      required: true
+      schema:
+        type: string
+    bgpPrefixId:
+      description: BGP prefix entry ID
+      in: path
+      name: prefixId
+      required: true
+      schema:
+        type: string
   requestBodies:
     VpnDnsUpdateModel:
       content:
@@ -10222,12 +10587,89 @@ components:
             $ref: '#/components/schemas/AlarmModel'
       description: Alarm body
       required: true
-    BGPConfig:
+    BGPConfigUpdate:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/BGPConfig'
-      description: BGP plugin configuration
+            $ref: '#/components/schemas/BGPConfigUpdate'
+      description: BGP top-level update request
+      required: true
+    BGPPeerGroupCreate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPPeerGroupCreate'
+      description: BGP peer group create request
+      required: true
+    BGPPeerCreate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPPeerCreate'
+      description: BGP peer create request
+      required: true
+    BGPPeerUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPPeerUpdate'
+      description: BGP peer update request
+      required: true
+    BGPImportPolicyCreate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPImportPolicyCreate'
+      description: BGP import policy create request
+      required: true
+    BGPImportPolicyUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPImportPolicyUpdate'
+      description: BGP import policy update request
+      required: true
+    BGPImportPrefixCreate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPImportPrefixCreate'
+      description: BGP import prefix create request
+      required: true
+    BGPImportPrefixUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPImportPrefixUpdate'
+      description: BGP import prefix update request
+      required: true
+    BGPExportPolicyCreate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPExportPolicyCreate'
+      description: BGP export policy create request
+      required: true
+    BGPExportPolicyUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPExportPolicyUpdate'
+      description: BGP export policy update request
+      required: true
+    BGPExportPrefixCreate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPExportPrefixCreate'
+      description: BGP export prefix create request
+      required: true
+    BGPExportPrefixUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BGPExportPrefixUpdate'
+      description: BGP export prefix update request
       required: true
     TagValueModel:
       content:
@@ -11144,9 +11586,7 @@ components:
       title: Alert V2
       type: object
     BGPConfig:
-      description: |-
-        BGP plugin configuration for an appliance or cluster. The full BGP
-        config is replaced on each PUT.
+      description: BGP plugin configuration stored in `config._bgp` on a node
       example:
         enabled: true
         id: 10.0.0.1
@@ -11173,43 +11613,33 @@ components:
                   action: allow
             exports:
               - _id: 105bee71-5312-4c39-a1de-1dcf348e3f42
-                name: vpn-exports
+                name: cluster-routes
                 match:
                   cluster: true
-                  network: 1955
+                action:
+                  action: allow
                   prefixes:
                     - _id: ed5d9187-4270-44db-892d-e2dc8b847a81
                       prefix: 10.0.200.0/24
-                      exact: true
-                action:
-                  action: allow
-                  prefixes: []
       properties:
         enabled:
-          description: Whether the BGP server is running on the node
+          description: Whether BGP is enabled on the node
           type: boolean
         id:
-          description: |-
-            Router ID for the local BGP speaker, in IPv4 dotted-quad form.
-            Typically the IP of the interface used for BGP communication.
+          description: Router ID for the local BGP speaker
           example: 10.0.0.1
-          format: ipv4
           type: string
         asn:
-          description: Autonomous System Number identifying the local router
+          description: Local autonomous system number
           example: 65001
-          maximum: 4294967295
           minimum: 1
+          maximum: 65534
           type: integer
         client:
-          description: |-
-            When `true`, this speaker behaves as a route-reflector client:
-            it relies on its iBGP peer to reflect learned routes rather than
-            full-meshing with every other internal peer. Leave `false` for
-            standard eBGP/iBGP roles.
+          description: Whether the local speaker operates in client mode
           type: boolean
         groups:
-          description: Peer groups configured on this BGP speaker
+          description: Configured peer groups
           items:
             $ref: '#/components/schemas/BGPPeerGroup'
           type: array
@@ -11218,39 +11648,59 @@ components:
         - id
         - asn
         - client
+        - groups
       title: BGPConfig
       type: object
+    BGPConfigUpdate:
+      additionalProperties: false
+      description: Request body for updating the top-level BGP settings on a node
+      properties:
+        enabled:
+          description: Whether BGP is enabled on the node
+          type: boolean
+        id:
+          description: Router ID for the local BGP speaker
+          example: 10.0.0.1
+          type: string
+        asn:
+          description: Local autonomous system number
+          example: 65001
+          minimum: 1
+          maximum: 65534
+          type: integer
+        client:
+          description: Whether the local speaker operates in client mode
+          type: boolean
+      required:
+        - enabled
+        - id
+        - asn
+        - client
+      title: BGPConfigUpdate
+      type: object
     BGPPeerGroup:
-      description: |-
-        A group of BGP peers that share import and export policies.
+      description: BGP peer group persisted on a node
       properties:
         _id:
-          description: Unique ID of the peer group
+          description: Peer group ID
           example: 8b4f2c9e-4d2a-4b8f-9a7c-1e2d3c4b5a6f
           type: string
         name:
-          description: User-friendly name for the peer group
+          description: Unique peer group name
           example: upstream-isp
           type: string
-        description:
-          description: Free-form note about this peer group, shown in the UI
-          type: string
         peers:
-          description: Remote BGP routers in this peer group
+          description: BGP peers belonging to this group
           items:
             $ref: '#/components/schemas/BGPPeer'
           type: array
         imports:
-          description: |-
-            Policies controlling which routes advertised by peers in this
-            group are accepted into the local routing table.
+          description: Import policies applied to this peer group
           items:
             $ref: '#/components/schemas/BGPImportPolicy'
           type: array
         exports:
-          description: |-
-            Policies controlling which prefixes are advertised to peers in
-            this group.
+          description: Export policies applied to this peer group
           items:
             $ref: '#/components/schemas/BGPExportPolicy'
           type: array
@@ -11259,85 +11709,132 @@ components:
         - name
       title: BGPPeerGroup
       type: object
+    BGPPeerGroupCreate:
+      additionalProperties: false
+      properties:
+        name:
+          description: Unique peer group name
+          example: upstream-isp
+          type: string
+      required:
+        - name
+      title: BGPPeerGroupCreate
+      type: object
     BGPPeer:
-      description: A single remote BGP peer
+      description: Remote BGP peer persisted on a node
       properties:
         _id:
-          description: Unique ID of the peer
+          description: Peer ID
           example: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
           type: string
         name:
-          description: User-friendly name for the peer
+          description: Peer name
           example: isp-router-1
           type: string
-        asn:
-          description: |-
-            Autonomous System Number that the peer identifies itself with
-          example: 65000
-          maximum: 4294967295
-          minimum: 1
-          type: integer
         ip:
-          description: IP address that the peer can be reached at
+          description: IPv4 address of the remote peer
           example: 10.0.0.254
-          format: ipv4
           type: string
+        asn:
+          description: Remote autonomous system number
+          example: 65000
+          minimum: 1
+          maximum: 65534
+          type: integer
         secret:
-          description: |-
-            Optional MD5 passphrase used to authenticate the BGP session with
-            this peer. When omitted the session is unauthenticated.
-          type: string
-        description:
-          description: Free-form note about this peer, shown in the UI
+          description: Optional MD5 authentication secret
           type: string
       required:
         - _id
         - name
-        - asn
         - ip
+        - asn
       title: BGPPeer
       type: object
+    BGPPeerCreate:
+      additionalProperties: false
+      properties:
+        name:
+          description: Peer name
+          example: isp-router-1
+          type: string
+        ip:
+          description: IPv4 address of the remote peer
+          example: 10.0.0.254
+          type: string
+        asn:
+          description: Remote autonomous system number
+          example: 65000
+          minimum: 1
+          maximum: 65534
+          type: integer
+        secret:
+          description: Optional MD5 authentication secret
+          type: string
+      required:
+        - name
+        - ip
+        - asn
+      title: BGPPeerCreate
+      type: object
+    BGPPeerUpdate:
+      additionalProperties: false
+      properties:
+        name:
+          description: Peer name
+          example: isp-router-1
+          type: string
+        ip:
+          description: IPv4 address of the remote peer
+          example: 10.0.0.254
+          type: string
+        asn:
+          description: Remote autonomous system number
+          example: 65000
+          minimum: 1
+          maximum: 65534
+          type: integer
+        secret:
+          description: Optional MD5 authentication secret. Omit to preserve the existing secret.
+          type: string
+      required:
+        - name
+        - ip
+        - asn
+      title: BGPPeerUpdate
+      type: object
     BGPImportPolicy:
-      description: |-
-        Policy controlling which routes advertised by peers in a group are
-        accepted. Routes that match the listed prefixes follow `action.action`;
-        routes that don't match any policy are rejected.
+      description: Import policy persisted on a BGP peer group
       properties:
         _id:
-          description: Unique ID of the policy
+          description: Import policy ID
           example: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
           type: string
         name:
-          description: User-friendly name for the policy
+          description: Policy name
           example: accept-defaults
           type: string
-        description:
-          description: Free-form note about this policy, shown in the UI
-          type: string
         match:
-          description: Criteria used to match advertised routes
+          type: object
           properties:
             prefixes:
-              description: Prefixes this policy applies to
+              description: Prefix matchers for this policy
               items:
                 $ref: '#/components/schemas/BGPImportPrefix'
               type: array
-          type: object
+          required:
+            - prefixes
         action:
-          description: Action to take when a route matches
+          type: object
           properties:
             action:
-              description: |-
-                * `allow` — matching advertised routes are added to the local
-                  routing table
-                * `deny` — matching advertised routes are rejected
+              description: Action for matching routes
               enum:
                 - allow
                 - deny
               type: string
           required:
             - action
-          type: object
       required:
         - _id
         - name
@@ -11345,111 +11842,126 @@ components:
         - action
       title: BGPImportPolicy
       type: object
+    BGPImportPolicyCreate:
+      additionalProperties: false
+      properties:
+        name:
+          description: Policy name
+          example: accept-defaults
+          type: string
+        action:
+          $ref: '#/components/schemas/BGPPolicyAction'
+      required:
+        - name
+        - action
+      title: BGPImportPolicyCreate
+      type: object
+    BGPImportPolicyUpdate:
+      additionalProperties: false
+      properties:
+        name:
+          description: Policy name
+          example: accept-defaults
+          type: string
+        action:
+          $ref: '#/components/schemas/BGPPolicyAction'
+      required:
+        - name
+        - action
+      title: BGPImportPolicyUpdate
+      type: object
     BGPImportPrefix:
-      description: A prefix entry inside a BGP import policy match
+      description: Prefix matcher stored under an import policy
       properties:
         _id:
-          description: Unique ID of the prefix entry
+          description: Prefix matcher ID
           example: 3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f
           type: string
         prefix:
-          description: CIDR network used to match advertised routes
-          example: 10.0.0.0/8
+          description: IPv4 CIDR prefix to match
+          example: 0.0.0.0/0
           type: string
         exact:
-          description: |-
-            When `true`, the advertised route's prefix length must equal the
-            prefix length configured here. When omitted or `false`, routes
-            for the same network with a different prefix length also match.
+          description: Require an exact prefix-length match when true
           type: boolean
         description:
-          description: Free-form note about this prefix entry, shown in the UI
+          description: Optional description for this prefix matcher
           type: string
       required:
         - _id
         - prefix
       title: BGPImportPrefix
       type: object
+    BGPImportPrefixCreate:
+      additionalProperties: false
+      properties:
+        prefix:
+          description: IPv4 CIDR prefix to match
+          example: 0.0.0.0/0
+          type: string
+        exact:
+          description: Require an exact prefix-length match when true
+          type: boolean
+        description:
+          description: Optional description for this prefix matcher
+          type: string
+      required:
+        - prefix
+      title: BGPImportPrefixCreate
+      type: object
+    BGPImportPrefixUpdate:
+      additionalProperties: false
+      properties:
+        prefix:
+          description: IPv4 CIDR prefix to match
+          example: 0.0.0.0/0
+          type: string
+        exact:
+          description: Require an exact prefix-length match when true
+          type: boolean
+        description:
+          description: Optional description for this prefix matcher
+          type: string
+      required:
+        - prefix
+      title: BGPImportPrefixUpdate
+      type: object
     BGPExportPolicy:
-      description: |-
-        Policy controlling which prefixes the local router advertises to
-        peers in a group. Prefixes that match `match` follow `action.action`.
+      description: Export policy persisted on a BGP peer group
       properties:
         _id:
-          description: Unique ID of the policy
+          description: Export policy ID
           example: 105bee71-5312-4c39-a1de-1dcf348e3f42
           type: string
         name:
-          description: User-friendly name for the policy
-          example: vpn-exports
-          type: string
-        description:
-          description: Free-form note about this policy, shown in the UI
+          description: Policy name
+          example: cluster-routes
           type: string
         match:
-          description: Criteria used to select which prefixes are exported
+          type: object
           properties:
             cluster:
-              description: |-
-                When `true`, prefixes are advertised only when this node is
-                the active member of its cluster. When `false`, prefixes are
-                advertised regardless of cluster state.
+              description: Export only while the node is the active cluster member when true
               type: boolean
-            network:
-              description: |-
-                Optional virtual network ID. When set, the policy matches
-                the node's route into that virtual network and the route is
-                automatically withdrawn (sent as a BGP `WITHDRAWN ROUTES`
-                update) when any of the following becomes true:
-
-                * the node has no learned route into the virtual network
-                  (the data plane has not converged or has lost the route)
-                * the node has lost data-plane connectivity to the virtual
-                  network's gateway / mesh peer
-                * route monitors attached to the VPN route fail their
-                  health check (e.g. ICMP / TCP probe to a configured
-                  destination)
-                * on a cluster, the node is not the active member (combined
-                  with `match.cluster: true`)
-
-                The route is re-advertised automatically once the underlying
-                vnet route becomes healthy again.
-              example: 1955
-              type: integer
-            prefixes:
-              description: Prefixes this policy applies to
-              items:
-                $ref: '#/components/schemas/BGPExportPrefix'
-              type: array
-          type: object
+          required:
+            - cluster
         action:
-          description: Action to take for matching prefixes
+          type: object
           properties:
             action:
-              description: |-
-                * `allow` — matching prefixes are advertised to peers in the
-                  group
-                * `deny` — matching prefixes are explicitly not advertised
+              description: Action for matching exports
               enum:
                 - allow
                 - deny
               type: string
             prefixes:
-              description: |-
-                Optional list of prefixes that the action applies to, in
-                addition to those listed under `match.prefixes`. New
-                configurations should put all prefixes in `match.prefixes`
-                and leave this empty; the field is retained for backwards
-                compatibility with policies authored before the two lists
-                were unified in the portal. The exact merge semantics
-                between `match.prefixes` and `action.prefixes` are
-                determined by the BGP plugin on the node.
+              description: Prefixes attached to the export action
               items:
                 $ref: '#/components/schemas/BGPExportPrefix'
               type: array
           required:
             - action
-          type: object
+            - prefixes
       required:
         - _id
         - name
@@ -11457,30 +11969,105 @@ components:
         - action
       title: BGPExportPolicy
       type: object
+    BGPExportPolicyCreate:
+      additionalProperties: false
+      properties:
+        name:
+          description: Policy name
+          example: cluster-routes
+          type: string
+        match:
+          $ref: '#/components/schemas/BGPExportPolicyMatch'
+        action:
+          $ref: '#/components/schemas/BGPPolicyAction'
+      required:
+        - name
+        - action
+      title: BGPExportPolicyCreate
+      type: object
+    BGPExportPolicyUpdate:
+      additionalProperties: false
+      properties:
+        name:
+          description: Policy name
+          example: cluster-routes
+          type: string
+        match:
+          $ref: '#/components/schemas/BGPExportPolicyMatch'
+        action:
+          $ref: '#/components/schemas/BGPPolicyAction'
+      required:
+        - name
+        - action
+      title: BGPExportPolicyUpdate
+      type: object
     BGPExportPrefix:
-      description: A prefix entry inside a BGP export policy
+      description: Prefix entry stored under an export policy action
       properties:
         _id:
-          description: Unique ID of the prefix entry
+          description: Export prefix ID
           example: ed5d9187-4270-44db-892d-e2dc8b847a81
           type: string
         prefix:
-          description: CIDR network to be advertised
+          description: IPv4 CIDR prefix to export
           example: 10.0.200.0/24
           type: string
-        exact:
-          description: |-
-            When `true`, only the exact prefix length is advertised. When
-            omitted or `false`, more-specific prefixes within this network
-            may also be advertised.
-          type: boolean
         description:
-          description: Free-form note about this prefix entry, shown in the UI
+          description: Optional description for this export prefix
           type: string
       required:
         - _id
         - prefix
       title: BGPExportPrefix
+      type: object
+    BGPExportPrefixCreate:
+      additionalProperties: false
+      properties:
+        prefix:
+          description: IPv4 CIDR prefix to export
+          example: 10.0.200.0/24
+          type: string
+        description:
+          description: Optional description for this export prefix
+          type: string
+      required:
+        - prefix
+      title: BGPExportPrefixCreate
+      type: object
+    BGPExportPrefixUpdate:
+      additionalProperties: false
+      properties:
+        prefix:
+          description: IPv4 CIDR prefix to export
+          example: 10.0.200.0/24
+          type: string
+        description:
+          description: Optional description for this export prefix
+          type: string
+      required:
+        - prefix
+      title: BGPExportPrefixUpdate
+      type: object
+    BGPExportPolicyMatch:
+      additionalProperties: false
+      properties:
+        cluster:
+          description: Export only while the node is the active cluster member when true
+          type: boolean
+      title: BGPExportPolicyMatch
+      type: object
+    BGPPolicyAction:
+      additionalProperties: false
+      properties:
+        action:
+          description: Policy decision for matching routes or exports
+          enum:
+            - allow
+            - deny
+          type: string
+      required:
+        - action
+      title: BGPPolicyAction
       type: object
     Certificate:
       description: TLS certificate managed by the Trustgrid platform
@@ -11867,6 +12454,163 @@ components:
       additionalProperties:
         $ref: '#/components/schemas/ContainerRuntimeStatus'
       title: NodeTriggerContainerStatusResponse
+      type: object
+    NodeTriggerBGPRequest:
+      description: Request body used when `{event}` is `bgp`
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              enum:
+                - bgp
+            action:
+              description: Retrieve BGP runtime status from the node
+              type: string
+              enum:
+                - get
+          required:
+            - name
+            - action
+        - type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              enum:
+                - bgp
+            action:
+              description: Restart the BGP service on the node
+              type: string
+              enum:
+                - restart
+          required:
+            - name
+            - action
+      title: NodeTriggerBGPRequest
+      type: object
+    NodeTriggerBGPRestartResponse:
+      description: Response returned after restarting the BGP service
+      properties:
+        status:
+          description: Human-readable restart status
+          example: restarted
+          type: string
+        error:
+          description: Error returned when the restart request fails
+          type: string
+      title: NodeTriggerBGPRestartResponse
+      type: object
+    NodeTriggerBGPRoute:
+      description: Learned route reported by a BGP peer
+      properties:
+        dest:
+          description: Destination IPv4 CIDR
+          example: 10.0.200.0/24
+          type: string
+        metric:
+          description: Route metric reported by the node
+          example: 100
+          type: integer
+      required:
+        - dest
+        - metric
+      title: NodeTriggerBGPRoute
+      type: object
+    NodeTriggerBGPRejectedRoute:
+      description: Route rejected by the BGP policy engine
+      properties:
+        dest:
+          description: Destination IPv4 CIDR that was rejected
+          example: 0.0.0.0/0
+          type: string
+        reason:
+          description: Reason the route was rejected
+          example: denied by import policy
+          type: string
+        group:
+          description: Peer group associated with the rejection, when present
+          example: upstream-isp
+          type: string
+      required:
+        - dest
+        - reason
+      title: NodeTriggerBGPRejectedRoute
+      type: object
+    NodeTriggerBGPAdvertisedPrefix:
+      description: Prefix currently advertised to a BGP peer
+      properties:
+        prefix:
+          description: Advertised IPv4 CIDR prefix
+          example: 10.0.200.0/24
+          type: string
+      required:
+        - prefix
+      title: NodeTriggerBGPAdvertisedPrefix
+      type: object
+    NodeTriggerBGPPeerStatus:
+      description: Runtime state of one BGP peer session
+      properties:
+        id:
+          description: Peer identifier as returned by the node service
+          type: string
+        connected:
+          description: Whether the peer session is established
+          type: boolean
+        connectTime:
+          description: Seconds since the peer session connected
+          type: integer
+        routes:
+          description: Routes learned from this peer
+          items:
+            $ref: '#/components/schemas/NodeTriggerBGPRoute'
+          type: array
+        rejections:
+          description: Routes rejected from this peer
+          items:
+            $ref: '#/components/schemas/NodeTriggerBGPRejectedRoute'
+          type: array
+        asn:
+          description: Remote autonomous system number
+          type: integer
+        advertised:
+          description: Prefixes currently advertised to this peer
+          items:
+            $ref: '#/components/schemas/NodeTriggerBGPAdvertisedPrefix'
+          type: array
+        ip:
+          description: Remote peer IPv4 address
+          type: string
+      required:
+        - id
+        - connected
+        - routes
+        - rejections
+        - asn
+        - advertised
+        - ip
+      title: NodeTriggerBGPPeerStatus
+      type: object
+    NodeTriggerBGPGetResponse:
+      description: Runtime BGP status returned by `event=bgp` with `action=get`
+      properties:
+        router:
+          type: object
+          properties:
+            peers:
+              description: Runtime peer session state for the local BGP speaker
+              items:
+                $ref: '#/components/schemas/NodeTriggerBGPPeerStatus'
+              type: array
+          required:
+            - peers
+        error:
+          description: Error returned when runtime BGP status cannot be fetched
+          type: string
+      required:
+        - router
+      title: NodeTriggerBGPGetResponse
       type: object
     ConnectorConfig:
       example:
@@ -13100,6 +13844,8 @@ components:
               $ref: '#/components/schemas/NodeServicesConfig'
             connectors:
               $ref: '#/components/schemas/NodeConnectorsConfig'
+            _bgp:
+              $ref: '#/components/schemas/BGPConfig'
             jvm:
               description: JVM heap memory settings for embedded Java workloads
               type: object
