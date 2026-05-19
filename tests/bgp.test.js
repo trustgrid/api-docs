@@ -12,305 +12,154 @@ const specPath = join(
 );
 const spec = parse(fs.readFileSync(specPath, "utf8"));
 
-describe("BGP plugin paths", () => {
+describe("node BGP config endpoint", () => {
   const path = spec.paths["/v2/node/{nodeID}/config/network/bgp"];
 
-  it("defines PUT on the node BGP path", () => {
-    assert.ok(path, "/v2/node/{nodeID}/config/network/bgp should exist");
-    assert.ok(path.put, "PUT should be defined to replace config");
-    assert.equal(path.put.operationId, "updateNodeBGPConfig");
+  it("defines PUT and no GET or DELETE", () => {
+    assert.ok(path, "BGP config path should exist");
+    assert.ok(path.put, "PUT should be defined");
+    assert.equal(path.get, undefined);
+    assert.equal(path.delete, undefined);
   });
 
-  it("does not define GET or DELETE — BGP is read via the node config and disabled by PUTing enabled:false", () => {
-    assert.equal(path.get, undefined, "GET is not implemented");
-    assert.equal(path.delete, undefined, "DELETE is not implemented");
-  });
-
-  it("references the BGPConfig request body on PUT", () => {
+  it("uses the top-level BGP update request body", () => {
     assert.equal(
       path.put.requestBody.$ref,
-      "#/components/requestBodies/BGPConfig"
+      "#/components/requestBodies/BGPConfigUpdate"
     );
   });
 
-  it("documents the 422 validation response on PUT", () => {
-    const resp = path.put.responses["422"];
-    assert.ok(resp, "PUT should have a 422 response");
-    assert.match(resp.description, /validation/i);
-    assert.equal(
-      resp.content["application/json"].schema.$ref,
-      "#/components/schemas/ValidationFailed"
-    );
+  it("documents the correct permission", () => {
+    assert.match(path.put.description, /nodes::configure:network/);
   });
 
-  it("uses the plural `nodes::` permission token", () => {
-    assert.match(
-      path.put.description,
-      /nodes::/,
-      "BGP PUT should use plural `nodes::` permission strings"
-    );
-    assert.doesNotMatch(
-      path.put.description,
-      /\bnode::configure/,
-      "BGP PUT should not use singular `node::configure`"
-    );
+  it("explains that nested BGP objects are managed through sub-resources", () => {
+    assert.match(path.put.description, /peer-group/i);
+    assert.doesNotMatch(path.put.description, /match\.network/);
+  });
+});
+
+describe("node BGP management sub-resource paths", () => {
+  const expected = [
+    "/v2/node/{nodeID}/config/network/bgp/peer-groups",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/peers",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/peers/{peerId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/peer/{peerId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policies",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policies/{policyId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}/match/prefixes",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}/match/prefixes/{prefixId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/import-policy/{importPolicyId}/match/prefix/{prefixId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policies",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policies/{policyId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}/match/prefixes",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}/match/prefixes/{prefixId}",
+    "/v2/node/{nodeID}/config/network/bgp/peer-group/{peerGroupId}/export-policy/{exportPolicyId}/match/prefix/{prefixId}"
+  ];
+
+  it("documents all BGP peer group, peer, policy, and prefix endpoints", () => {
+    for (const path of expected) {
+      assert.ok(spec.paths[path], `missing path: ${path}`);
+    }
+  });
+});
+
+describe("generic node trigger path BGP docs", () => {
+  const path = spec.paths["/node/{nodeID}/trigger/{event}"];
+
+  it("documents BGP get and restart under the generic trigger endpoint", () => {
+    assert.ok(path, "generic node trigger path should exist");
+    assert.match(path.post.description, /event=bgp/);
+    assert.match(path.post.description, /action: get/);
+    assert.match(path.post.description, /action: restart/);
   });
 
-  it("tags PUT as Appliance", () => {
-    assert.deepEqual(path.put.tags, ["Appliance"]);
-  });
+  it("references the BGP trigger request and response schemas", () => {
+    const reqAnyOf = path.post.requestBody.content["application/json"].schema.anyOf;
+    const resAnyOf = path.post.responses["200"].content["application/json"].schema.anyOf;
 
-  it("explains how cluster BGP is configured (per-member PUTs)", () => {
-    assert.match(
-      path.put.description,
-      /cluster/i,
-      "PUT description should explain cluster BGP semantics"
+    assert.ok(
+      reqAnyOf.some(item => item.$ref === "#/components/schemas/NodeTriggerBGPRequest")
     );
-    assert.match(
-      path.put.description,
-      /match\.cluster/,
-      "PUT description should mention match.cluster gating"
+    assert.ok(
+      resAnyOf.some(item => item.$ref === "#/components/schemas/NodeTriggerBGPGetResponse")
+    );
+    assert.ok(
+      resAnyOf.some(item => item.$ref === "#/components/schemas/NodeTriggerBGPRestartResponse")
     );
   });
 });
 
-describe("BGPConfig request body", () => {
-  const body = spec.components.requestBodies.BGPConfig;
+describe("BGP schemas", () => {
+  it("keeps stored BGP config separate from the top-level update request", () => {
+    const stored = spec.components.schemas.BGPConfig;
+    const update = spec.components.schemas.BGPConfigUpdate;
 
-  it("is required and references the BGPConfig schema", () => {
-    assert.ok(body, "BGPConfig request body should exist");
-    assert.equal(body.required, true);
+    assert.ok(stored, "BGPConfig schema should exist");
+    assert.ok(update, "BGPConfigUpdate schema should exist");
+    assert.ok(stored.properties.groups, "stored config should include groups");
+    assert.equal(update.properties.groups, undefined);
     assert.equal(
-      body.content["application/json"].schema.$ref,
+      spec.components.requestBodies.BGPConfigUpdate.content["application/json"].schema.$ref,
+      "#/components/schemas/BGPConfigUpdate"
+    );
+  });
+
+  it("references BGPConfig from the node config schema as _bgp", () => {
+    const nodeSchema = spec.components.schemas.Node;
+    assert.equal(
+      nodeSchema.properties.config.properties._bgp.$ref,
       "#/components/schemas/BGPConfig"
     );
   });
-});
 
-describe("BGPConfig schema", () => {
-  const schema = spec.components.schemas.BGPConfig;
-
-  it("requires the core router fields", () => {
-    assert.ok(schema, "BGPConfig schema should exist");
-    // `client` is enforced by the server validator — omitting it returns 422.
-    for (const field of ["enabled", "id", "asn", "client"]) {
-      assert.ok(
-        schema.required.includes(field),
-        `BGPConfig should require ${field}`
-      );
-    }
-  });
-
-  it("has the expected top-level properties", () => {
-    for (const prop of ["enabled", "id", "asn", "client", "groups"]) {
-      assert.ok(schema.properties[prop], `missing property ${prop}`);
-    }
-    assert.equal(schema.properties.enabled.type, "boolean");
-    assert.equal(schema.properties.id.type, "string");
-    assert.equal(schema.properties.asn.type, "integer");
-    assert.equal(schema.properties.client.type, "boolean");
-    assert.equal(schema.properties.groups.type, "array");
+  it("documents export policy match.cluster and action.prefixes, but not fake match.network fields", () => {
+    const schema = spec.components.schemas.BGPExportPolicy;
+    assert.ok(schema.properties.match.properties.cluster);
+    assert.equal(schema.properties.match.properties.network, undefined);
+    assert.equal(schema.properties.match.properties.prefixes, undefined);
     assert.equal(
-      schema.properties.groups.items.$ref,
-      "#/components/schemas/BGPPeerGroup"
-    );
-  });
-
-  it("includes a worked example with peers, imports, and exports", () => {
-    assert.ok(schema.example, "BGPConfig should have an example");
-    assert.ok(Array.isArray(schema.example.groups));
-    const group = schema.example.groups[0];
-    assert.ok(group.peers.length > 0, "example should include a peer");
-    assert.ok(group.imports.length > 0, "example should include an import policy");
-    assert.ok(group.exports.length > 0, "example should include an export policy");
-  });
-});
-
-describe("BGPPeerGroup schema", () => {
-  const schema = spec.components.schemas.BGPPeerGroup;
-
-  it("requires _id and name", () => {
-    assert.ok(schema, "BGPPeerGroup schema should exist");
-    assert.ok(schema.required.includes("_id"));
-    assert.ok(schema.required.includes("name"));
-  });
-
-  it("exposes a description field for UI annotation", () => {
-    assert.ok(schema.properties.description);
-    assert.equal(schema.properties.description.type, "string");
-  });
-
-  it("references BGPPeer, BGPImportPolicy, and BGPExportPolicy", () => {
-    assert.equal(
-      schema.properties.peers.items.$ref,
-      "#/components/schemas/BGPPeer"
-    );
-    assert.equal(
-      schema.properties.imports.items.$ref,
-      "#/components/schemas/BGPImportPolicy"
-    );
-    assert.equal(
-      schema.properties.exports.items.$ref,
-      "#/components/schemas/BGPExportPolicy"
-    );
-  });
-});
-
-describe("BGPPeer schema", () => {
-  const schema = spec.components.schemas.BGPPeer;
-
-  it("requires _id, name, asn, and ip", () => {
-    assert.ok(schema, "BGPPeer schema should exist");
-    for (const f of ["_id", "name", "asn", "ip"]) {
-      assert.ok(schema.required.includes(f), `BGPPeer should require ${f}`);
-    }
-  });
-
-  it("makes secret optional", () => {
-    assert.ok(schema.properties.secret, "secret should be defined");
-    assert.ok(
-      !schema.required.includes("secret"),
-      "secret should not be required"
-    );
-  });
-
-  it("exposes a description field for UI annotation", () => {
-    assert.ok(schema.properties.description);
-    assert.equal(schema.properties.description.type, "string");
-  });
-});
-
-describe("BGPImportPolicy schema", () => {
-  const schema = spec.components.schemas.BGPImportPolicy;
-
-  it("requires _id, name, match, and action", () => {
-    assert.ok(schema, "BGPImportPolicy schema should exist");
-    for (const f of ["_id", "name", "match", "action"]) {
-      assert.ok(
-        schema.required.includes(f),
-        `BGPImportPolicy should require ${f}`
-      );
-    }
-  });
-
-  it("constrains action.action to allow or deny", () => {
-    const enumVals = schema.properties.action.properties.action.enum;
-    assert.deepEqual([...enumVals].sort(), ["allow", "deny"]);
-  });
-
-  it("references BGPImportPrefix in match.prefixes", () => {
-    assert.equal(
-      schema.properties.match.properties.prefixes.items.$ref,
-      "#/components/schemas/BGPImportPrefix"
-    );
-  });
-
-  it("exposes a description field for UI annotation", () => {
-    assert.ok(schema.properties.description);
-    assert.equal(schema.properties.description.type, "string");
-  });
-});
-
-describe("BGPImportPrefix schema", () => {
-  const schema = spec.components.schemas.BGPImportPrefix;
-
-  it("requires _id and prefix; exact is optional and matches export shape", () => {
-    assert.ok(schema, "BGPImportPrefix schema should exist");
-    for (const f of ["_id", "prefix"]) {
-      assert.ok(
-        schema.required.includes(f),
-        `BGPImportPrefix should require ${f}`
-      );
-    }
-    assert.ok(
-      !schema.required.includes("exact"),
-      "exact should be optional to match BGPExportPrefix"
-    );
-    assert.equal(schema.properties.exact.type, "boolean");
-  });
-});
-
-describe("BGPExportPolicy schema", () => {
-  const schema = spec.components.schemas.BGPExportPolicy;
-
-  it("requires _id, name, match, and action", () => {
-    assert.ok(schema, "BGPExportPolicy schema should exist");
-    for (const f of ["_id", "name", "match", "action"]) {
-      assert.ok(
-        schema.required.includes(f),
-        `BGPExportPolicy should require ${f}`
-      );
-    }
-  });
-
-  it("documents the cluster, network, and prefixes match fields", () => {
-    const matchProps = schema.properties.match.properties;
-    assert.ok(matchProps.cluster, "match.cluster should be documented");
-    assert.equal(matchProps.cluster.type, "boolean");
-    assert.ok(
-      matchProps.network,
-      "match.network should be documented (WOR-9737)"
-    );
-    assert.equal(matchProps.network.type, "integer");
-    assert.equal(
-      matchProps.prefixes.items.$ref,
+      schema.properties.action.properties.prefixes.items.$ref,
       "#/components/schemas/BGPExportPrefix"
     );
   });
 
-  it("enumerates the auto-withdraw triggers for match.network", () => {
-    const desc = schema.properties.match.properties.network.description;
-    assert.match(desc, /withdraw/i);
-    // The triggers documented for WOR-9737: data-plane disconnect, no
-    // learned vnet route, route-monitor failure, and inactive cluster member.
-    for (const trigger of [
-      /data.plane/i,
-      /learned route/i,
-      /route monitor/i,
-      /active member/i
-    ]) {
-      assert.match(
-        desc,
-        trigger,
-        `match.network description should document ${trigger}`
-      );
-    }
+  it("does not document exact matching on export prefixes", () => {
+    const schema = spec.components.schemas.BGPExportPrefix;
+    assert.equal(schema.properties.exact, undefined);
   });
 
-  it("constrains action.action to allow or deny", () => {
-    const enumVals = schema.properties.action.properties.action.enum;
-    assert.deepEqual([...enumVals].sort(), ["allow", "deny"]);
-  });
-
-  it("exposes a description field for UI annotation", () => {
-    assert.ok(schema.properties.description);
-    assert.equal(schema.properties.description.type, "string");
-  });
-
-  it("documents action.prefixes as a backwards-compatibility list", () => {
-    const desc = schema.properties.action.properties.prefixes.description;
-    assert.match(desc, /match\.prefixes/i);
-    assert.match(desc, /backwards[\s-]compat|legacy/i);
+  it("keeps optional description fields off stored peer-group and peer schemas when the backend does not persist them", () => {
+    assert.equal(spec.components.schemas.BGPPeerGroup.properties.description, undefined);
+    assert.equal(spec.components.schemas.BGPPeer.properties.description, undefined);
   });
 });
 
-describe("BGPExportPrefix schema", () => {
-  const schema = spec.components.schemas.BGPExportPrefix;
-
-  it("requires _id and prefix", () => {
-    assert.ok(schema, "BGPExportPrefix schema should exist");
-    assert.ok(schema.required.includes("_id"));
-    assert.ok(schema.required.includes("prefix"));
-  });
-});
-
-describe("BGP cluster plugin paths", () => {
-  it("does not define a cluster-level BGP endpoint", () => {
-    // Cluster BGP is configured by PUTing the same config to each member's
-    // node ID, not via a single cluster endpoint. See the node PUT description.
+describe("BGP trigger response schemas", () => {
+  it("documents peer status with routes, rejections, and advertised prefixes", () => {
+    const schema = spec.components.schemas.NodeTriggerBGPPeerStatus;
     assert.equal(
-      spec.paths["/v2/cluster/{clusterFQDN}/config/network/bgp"],
-      undefined
+      schema.properties.routes.items.$ref,
+      "#/components/schemas/NodeTriggerBGPRoute"
+    );
+    assert.equal(
+      schema.properties.rejections.items.$ref,
+      "#/components/schemas/NodeTriggerBGPRejectedRoute"
+    );
+    assert.equal(
+      schema.properties.advertised.items.$ref,
+      "#/components/schemas/NodeTriggerBGPAdvertisedPrefix"
+    );
+  });
+
+  it("documents runtime BGP get response as router.peers", () => {
+    const schema = spec.components.schemas.NodeTriggerBGPGetResponse;
+    assert.equal(
+      schema.properties.router.properties.peers.items.$ref,
+      "#/components/schemas/NodeTriggerBGPPeerStatus"
     );
   });
 });
