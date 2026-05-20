@@ -12552,9 +12552,6 @@ components:
     NodeTriggerBGPPeerStatus:
       description: Runtime state of one BGP peer session
       properties:
-        id:
-          description: Peer identifier as returned by the node service
-          type: string
         connected:
           description: Whether the peer session is established
           type: boolean
@@ -12583,7 +12580,6 @@ components:
           description: Remote peer IPv4 address
           type: string
       required:
-        - id
         - connected
         - routes
         - rejections
@@ -12598,12 +12594,17 @@ components:
         router:
           type: object
           properties:
+            router:
+              description: Local BGP speaker's router-id (BGP "ID")
+              example: 10.0.0.1
+              type: string
             peers:
               description: Runtime peer session state for the local BGP speaker
               items:
                 $ref: '#/components/schemas/NodeTriggerBGPPeerStatus'
               type: array
           required:
+            - router
             - peers
         error:
           description: Error returned when runtime BGP status cannot be fetched
