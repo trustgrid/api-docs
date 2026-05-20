@@ -162,4 +162,16 @@ describe("BGP trigger response schemas", () => {
       "#/components/schemas/NodeTriggerBGPPeerStatus"
     );
   });
+
+  it("documents the local BGP router-id on the runtime get response", () => {
+    const schema = spec.components.schemas.NodeTriggerBGPGetResponse;
+    assert.equal(
+      schema.properties.router.properties.router.type,
+      "string"
+    );
+    assert.ok(
+      schema.properties.router.required.includes("router"),
+      "router.router should be required"
+    );
+  });
 });
