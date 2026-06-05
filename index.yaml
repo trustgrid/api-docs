@@ -777,8 +777,8 @@ paths:
       summary: Retrieve all high-availability node clusters in the organization
       parameters:
         - description: >-
-            If specified, the nodes will return with their associated
-            configuration.
+            If specified, clusters will return with their full config
+            populated.
           in: query
           name: withConfig
           required: false
