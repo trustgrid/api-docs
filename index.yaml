@@ -11623,7 +11623,7 @@ components:
                       prefix: 10.0.200.0/24
       properties:
         enabled:
-          description: Whether BGP is enabled on the node
+          description: Whether the BGP server is running on the node
           type: boolean
         id:
           description: Router ID for the local BGP speaker
@@ -11656,7 +11656,7 @@ components:
       description: Request body for updating the top-level BGP settings on a node
       properties:
         enabled:
-          description: Whether BGP is enabled on the node
+          description: Whether the BGP server is running on the node
           type: boolean
         id:
           description: Router ID for the local BGP speaker
