@@ -15022,10 +15022,11 @@ components:
           description: |-
             When true and `sourceInterface` is set, the forwarder binds the outbound
             socket to the cluster VIP on that interface instead of the active node's
-            interface IP. Has no effect unless `sourceInterface` is also set.
+            interface IP. Has no effect unless `sourceInterface` is also set. Only
+            meaningful on cluster services; ignored on standalone node services.
           type: boolean
         sourceInterface:
-          description: NIC name (e.g. `ens192`) the L4 forwarder uses to source the upstream connection. Must be set together with `sourceFromClusterIP` for cluster VIP sourcing to take effect.
+          description: NIC name (e.g. `ens192`) the L4 forwarder uses to source the upstream connection. Valid on its own to control source interface binding; also required for `sourceFromClusterIP` to take effect.
           type: string
       required:
         - host
