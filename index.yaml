@@ -14978,6 +14978,14 @@ components:
       title: SAML Config
       type: object
     EdgeService:
+      example:
+        name: gw-http
+        protocol: tcp
+        port: 5000
+        host: 192.168.200.62
+        enabled: true
+        sourceInterface: ens192
+        sourceFromClusterIP: true
       properties:
         description:
           description: service description
@@ -15009,6 +15017,15 @@ components:
             - rdp
             - vnc
             - ssh
+          type: string
+        sourceFromClusterIP:
+          description: |-
+            When true and `sourceInterface` is set, the forwarder binds the outbound
+            socket to the cluster VIP on that interface instead of the active node's
+            interface IP. Has no effect unless `sourceInterface` is also set.
+          type: boolean
+        sourceInterface:
+          description: NIC name (e.g. `ens192`) the L4 forwarder uses to source the upstream connection. Must be set together with `sourceFromClusterIP` for cluster VIP sourcing to take effect.
           type: string
       required:
         - host
