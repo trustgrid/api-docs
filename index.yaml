@@ -4532,11 +4532,6 @@ paths:
           name: projectID
           schema:
             type: string
-        - description: Organization ID, name, or `special:` value (e.g. `special:all`)
-          in: query
-          name: org
-          schema:
-            type: string
         - description: Filter by priority
           in: query
           name: priority
@@ -4715,30 +4710,6 @@ paths:
                 type: array
       tags:
         - Order
-  /provisioning/api/v1/orders/orgs:
-    get:
-      operationId: listOrderOrgs
-      summary: List organizations that have orders
-      description: |-
-        Returns organizations that have orders. Callers must be able to change
-        the order org (`orders::change-org`) to use this endpoint.
-
-        ---
-
-        Requires `orders::read` and `orders::change-org` permissions.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/OrgModel'
-                type: array
-        '403':
-          description: Forbidden
-      tags:
-        - Order
   /provisioning/api/v1/orders/status-counts:
     get:
       operationId: getOrderStatusCounts
@@ -4775,11 +4746,6 @@ paths:
         - description: Filter by project ID
           in: query
           name: projectID
-          schema:
-            type: string
-        - description: Organization ID, name, or `special:` value (e.g. `special:all`)
-          in: query
-          name: org
           schema:
             type: string
         - description: Filter by priority
