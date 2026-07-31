@@ -4648,133 +4648,6 @@ paths:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Order
-  /provisioning/api/v1/orders/{uid}:
-    parameters:
-      - description: Order UID
-        in: path
-        name: uid
-        required: true
-        schema:
-          type: string
-    get:
-      operationId: getOrder
-      summary: Retrieve detailed information about a specific provisioning order
-      description: |-
-        Returns the fully hydrated order, including node details, comments,
-        attachments, and history.
-
-        ---
-
-        Requires `orders::read` permission.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderModel'
-        '404':
-          description: Order not found
-      tags:
-        - Order
-    put:
-      operationId: updateOrder
-      summary: Modify the details and requirements of an existing provisioning order
-      description: |-
-        Updates an existing order. The request body accepts the same fields as
-        order creation, except fields that are immutable (creator, org, UID,
-        comments).
-
-        ---
-
-        Requires `orders::modify` permission.
-      requestBody:
-        $ref: '#/components/requestBodies/OrderModel'
-      responses:
-        '200':
-          description: OK
-        '422':
-          description: Validation Failed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationFailed'
-        '404':
-          description: Order not found
-      tags:
-        - Order
-  /provisioning/api/v1/orders/{uid}/comment:
-    parameters:
-      - description: Order UID
-        in: path
-        name: uid
-        required: true
-        schema:
-          type: string
-    post:
-      operationId: addOrderComment
-      summary: Add a note or comment to track order progress and communication
-      description: |-
-        Adds a comment to the order, attributed to the authenticated user.
-
-        ---
-
-        Requires `orders::comment` permission.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                body:
-                  type: string
-              type: object
-      responses:
-        '200':
-          description: OK
-        '404':
-          description: Order not found
-      tags:
-        - Order
-  /provisioning/api/v1/orders/{uid}/flag:
-    parameters:
-      - description: Order UID
-        in: path
-        name: uid
-        required: true
-        schema:
-          type: string
-    put:
-      operationId: addOrderFlag
-      summary: Mark an order as high priority or requiring special attention
-      description: |-
-        Sets `flagged=true` on the order.
-
-        ---
-
-        Requires `orders::modify` permission.
-      responses:
-        '200':
-          description: OK
-        '404':
-          description: Order not found
-      tags:
-        - Order
-    delete:
-      operationId: removeOrderFlag
-      summary: Remove priority flag from an order to normalize processing
-      description: |-
-        Sets `flagged=false` on the order.
-
-        ---
-
-        Requires `orders::modify` permission.
-      responses:
-        '200':
-          description: OK
-        '404':
-          description: Order not found
-      tags:
-        - Order
   /provisioning/api/v1/orders.stream/{uid}:
     parameters:
       - description: Order UID
@@ -4796,14 +4669,16 @@ paths:
       responses:
         '101':
           description: Switching Protocols
+        '404':
+          description: Order not found
       tags:
         - Order
-  /provisioning/api/v1/orders/labels:
+  /provisioning/api/v1/orders/creators:
     get:
-      operationId: listOrderLabels
-      summary: List order labels visible to the caller
+      operationId: listOrderCreators
+      summary: List users who have created orders
       description: |-
-        Returns the distinct labels used on orders the caller can see.
+        Returns user IDs of order creators visible to the caller.
 
         ---
 
@@ -4819,12 +4694,12 @@ paths:
                 type: array
       tags:
         - Order
-  /provisioning/api/v1/orders/creators:
+  /provisioning/api/v1/orders/labels:
     get:
-      operationId: listOrderCreators
-      summary: List users who have created orders
+      operationId: listOrderLabels
+      summary: List order labels visible to the caller
       description: |-
-        Returns user IDs of order creators visible to the caller.
+        Returns the distinct labels used on orders the caller can see.
 
         ---
 
@@ -4994,6 +4869,61 @@ paths:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Order
+  /provisioning/api/v1/orders/{uid}:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getOrder
+      summary: Retrieve detailed information about a specific provisioning order
+      description: |-
+        Returns the fully hydrated order, including node details, comments,
+        attachments, and history.
+
+        ---
+
+        Requires `orders::read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderModel'
+        '404':
+          description: Order not found
+      tags:
+        - Order
+    put:
+      operationId: updateOrder
+      summary: Modify the details and requirements of an existing provisioning order
+      description: |-
+        Updates an existing order. The request body accepts the same fields as
+        order creation, except fields that are immutable (creator, org, UID,
+        comments).
+
+        ---
+
+        Requires `orders::modify` permission.
+      requestBody:
+        $ref: '#/components/requestBodies/OrderModel'
+      responses:
+        '200':
+          description: OK
+        '422':
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+        '404':
+          description: Order not found
+      tags:
+        - Order
   /provisioning/api/v1/orders/{uid}/attachment:
     parameters:
       - description: Order UID
@@ -5061,6 +4991,78 @@ paths:
           description: Order not found
       tags:
         - Order
+  /provisioning/api/v1/orders/{uid}/comment:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: addOrderComment
+      summary: Add a note or comment to track order progress and communication
+      description: |-
+        Adds a comment to the order, attributed to the authenticated user.
+
+        ---
+
+        Requires `orders::comment` permission.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                body:
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Order not found
+      tags:
+        - Order
+  /provisioning/api/v1/orders/{uid}/flag:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    put:
+      operationId: addOrderFlag
+      summary: Mark an order as high priority or requiring special attention
+      description: |-
+        Sets `flagged=true` on the order.
+
+        ---
+
+        Requires `orders::modify` permission.
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Order not found
+      tags:
+        - Order
+    delete:
+      operationId: removeOrderFlag
+      summary: Remove priority flag from an order to normalize processing
+      description: |-
+        Sets `flagged=false` on the order.
+
+        ---
+
+        Requires `orders::modify` permission.
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Order not found
+      tags:
+        - Order
   /provisioning/api/v1/orders/{uid}/history:
     parameters:
       - description: Order UID
@@ -5123,11 +5125,15 @@ paths:
         '404':
           description: Order not found
         '422':
-          description: Validation Failed
+          description: ShipStation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ValidationFailed'
+                properties:
+                  error:
+                    description: Error message
+                    type: string
+                type: object
       tags:
         - Order
     put:
@@ -15709,7 +15715,7 @@ components:
         state:
           type: string
         status:
-          description: >-
+          description: |-
             Order status. API-side holistic validations apply to orders whose
             status is in provisioning, qa, shipped, delivered, installed, and in
             production.
