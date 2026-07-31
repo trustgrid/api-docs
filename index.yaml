@@ -4508,7 +4508,7 @@ paths:
       description: |-
         Search and list hardware provisioning orders visible to the caller.
         Results are paginated; use `page` and `perPage` to iterate and
-        `X-Total-Count` for the total matching set.
+        `x-total-count` for the total matching set.
 
         Responses from this endpoint are not fully hydrated (for example,
         node details are omitted).
