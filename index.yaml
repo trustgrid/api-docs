@@ -4643,31 +4643,6 @@ paths:
                 $ref: '#/components/schemas/ValidationFailed'
       tags:
         - Order
-  /provisioning/api/v1/orders.stream/{uid}:
-    parameters:
-      - description: Order UID
-        in: path
-        name: uid
-        required: true
-        schema:
-          type: string
-    get:
-      operationId: streamOrderUpdates
-      summary: Open a WebSocket stream of order update notifications
-      description: |-
-        Upgrades the connection to a WebSocket and pushes a message each time
-        the order is updated.
-
-        ---
-
-        Requires `orders::read` permission.
-      responses:
-        '101':
-          description: Switching Protocols
-        '404':
-          description: Order not found
-      tags:
-        - Order
   /provisioning/api/v1/orders/creators:
     get:
       operationId: listOrderCreators
@@ -5056,69 +5031,6 @@ paths:
                 items:
                   $ref: '#/components/schemas/OrderAudit'
                 type: array
-        '404':
-          description: Order not found
-      tags:
-        - Order
-  /provisioning/api/v1/orders/{uid}/shipstation:
-    parameters:
-      - description: Order UID
-        in: path
-        name: uid
-        required: true
-        schema:
-          type: string
-    post:
-      operationId: sendOrderToShipStation
-      summary: Create the order in ShipStation
-      description: |-
-        Sends the order to ShipStation and stores the resulting ShipStation
-        order ID on the order.
-
-        ---
-
-        Requires `orders::read` and `orders::ship-station` permissions.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                properties:
-                  shipStationOrderId:
-                    type: integer
-                type: object
-        '404':
-          description: Order not found
-        '422':
-          description: ShipStation error
-          content:
-            application/json:
-              schema:
-                properties:
-                  error:
-                    description: Error message
-                    type: string
-                type: object
-      tags:
-        - Order
-    put:
-      operationId: syncOrderShipStation
-      summary: Sync ShipStation tracking information for an order
-      description: |-
-        Pulls tracking information from ShipStation for the order and records
-        it locally.
-
-        ---
-
-        Requires `orders::read` and `orders::ship-station` permissions.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderTrackingInfo'
         '404':
           description: Order not found
       tags:
@@ -15264,20 +15176,6 @@ components:
           description: Role or relationship to the order
           type: string
       title: Order Stakeholder
-      type: object
-    OrderTrackingInfo:
-      description: Tracking information returned for a shipped order
-      properties:
-        trackingNumber:
-          description: Carrier tracking number
-          type: string
-        carrierCode:
-          description: Carrier code
-          type: string
-        orderId:
-          description: Order UID
-          type: string
-      title: Order Tracking Info
       type: object
     OrderTransition:
       description: Status transition recorded for an order
