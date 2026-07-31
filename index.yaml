@@ -4505,12 +4505,115 @@ paths:
     get:
       operationId: listOrders
       summary: Retrieve all hardware provisioning orders and their current status
-      description: >-
-        The responses for orders from this API request are not fully hydrated
-        (eg, no nodes).
+      description: |-
+        Search and list hardware provisioning orders visible to the caller.
+        Results are paginated; use `page` and `perPage` to iterate and
+        `X-Total-Count` for the total matching set.
+
+        Responses from this endpoint are not fully hydrated (for example,
+        node details are omitted).
+
+        ---
+
+        Requires `orders::read` permission.
+      parameters:
+        - description: Filter by assigned Trustgrid user
+          in: query
+          name: assignee
+          schema:
+            type: string
+        - description: Filter by order creator user ID
+          in: query
+          name: creator
+          schema:
+            type: string
+        - description: Filter by project ID
+          in: query
+          name: projectID
+          schema:
+            type: string
+        - description: Organization ID, name, or `special:` value (e.g. `special:all`)
+          in: query
+          name: org
+          schema:
+            type: string
+        - description: Filter by priority
+          in: query
+          name: priority
+          schema:
+            $ref: '#/components/schemas/OrderPriority'
+        - description: Filter by status
+          in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - description: Exclude orders with this status
+          in: query
+          name: excludeStatus
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - description: Status value to count transitions for
+          in: query
+          name: transition-status
+          schema:
+            type: string
+        - description: Start of transition window (unix timestamp)
+          in: query
+          name: transition-from
+          schema:
+            type: integer
+            format: int64
+        - description: End of transition window (unix timestamp; defaults to now)
+          in: query
+          name: transition-to
+          schema:
+            type: integer
+            format: int64
+        - description: Filter by label
+          in: query
+          name: label
+          schema:
+            type: string
+        - description: Free-text search across the order
+          in: query
+          name: q
+          schema:
+            type: string
+        - description: Page number
+          in: query
+          name: page
+          schema:
+            type: integer
+        - description: Number of orders per page
+          in: query
+          name: perPage
+          schema:
+            type: integer
+        - description: Sort field and direction (e.g. `createdAt:desc`)
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Include orders created at or after this RFC3339 timestamp
+          in: query
+          name: createdAfter
+          schema:
+            type: string
+            format: date-time
+        - description: Include orders created before this RFC3339 timestamp
+          in: query
+          name: createdBefore
+          schema:
+            type: string
+            format: date-time
       responses:
         '200':
           description: OK
+          headers:
+            x-total-count:
+              description: Total number of orders matching the query
+              schema:
+                type: integer
           content:
             application/json:
               schema:
@@ -4520,12 +4623,23 @@ paths:
       tags:
         - Order
     post:
+      operationId: createOrder
       summary: Submit a new hardware provisioning order for appliances or agents
+      description: |-
+        Creates a new provisioning order.
+
+        ---
+
+        Requires `orders::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/OrderModel'
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderModel'
         '422':
           description: Validation Failed
           content:
@@ -4535,9 +4649,23 @@ paths:
       tags:
         - Order
   /provisioning/api/v1/orders/{uid}:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
     get:
       operationId: getOrder
       summary: Retrieve detailed information about a specific provisioning order
+      description: |-
+        Returns the fully hydrated order, including node details, comments,
+        attachments, and history.
+
+        ---
+
+        Requires `orders::read` permission.
       responses:
         '200':
           description: OK
@@ -4545,16 +4673,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderModel'
+        '404':
+          description: Order not found
       tags:
         - Order
-    parameters:
-      - in: path
-        name: uid
-        required: true
-        schema:
-          type: string
     put:
+      operationId: updateOrder
       summary: Modify the details and requirements of an existing provisioning order
+      description: |-
+        Updates an existing order. The request body accepts the same fields as
+        order creation, except fields that are immutable (creator, org, UID,
+        comments).
+
+        ---
+
+        Requires `orders::modify` permission.
       requestBody:
         $ref: '#/components/requestBodies/OrderModel'
       responses:
@@ -4566,17 +4699,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationFailed'
+        '404':
+          description: Order not found
       tags:
         - Order
   /provisioning/api/v1/orders/{uid}/comment:
     parameters:
-      - in: path
+      - description: Order UID
+        in: path
         name: uid
         required: true
         schema:
           type: string
     post:
+      operationId: addOrderComment
       summary: Add a note or comment to track order progress and communication
+      description: |-
+        Adds a comment to the order, attributed to the authenticated user.
+
+        ---
+
+        Requires `orders::comment` permission.
       requestBody:
         content:
           application/json:
@@ -4588,27 +4731,441 @@ paths:
       responses:
         '200':
           description: OK
+        '404':
+          description: Order not found
       tags:
         - Order
   /provisioning/api/v1/orders/{uid}/flag:
-    delete:
-      summary: Remove priority flag from an order to normalize processing
-      responses:
-        '200':
-          description: OK
-      tags:
-        - Order
     parameters:
-      - in: path
+      - description: Order UID
+        in: path
         name: uid
         required: true
         schema:
           type: string
     put:
+      operationId: addOrderFlag
       summary: Mark an order as high priority or requiring special attention
+      description: |-
+        Sets `flagged=true` on the order.
+
+        ---
+
+        Requires `orders::modify` permission.
       responses:
         '200':
           description: OK
+        '404':
+          description: Order not found
+      tags:
+        - Order
+    delete:
+      operationId: removeOrderFlag
+      summary: Remove priority flag from an order to normalize processing
+      description: |-
+        Sets `flagged=false` on the order.
+
+        ---
+
+        Requires `orders::modify` permission.
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Order not found
+      tags:
+        - Order
+  /provisioning/api/v1/orders.stream/{uid}:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: streamOrderUpdates
+      summary: Open a WebSocket stream of order update notifications
+      description: |-
+        Upgrades the connection to a WebSocket and pushes a message each time
+        the order is updated.
+
+        ---
+
+        Requires `orders::read` permission.
+      responses:
+        '101':
+          description: Switching Protocols
+      tags:
+        - Order
+  /provisioning/api/v1/orders/labels:
+    get:
+      operationId: listOrderLabels
+      summary: List order labels visible to the caller
+      description: |-
+        Returns the distinct labels used on orders the caller can see.
+
+        ---
+
+        Requires `orders::read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+      tags:
+        - Order
+  /provisioning/api/v1/orders/creators:
+    get:
+      operationId: listOrderCreators
+      summary: List users who have created orders
+      description: |-
+        Returns user IDs of order creators visible to the caller.
+
+        ---
+
+        Requires `orders::read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+      tags:
+        - Order
+  /provisioning/api/v1/orders/orgs:
+    get:
+      operationId: listOrderOrgs
+      summary: List organizations that have orders
+      description: |-
+        Returns organizations that have orders. Callers must be able to change
+        the order org (`orders::change-org`) to use this endpoint.
+
+        ---
+
+        Requires `orders::read` and `orders::change-org` permissions.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OrgModel'
+                type: array
+        '403':
+          description: Forbidden
+      tags:
+        - Order
+  /provisioning/api/v1/orders/status-counts:
+    get:
+      operationId: getOrderStatusCounts
+      summary: Count orders grouped by status
+      description: |-
+        Returns a map of status names to order counts for the filtered query.
+
+        ---
+
+        Requires `orders::read` permission.
+      parameters:
+        - description: Include orders created at or after this RFC3339 timestamp
+          in: query
+          name: createdAfter
+          schema:
+            type: string
+            format: date-time
+        - description: Include orders created before this RFC3339 timestamp
+          in: query
+          name: createdBefore
+          schema:
+            type: string
+            format: date-time
+        - description: Filter by assigned Trustgrid user
+          in: query
+          name: assignee
+          schema:
+            type: string
+        - description: Filter by order creator user ID
+          in: query
+          name: creator
+          schema:
+            type: string
+        - description: Filter by project ID
+          in: query
+          name: projectID
+          schema:
+            type: string
+        - description: Organization ID, name, or `special:` value (e.g. `special:all`)
+          in: query
+          name: org
+          schema:
+            type: string
+        - description: Filter by priority
+          in: query
+          name: priority
+          schema:
+            $ref: '#/components/schemas/OrderPriority'
+        - description: Filter by status
+          in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - description: Exclude orders with this status
+          in: query
+          name: excludeStatus
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - description: Status value to count transitions for
+          in: query
+          name: transition-status
+          schema:
+            type: string
+        - description: Start of transition window (unix timestamp)
+          in: query
+          name: transition-from
+          schema:
+            type: integer
+            format: int64
+        - description: End of transition window (unix timestamp; defaults to now)
+          in: query
+          name: transition-to
+          schema:
+            type: integer
+            format: int64
+        - description: Filter by label
+          in: query
+          name: label
+          schema:
+            type: string
+        - description: Free-text search across the order
+          in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: integer
+                type: object
+      tags:
+        - Order
+  /provisioning/api/v1/orders/webhook:
+    post:
+      operationId: createOrderWebhook
+      summary: Create an order from a sales/webhook payload
+      description: |-
+        Creates a new order from a flat webhook-style payload. The flat network
+        fields are translated into nodes and NATs.
+
+        ---
+
+        Requires `orders::modify` permission.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderWebhookInput'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  uid:
+                    type: string
+                type: object
+        '422':
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Order
+  /provisioning/api/v1/orders/{uid}/attachment:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: addOrderAttachment
+      summary: Attach a file to an order
+      description: |-
+        Uploads one or more files and associates them with the order as
+        attachments.
+
+        ---
+
+        Requires `orders::modify` permission.
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              properties:
+                attachment:
+                  items:
+                    type: string
+                    format: binary
+                  type: array
+              type: object
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Order
+  /provisioning/api/v1/orders/{uid}/clone:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: cloneOrder
+      summary: Clone an existing order
+      description: |-
+        Creates a new order as a copy of the given order. The new order has a
+        fresh UID, order number, and `createdAt`; shipping and clone metadata
+        are cleared.
+
+        ---
+
+        Requires `orders::read` and `orders::modify` permissions.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  uid:
+                    type: string
+                type: object
+        '404':
+          description: Order not found
+      tags:
+        - Order
+  /provisioning/api/v1/orders/{uid}/history:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getOrderHistory
+      summary: Retrieve audit history for an order
+      description: |-
+        Returns the audit trail (changes, status transitions, system messages)
+        for the order.
+
+        ---
+
+        Requires `orders::read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OrderAudit'
+                type: array
+        '404':
+          description: Order not found
+      tags:
+        - Order
+  /provisioning/api/v1/orders/{uid}/shipstation:
+    parameters:
+      - description: Order UID
+        in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: sendOrderToShipStation
+      summary: Create the order in ShipStation
+      description: |-
+        Sends the order to ShipStation and stores the resulting ShipStation
+        order ID on the order.
+
+        ---
+
+        Requires `orders::read` and `orders::ship-station` permissions.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                properties:
+                  shipStationOrderId:
+                    type: integer
+                type: object
+        '404':
+          description: Order not found
+        '422':
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailed'
+      tags:
+        - Order
+    put:
+      operationId: syncOrderShipStation
+      summary: Sync ShipStation tracking information for an order
+      description: |-
+        Pulls tracking information from ShipStation for the order and records
+        it locally.
+
+        ---
+
+        Requires `orders::read` and `orders::ship-station` permissions.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderTrackingInfo'
+        '404':
+          description: Order not found
+      tags:
+        - Order
+  /provisioning/api/v1/config/assignees:
+    get:
+      operationId: listConfigAssignees
+      summary: List configured order assignees
+      description: |-
+        Returns the list of configured assignee names from Janine configuration.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
       tags:
         - Order
   /repositories:
@@ -14599,7 +15156,362 @@ components:
           type: string
       title: OpenID Config
       type: object
+    OrderAttachment:
+      description: File attached to an order
+      properties:
+        key:
+          description: Storage key
+          type: string
+        uid:
+          description: Attachment UID
+          type: string
+        name:
+          description: Original filename
+          type: string
+        owner:
+          description: User ID of the attachment uploader
+          type: string
+        uploadedAt:
+          description: Timestamp when the attachment was uploaded
+          type: string
+          format: date-time
+      title: Order Attachment
+      type: object
+    OrderAudit:
+      description: Audit log entry for an order
+      properties:
+        uid:
+          description: Audit entry UID
+          type: string
+        userName:
+          description: User ID that performed the action
+          type: string
+        createdAt:
+          description: Timestamp when the action occurred
+          type: string
+          format: date-time
+        auditType:
+          description: Type of audit event
+          type: string
+        message:
+          description: Human-readable summary
+          type: string
+        details:
+          description: Free-form details about the action
+          type: string
+        changes:
+          description: Fields that changed in the action
+          items:
+            $ref: '#/components/schemas/OrderAuditChange'
+          type: array
+      title: Order Audit
+      type: object
+    OrderAuditChange:
+      description: Single field change in an order audit entry
+      properties:
+        field:
+          description: Field name
+          type: string
+        oldValue:
+          description: Previous value
+          type: string
+        newValue:
+          description: New value
+          type: string
+      title: Order Audit Change
+      type: object
+    OrderComment:
+      description: Comment on an order
+      properties:
+        uid:
+          description: Comment UID
+          type: string
+        body:
+          description: Comment text
+          type: string
+        createdAt:
+          description: Timestamp when the comment was posted
+          type: string
+          format: date-time
+        user:
+          description: User ID of the commenter
+          type: string
+      title: Order Comment
+      type: object
+    OrderHyperlink:
+      description: External hyperlink associated with an order
+      properties:
+        url:
+          description: URL
+          type: string
+        description:
+          description: Display text
+          type: string
+      title: Order Hyperlink
+      type: object
+    OrderPriority:
+      description: Order priority
+      enum:
+        - normal
+        - high
+        - urgent
+      title: Order Priority
+      type: string
+    OrderStatus:
+      description: Order lifecycle status
+      enum:
+        - new
+        - on hold per client
+        - gathering info
+        - pending feedback
+        - info received
+        - provisioning
+        - qa
+        - shipped
+        - delivered
+        - installed
+        - production ready
+        - in production
+        - archived
+        - cancelled
+      title: Order Status
+      type: string
+    OrderStakeholder:
+      description: Stakeholder associated with an order
+      properties:
+        name:
+          description: Name
+          type: string
+        email:
+          description: Email address
+          type: string
+        phone:
+          description: Phone number
+          type: string
+        role:
+          description: Role or relationship to the order
+          type: string
+      title: Order Stakeholder
+      type: object
+    OrderTrackingInfo:
+      description: Tracking information returned for a shipped order
+      properties:
+        trackingNumber:
+          description: Carrier tracking number
+          type: string
+        carrierCode:
+          description: Carrier code
+          type: string
+        orderId:
+          description: Order UID
+          type: string
+      title: Order Tracking Info
+      type: object
+    OrderTransition:
+      description: Status transition recorded for an order
+      properties:
+        from:
+          $ref: '#/components/schemas/OrderStatus'
+        to:
+          $ref: '#/components/schemas/OrderStatus'
+        timestamp:
+          description: Timestamp when the transition occurred
+          type: string
+          format: date-time
+      title: Order Transition
+      type: object
+    OrderValidation:
+      description: Validation result for an order
+      properties:
+        valid:
+          description: Whether the order passes validation
+          type: boolean
+        anonymous:
+          description: Top-level validation message
+          type: string
+        nats:
+          description: NAT validation results
+          items:
+            $ref: '#/components/schemas/OrderValidationNAT'
+          type: array
+        nodes:
+          description: Node validation results
+          items:
+            $ref: '#/components/schemas/OrderValidationNode'
+          type: array
+      title: Order Validation
+      type: object
+    OrderValidationIface:
+      description: Validation result for a single node interface
+      properties:
+        valid:
+          description: Whether the interface passes validation
+          type: boolean
+        ip:
+          description: IP address validation message
+          type: string
+        subnet:
+          description: Subnet validation message
+          type: string
+        gateway:
+          description: Gateway validation message
+          type: string
+        anonymous:
+          description: General interface validation message
+          type: string
+      title: Order Validation Interface
+      type: object
+    OrderValidationNAT:
+      description: Validation result for a single NAT entry
+      properties:
+        valid:
+          description: Whether the NAT passes validation
+          type: boolean
+        networkCidr:
+          description: Network CIDR validation message
+          type: string
+        localCidr:
+          description: Local CIDR validation message
+          type: string
+      title: Order Validation NAT
+      type: object
+    OrderValidationNode:
+      description: Validation result for a single node
+      properties:
+        valid:
+          description: Whether the node passes validation
+          type: boolean
+        name:
+          description: Node name validation message
+          type: string
+        dns1:
+          description: DNS1 validation message
+          type: string
+        dns2:
+          description: DNS2 validation message
+          type: string
+        linkedNode:
+          description: Linked node validation message
+          type: string
+        anonymous:
+          description: General node validation message
+          type: string
+        interfaces:
+          description: Interface validation results
+          items:
+            $ref: '#/components/schemas/OrderValidationIface'
+          type: array
+      title: Order Validation Node
+      type: object
+    OrderWebhookInput:
+      description: Flat webhook payload used to create an order
+      properties:
+        contactName:
+          type: string
+        contactEmail:
+          type: string
+        companyName:
+          type: string
+        technicalContactName:
+          type: string
+        technicalContactEmail:
+          type: string
+        technicalContactPhone:
+          type: string
+        locationName:
+          type: string
+        siteType:
+          type: string
+        deploymentType:
+          description: Deployment type
+          enum:
+            - High Availability Pair (HA)
+            - Single Node
+          type: string
+        interfacesCount:
+          description: Number of Ethernet interfaces
+          enum:
+            - One Ethernet
+            - Two Ethernet
+          type: string
+        applianceType:
+          type: string
+        hypervisor:
+          description: Hypervisor or appliance type override
+          type: string
+        rackMounts:
+          description: Whether rack mounts are requested
+          type: string
+        firstNodeWANIP:
+          type: string
+        firstNodeWANSubnet:
+          type: string
+        firstNodeWANGw:
+          type: string
+        firstNodeLANIP:
+          type: string
+        firstNodeLANSubnet:
+          type: string
+        firstNodeLANGw:
+          type: string
+        secondNodeWANIP:
+          type: string
+        secondNodeWANSubnet:
+          type: string
+        secondNodeWANGw:
+          type: string
+        secondNodeLANIP:
+          type: string
+        secondNodeLANSubnet:
+          type: string
+        secondNodeLANGw:
+          type: string
+        dns1:
+          type: string
+        dns2:
+          type: string
+        clusterIp:
+          type: string
+        shippingCompanyName:
+          type: string
+        shippingContactEmail:
+          type: string
+        attn:
+          type: string
+        address1:
+          type: string
+        address2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zip:
+          type: string
+        notes:
+          type: string
+        NAT1Local:
+          description: NAT 1 local CIDR
+          type: string
+        NAT1Desc:
+          description: NAT 1 description
+          type: string
+        NAT2Local:
+          description: NAT 2 local CIDR
+          type: string
+        NAT2Desc:
+          description: NAT 2 description
+          type: string
+        NAT3Local:
+          description: NAT 3 local CIDR
+          type: string
+        NAT3Desc:
+          description: NAT 3 description
+          type: string
+      title: Order Webhook Input
+      type: object
     OrderModel:
+      description: Hardware provisioning order
       properties:
         address1:
           type: string
@@ -14607,25 +15519,35 @@ components:
           type: string
         applianceType:
           type: string
+        assignee:
+          description: Trustgrid user assigned to the order
+          type: string
+        attachments:
+          description: Files attached to the order
+          items:
+            $ref: '#/components/schemas/OrderAttachment'
+          type: array
         attn:
+          type: string
+        carrierCode:
+          description: Shipping carrier code
+          type: string
+        cellProvider:
           type: string
         city:
           type: string
+        clonedFromId:
+          description: UID of the original order if this order is a clone
+          type: string
+        clonedFromOrderNumber:
+          description: Order number of the original order if this order is a clone
+          type: integer
         clusterIp:
           type: string
         comments:
+          description: Comments on the order
           items:
-            type: object
-            properties:
-              body:
-                description: Comment text
-                type: string
-              author:
-                description: User ID of the commenter
-                type: string
-              timestamp:
-                description: Unix timestamp (seconds) when the comment was posted
-                type: integer
+            $ref: '#/components/schemas/OrderComment'
           type: array
         companyName:
           type: string
@@ -14635,24 +15557,54 @@ components:
           type: string
         contactPhone:
           type: string
+        createdAt:
+          description: Timestamp when the order was created
+          type: string
+          format: date-time
+        creator:
+          description: User ID of the order creator
+          type: string
+        custom:
+          description: Custom key-value fields
+          type: object
+          additionalProperties:
+            type: string
         customerRefNum:
           type: string
-        domain:
+        dataPlan:
+          type: string
+        dns1:
+          description: Legacy primary DNS
+          type: string
+        dns2:
+          description: Legacy secondary DNS
           type: string
         dueDate:
           type: string
         endUserAccountNum:
+          type: string
+        failoverType:
           type: string
         flagged:
           type: boolean
         ha:
           description: True when this order is for an HA pair
           type: boolean
+        hyperlinks:
+          description: Customer-facing hyperlinks
+          items:
+            $ref: '#/components/schemas/OrderHyperlink'
+          type: array
         interfacesCount:
           description: Number of interfaces to configure per node
           maximum: 2
           minimum: 1
           type: number
+        labels:
+          description: Labels attached to the order
+          items:
+            type: string
+          type: array
         locationName:
           type: string
         nats:
@@ -14669,13 +15621,14 @@ components:
                 type: string
             type: object
           type: array
+        noBill:
+          description: Whether the order should not be billed
+          type: boolean
         nodeCount:
           description: Number of nodes needed to fulfill order
           maximum: 2
           minimum: 1
           type: number
-        nodeName:
-          type: string
         nodes:
           items:
             properties:
@@ -14696,6 +15649,9 @@ components:
                       type: string
                   type: object
                 type: array
+              linkedNode:
+                description: UID of the linked provisioned node
+                type: string
               name:
                 type: string
             type: object
@@ -14705,7 +15661,38 @@ components:
         orderNum:
           description: System-wide unique order number
           type: number
-        routedNetworks:
+        orgId:
+          description: Organization ID
+          type: string
+        orgName:
+          description: Organization display name
+          type: string
+        priority:
+          $ref: '#/components/schemas/OrderPriority'
+        projectID:
+          description: Associated project ID
+          type: string
+        rackMounts:
+          description: Whether rack mounts are requested
+          type: boolean
+        rma:
+          description: Whether this order is an RMA
+          type: boolean
+        shippedDate:
+          description: Timestamp when the order shipped
+          type: string
+          format: date-time
+        shippingCompanyName:
+          type: string
+        shippingContactEmail:
+          type: string
+        shippingStatus:
+          description: Carrier shipping status
+          type: string
+        shipStationOrderId:
+          description: ShipStation order ID
+          type: integer
+        siteName:
           type: string
         siteType:
           description: Site deployment type
@@ -14714,6 +15701,11 @@ components:
             - secondary
             - test
           type: string
+        stakeholders:
+          description: Order stakeholders
+          items:
+            $ref: '#/components/schemas/OrderStakeholder'
+          type: array
         state:
           type: string
         status:
@@ -14721,19 +15713,9 @@ components:
             Order status. API-side holistic validations apply to orders whose
             status is in provisioning, qa, shipped, delivered, installed, and in
             production.
-          enum:
-            - new
-            - gathering info
-            - pending feedback
-            - info received
-            - provisioning
-            - qa
-            - shipped
-            - delivered
-            - installed
-            - in production
-            - archived
-            - cancelled
+          allOf:
+            - $ref: '#/components/schemas/OrderStatus'
+        summary:
           type: string
         technicalContactEmail:
           type: string
@@ -14741,10 +15723,31 @@ components:
           type: string
         technicalContactPhone:
           type: string
+        tgHyperlinks:
+          description: Trustgrid-facing hyperlinks
+          items:
+            $ref: '#/components/schemas/OrderHyperlink'
+          type: array
+        tgNotes:
+          description: Trustgrid-internal notes (visible only to users with `trustgrid::order-notes`)
+          type: string
+        trackingNumber:
+          description: Carrier tracking number
+          type: string
+        transitions:
+          description: Status transition history
+          items:
+            $ref: '#/components/schemas/OrderTransition'
+          type: array
         uid:
           type: string
+        validations:
+          description: Live validation results for the order
+          allOf:
+            - $ref: '#/components/schemas/OrderValidation'
         zip:
           type: string
+      title: Order
       type: object
     OrgModel:
       properties:
