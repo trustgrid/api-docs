@@ -4744,7 +4744,7 @@ paths:
               schema:
                 items:
                   additionalProperties: true
-                  description: Response fields are returned as objects.
+                  description: Response fields are not yet documented.
                   type: object
                 type: array
         '404':
