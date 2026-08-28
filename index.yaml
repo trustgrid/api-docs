@@ -4744,7 +4744,7 @@ paths:
               schema:
                 items:
                   additionalProperties: true
-                  description: Response fields are not yet documented by the backend.
+                  description: Response fields are returned as objects.
                   type: object
                 type: array
         '404':
