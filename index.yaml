@@ -4506,7 +4506,7 @@ paths:
       operationId: listOrders
       summary: Retrieve hardware provisioning orders
       description: |-
-        Returns one page of matching hardware provisioning orders. The response is not fully hydrated: compared with `GET /orders/{uid}`, list items omit `tgNotes` and `tgHyperlinks`. The `x-total-count` response header is the total number of orders matching the query, not the number in this page; page through the results when the header is greater than the page length.
+        Returns one page of matching hardware provisioning orders. The response is not fully hydrated compared with `GET /orders/{uid}`. The `x-total-count` response header is the total number of orders matching the query, not the number in this page; page through the results when the header is greater than the page length.
       parameters:
         - $ref: '#/components/parameters/orderAssignee'
         - $ref: '#/components/parameters/orderLabel'
@@ -4514,7 +4514,6 @@ paths:
         - $ref: '#/components/parameters/orderQuery'
         - $ref: '#/components/parameters/orderProjectID'
         - $ref: '#/components/parameters/orderPage'
-        - $ref: '#/components/parameters/orderOrg'
         - $ref: '#/components/parameters/orderPerPage'
         - $ref: '#/components/parameters/orderPriority'
         - $ref: '#/components/parameters/orderSort'
@@ -4666,23 +4665,6 @@ paths:
                 type: array
       tags:
         - Order
-  /provisioning/api/v1/orders/orgs:
-    get:
-      operationId: listOrderOrganizations
-      summary: List organizations with orders
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                items:
-                  additionalProperties: true
-                  description: Response fields are not yet documented by the backend.
-                  type: object
-                type: array
-      tags:
-        - Order
   /provisioning/api/v1/orders/labels:
     get:
       operationId: listOrderLabels
@@ -4721,50 +4703,6 @@ paths:
                 type: array
         '404':
           description: order not found
-      tags:
-        - Order
-  /provisioning/api/v1/orders.stream/{uid}:
-    parameters:
-      - in: path
-        name: uid
-        required: true
-        schema:
-          type: string
-    get:
-      operationId: streamOrderEvents
-      summary: Stream order events
-      description: WebSocket endpoint that streams changes to an order.
-      responses:
-        '200':
-          description: WebSocket connection for order event updates.
-        '404':
-          description: order not found
-      tags:
-        - Order
-  /provisioning/api/v1/config/assignees:
-    get:
-      operationId: listOrderAssignees
-      summary: List order assignees
-      description: Trustgrid-internal configuration endpoint; not intended for general customer use.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                items:
-                  type: string
-                type: array
-      tags:
-        - Order
-  /provisioning/api/v1/orders/webhook:
-    post:
-      operationId: receiveOrderWebhook
-      summary: Receive an order shipping webhook
-      description: Trustgrid-internal carrier callback; not intended for general customer use.
-      responses:
-        '200':
-          description: OK
       tags:
         - Order
   /provisioning/api/v1/orders/{uid}/clone:
@@ -4848,35 +4786,6 @@ paths:
                 type: string
         '404':
           description: order or attachment not found
-      tags:
-        - Order
-  /provisioning/api/v1/orders/{uid}/shipstation:
-    parameters:
-      - in: path
-        name: uid
-        required: true
-        schema:
-          type: string
-    post:
-      operationId: createOrderShipstationRecord
-      summary: Create an order ShipStation record
-      description: Trustgrid-internal shipping integration endpoint; not intended for general customer use.
-      responses:
-        '200':
-          description: OK
-        '404':
-          description: order not found
-      tags:
-        - Order
-    put:
-      operationId: updateOrderShipstationRecord
-      summary: Update an order ShipStation record
-      description: Trustgrid-internal shipping integration endpoint; not intended for general customer use.
-      responses:
-        '200':
-          description: OK
-        '404':
-          description: order not found
       tags:
         - Order
   /repositories:
@@ -10813,12 +10722,6 @@ components:
       name: page
       schema:
         type: integer
-    orderOrg:
-      description: Filter orders by organization ID.
-      in: query
-      name: org
-      schema:
-        type: string
     orderPerPage:
       description: Set the number of matching orders returned in a page.
       in: query
@@ -15056,16 +14959,6 @@ components:
           type: array
         summary:
           type: string
-        tgHyperlinks:
-          items:
-            type: object
-          readOnly: true
-          type: array
-        tgNotes:
-          items:
-            type: object
-          readOnly: true
-          type: array
         trackingNumber:
           readOnly: true
           type: string

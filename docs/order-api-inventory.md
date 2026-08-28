@@ -1,38 +1,14 @@
-# Order API inventory
+# Public Order API scope
 
-This note records the sources used to reconcile the Order section for issue #47. The implementation source is the `cloud` repository (janine), principally `internal/api/order.go`, `internal/data/order.go`, `internal/controllers/order.go`, and `cmd/server/main.go`. Those files were not available in this checkout, so facts that could not be confirmed from the live API are marked **UNVERIFIED** rather than inferred.
+The public OpenAPI contract retains the legitimate OrderModel fields and supported non-organization search parameters while intentionally omitting Trustgrid-internal Order surfaces.
 
-## Verified API facts
+## Deliberate public-doc omissions
 
-- `GET /provisioning/api/v1/orders` returns an array and sets lowercase `x-total-count` to the total matching the query, not the current page. Verified by live API probe.
-- The list form omits `tgNotes` and `tgHyperlinks` that are present on `GET /provisioning/api/v1/orders/{uid}`. Verified by live API probe.
-- `orgId` is a string and `createdAt` is an RFC3339 date-time string. Verified by live API probe.
-- `GET /provisioning/api/v1/orders/status-counts` returns an object mapping status strings to integer counts; `production ready` is a live status. Verified by live API probe.
-- `GET /provisioning/api/v1/orders/creators` and `/labels` return arrays of strings. `/orders/{uid}/history` and `/config/assignees` return arrays. Verified by live API probe.
-- All sibling routes use the `/provisioning/api/v1/` prefix, including `/config/assignees`. Verified by live API probe and route inventory.
+- Organization filtering (`orderOrg` / `org`) is not exposed as a public query parameter.
+- Internal detail fields `tgHyperlinks` and `tgNotes` are not part of the public `OrderModel` schema.
+- `/orders/orgs`, `orders.stream`, `/config/assignees`, the shipping webhook, and ShipStation endpoints are omitted because they are internal plumbing rather than customer-facing API.
+- `shipStationOrderId` remains on `OrderModel` because it is a legitimate OrderModel field even though the ShipStation management endpoints are private.
 
-## Query parameters
+The remaining Order endpoints and model fields were reconciled from the existing Order API inventory. `orgId` remains a string and `createdAt` remains an RFC3339 date-time. Server-managed fields are marked read-only because the request body reuses `OrderModel`.
 
-The 17 names are bound by `api.OrderSearch` in `internal/api/order.go` (the issue identifies the binding at approximately line 40): `assignee`, `label`, `creator`, `q`, `projectID`, `page`, `org`, `perPage`, `priority`, `sort`, `status`, `createdAfter`, `excludeStatus`, `createdBefore`, `transition-status`, `transition-from`, and `transition-to`. The OpenAPI types and RFC3339 date formats are documented, but default values and repeatability were not confirmed from janine in this checkout and are intentionally not asserted.
-
-## Schema decisions
-
-The 36 fields from the issue are present in `OrderModel`. `orgId` and `createdAt` use the observed wire types. Server-managed identifiers, timestamps, validation results, transitions, attachments, and shipping results are marked `readOnly` because the existing request body reuses the response schema. This avoids advertising server-managed fields as writable without introducing a second schema that can drift. The three stale fields `domain`, `nodeName`, and `routedNetworks` were removed because they were not present in the source-of-truth field list and no write acceptance evidence was available.
-
-Shapes that were not available from the source checkout are represented conservatively as arrays or objects and are candidates for a future janine-generated schema fragment. `custom` is explicitly free-form.
-
-## Sibling routes
-
-The following routes are represented in the spec as customer-facing or explicitly internal:
-
-- `GET /orders/status-counts`, `/creators`, `/orgs`, `/labels`: enumeration/read routes.
-- `GET /orders/{uid}/history`: order history.
-- `GET /orders.stream/{uid}`: WebSocket order-event stream.
-- `GET /config/assignees`: Trustgrid-internal configuration enumeration.
-- `POST /orders/webhook`: Trustgrid-internal carrier callback.
-- `POST /orders/{uid}/clone`: clone an order.
-- `POST /orders/{uid}/attachment`: multipart attachment upload.
-- `GET /orders/{uid}/attachment/{attachmentID}`: retrieve an order attachment.
-- `POST` and `PUT /orders/{uid}/shipstation`: Trustgrid-internal shipping integration.
-
-The webhook and ShipStation routes are documented with internal-use descriptions rather than presented as general customer integrations. The generation-path recommendation is to have janine emit an OpenAPI fragment during its build, then have api-docs consume it; until the service owns that fragment, this regression test is the guard against silent drift.
+The regression tests in `tests/orders.test.js` protect this public scope and the lowercase `x-total-count` pagination header. A future generation or diff step should live with the service that owns the Go model and routes, then publish a reviewed OpenAPI fragment; this repository cannot generate that fragment without the service source.
