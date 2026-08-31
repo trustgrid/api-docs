@@ -4597,7 +4597,7 @@ paths:
       summary: Modify the details and requirements of an existing provisioning order
       description: |-
         Updates an existing order. The request body accepts the same fields as
-        order creation, except fields that are immutable (creator, org, UID,
+        order creation, except fields that are immutable (creator, UID,
         comments).
 
         ---
