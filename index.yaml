@@ -265,8 +265,14 @@ paths:
   /audit/download/config:
     get:
       operationId: downloadConfigAudit
+      deprecated: true
       summary: Export configuration change audit logs as a downloadable file
-      description: Requires `audits::read:config` permission.
+      description: |-
+        This is deprecated; use `/v2/audit/changes/download` instead.
+
+        ---
+
+        Requires `audits::read:config` permission.
       parameters:
         - description: ID for the item to audit. If specified, must include itemType.
           in: query
@@ -318,8 +324,14 @@ paths:
   /audit/download/node:
     get:
       operationId: downloadNodeAudit
+      deprecated: true
       summary: Export node activity and operational audit logs as a downloadable file
-      description: Requires `audits::read:node` permission.
+      description: |-
+        This is deprecated; use `/v2/audit/node/download` instead.
+
+        ---
+
+        Requires `audits::read:node` permission.
       parameters:
         - description: Start time (unix timestamp) to query from
           in: query
@@ -339,8 +351,14 @@ paths:
   /audit/download/user:
     get:
       operationId: downloadUserAudit
+      deprecated: true
       summary: Export user authentication and access audit logs as a downloadable file
-      description: Requires `audits::read:user` permission.
+      description: |-
+        This is deprecated; use `/v2/audit/auth/download` instead.
+
+        ---
+
+        Requires `audits::read:user` permission.
       responses:
         '200':
           description: OK
@@ -349,8 +367,14 @@ paths:
   /audit/tail/config:
     get:
       operationId: tailConfigAudit
+      deprecated: true
       summary: Retrieve real-time configuration change audit logs with filtering options
-      description: Requires `audits::read:config` permission.
+      description: |-
+        This is deprecated; use `/v2/audit/changes` instead.
+
+        ---
+
+        Requires `audits::read:config` permission.
       parameters:
         - description: ID for the item to audit. If specified, must include itemType.
           in: query
@@ -674,8 +698,11 @@ paths:
   /audit/tail/node:
     get:
       operationId: tailNodeAudit
+      deprecated: true
       summary: Retrieve real-time node operational and security audit logs
       description: |-
+        This is deprecated; use `/v2/audit/node` instead.
+
         List node (appliance or agent) audits
 
         ---
@@ -728,8 +755,14 @@ paths:
   /audit/tail/user:
     get:
       operationId: tailUserAudit
+      deprecated: true
       summary: Retrieve real-time user authentication and session audit logs
-      description: Requires `audits::read:user` permission.
+      description: |-
+        This is deprecated; use `/v2/audit/auth` instead.
+
+        ---
+
+        Requires `audits::read:user` permission.
       responses:
         '200':
           description: OK
@@ -6187,6 +6220,541 @@ paths:
                       nullable: true
                   type: object
                 type: array
+      tags:
+        - Audit
+  /v2/audit/auth:
+    get:
+      operationId: listAuthAudits
+      summary: List authentication audit events
+      description: |-
+        Returns a paginated list of authentication audit events for the organization, such as portal logins and API key usage.
+
+        The `x-total-count` response header contains the total number of records matching the query.
+
+        ---
+
+        Requires `audits::read:user` permission.
+      parameters:
+        - description: Start time (ISO 8601) to query from
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: End time (ISO 8601) to query to
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Page number (1-based)
+          in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - description: Maximum number of results per page (max 200)
+          in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - description: Sort field and direction, e.g. `timestamp:desc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Free-text search query
+          in: query
+          name: q
+          schema:
+            type: string
+        - description: Filter by IP addresses
+          in: query
+          name: ips
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by user IDs
+          in: query
+          name: userIDs
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          headers:
+            x-total-count:
+              description: Total number of records matching the query
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuthAuditRecord'
+      tags:
+        - Audit
+  /v2/audit/auth/download:
+    get:
+      operationId: downloadAuthAudits
+      summary: Download authentication audit events as CSV
+      description: |-
+        Exports all authentication audit events matching the query as a CSV file.
+
+        ---
+
+        Requires `audits::read:user` permission.
+      parameters:
+        - description: Start time (ISO 8601) to query from
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: End time (ISO 8601) to query to
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Sort field and direction, e.g. `timestamp:desc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Free-text search query
+          in: query
+          name: q
+          schema:
+            type: string
+        - description: Filter by IP addresses
+          in: query
+          name: ips
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by user IDs
+          in: query
+          name: userIDs
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: CSV columns to include. When omitted, all columns are included.
+          in: query
+          name: fields
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+      tags:
+        - Audit
+  /v2/audit/change-config:
+    get:
+      operationId: getChangeAuditConfig
+      summary: Get configuration audit metadata
+      description: |-
+        Returns the available audit event types and item types used for filtering configuration change audits.
+
+        ---
+
+        Requires `audits::read:config` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeAuditConfig'
+      tags:
+        - Audit
+  /v2/audit/changes:
+    get:
+      operationId: listChangeAudits
+      summary: List configuration change audit events
+      description: |-
+        Returns a paginated list of configuration change audit events for the organization.
+
+        The `x-total-count` response header contains the total number of records matching the query.
+
+        ---
+
+        Requires `audits::read:config` permission.
+      parameters:
+        - description: Start time (ISO 8601) to query from
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: End time (ISO 8601) to query to
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Page number (1-based)
+          in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - description: Maximum number of results per page (max 10000)
+          in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 10000
+        - description: Sort field and direction, e.g. `timestamp:desc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Free-text search query
+          in: query
+          name: q
+          schema:
+            type: string
+        - description: Filter by audit event types (e.g. create, delete, change, action)
+          in: query
+          name: auditTypes
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by item types (e.g. Node, Cluster)
+          in: query
+          name: itemTypes
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by user names
+          in: query
+          name: userNames
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by item IDs
+          in: query
+          name: itemIDs
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by IP addresses
+          in: query
+          name: ips
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          headers:
+            x-total-count:
+              description: Total number of records matching the query
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChangeAuditRecord'
+      tags:
+        - Audit
+  /v2/audit/changes/download:
+    get:
+      operationId: downloadChangeAudits
+      summary: Download configuration change audit events as CSV
+      description: |-
+        Exports all configuration change audit events matching the query as a CSV file.
+
+        ---
+
+        Requires `audits::read:config` permission.
+      parameters:
+        - description: Start time (ISO 8601) to query from
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: End time (ISO 8601) to query to
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Sort field and direction, e.g. `timestamp:desc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Free-text search query
+          in: query
+          name: q
+          schema:
+            type: string
+        - description: Filter by audit event types (e.g. create, delete, change, action)
+          in: query
+          name: auditTypes
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by item types (e.g. Node, Cluster)
+          in: query
+          name: itemTypes
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by user names
+          in: query
+          name: userNames
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by item IDs
+          in: query
+          name: itemIDs
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by IP addresses
+          in: query
+          name: ips
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: CSV columns to include. When omitted, all columns are included.
+          in: query
+          name: fields
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+      tags:
+        - Audit
+  /v2/audit/node:
+    get:
+      operationId: listNodeAudits
+      summary: List node audit events
+      description: |-
+        Returns a paginated list of node audit events for the organization, such as connects, disconnects, and other node actions.
+
+        The `x-total-count` response header contains the total number of records matching the query.
+
+        ---
+
+        Requires `audits::read:node` permission.
+      parameters:
+        - description: Start time (ISO 8601) to query from
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: End time (ISO 8601) to query to
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Page number (1-based)
+          in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - description: Maximum number of results per page (max 200)
+          in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - description: Sort field and direction, e.g. `timestamp:desc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Free-text search query
+          in: query
+          name: q
+          schema:
+            type: string
+        - description: Filter by event categories
+          in: query
+          name: categories
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by node FQDNs
+          in: query
+          name: fqdns
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          headers:
+            x-total-count:
+              description: Total number of records matching the query
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NodeAuditRecord'
+      tags:
+        - Audit
+  /v2/audit/node-categories:
+    get:
+      operationId: getNodeAuditCategories
+      summary: Get node audit event categories
+      description: |-
+        Returns the list of available node audit event categories used for filtering.
+
+        ---
+
+        Requires `audits::read:node` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+      tags:
+        - Audit
+  /v2/audit/node/download:
+    get:
+      operationId: downloadNodeAudits
+      summary: Download node audit events as CSV
+      description: |-
+        Exports all node audit events matching the query as a CSV file.
+
+        ---
+
+        Requires `audits::read:node` permission.
+      parameters:
+        - description: Start time (ISO 8601) to query from
+          in: query
+          name: sTime
+          schema:
+            type: string
+        - description: End time (ISO 8601) to query to
+          in: query
+          name: eTime
+          schema:
+            type: string
+        - description: Sort field and direction, e.g. `timestamp:desc`
+          in: query
+          name: sort
+          schema:
+            type: string
+        - description: Free-text search query
+          in: query
+          name: q
+          schema:
+            type: string
+        - description: Filter by event categories
+          in: query
+          name: categories
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: Filter by node FQDNs
+          in: query
+          name: fqdns
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - description: CSV columns to include. When omitted, all columns are included.
+          in: query
+          name: fields
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
       tags:
         - Audit
   /v2/certificates:
@@ -12025,6 +12593,127 @@ components:
           example: 2DqxLdknjWxEkGt474d2Cstsa1O
           type: string
       title: Alert V2
+      type: object
+    AuthAuditRecord:
+      description: An authentication audit event
+      properties:
+        uid:
+          description: Unique identifier
+          type: string
+        org:
+          description: Organization ID
+          type: string
+        timestamp:
+          description: Timestamp of the event (ISO 8601)
+          example: '2024-10-21T17:35:26Z'
+          type: string
+        ip:
+          description: IP address of the client
+          example: 44.44.44.43
+          type: string
+        message:
+          description: Human-readable description of the authentication event
+          example: Portal login (Local Authentication)
+          type: string
+        userId:
+          description: User who performed the authentication
+          example: admin@example.com
+          type: string
+      type: object
+    ChangeAuditConfig:
+      description: Metadata for filtering configuration change audits
+      properties:
+        auditTypes:
+          description: Available audit event types
+          type: array
+          items:
+            type: string
+          example:
+            - change
+            - create
+            - delete
+            - action
+        itemTypes:
+          description: Available item types with display metadata
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              link:
+                description: URL path for the item type in the portal
+                type: string
+              displayName:
+                description: Human-readable display name
+                type: string
+      type: object
+    ChangeAuditRecord:
+      description: A configuration change audit event
+      properties:
+        uid:
+          description: Unique identifier
+          type: string
+        org:
+          description: Organization ID
+          type: string
+        timestamp:
+          description: Timestamp of the change (ISO 8601)
+          example: '2024-10-21T17:35:26Z'
+          type: string
+        ip:
+          description: IP address of the client that initiated the change
+          example: 44.44.44.43
+          type: string
+        userName:
+          description: User who initiated the change
+          example: admin@trustgrid.io
+          type: string
+        itemType:
+          description: Type of the item that was changed
+          example: Node
+          type: string
+        itemId:
+          description: Unique ID of the item that was changed
+          example: 19084f81-5668-41ee-adbe-295e4c65531a
+          type: string
+        auditType:
+          description: Type of change event
+          enum:
+            - change
+            - create
+            - delete
+            - action
+          type: string
+        message:
+          description: Human-readable description of the change
+          example: Node license created
+          type: string
+      type: object
+    NodeAuditRecord:
+      description: A node audit event
+      properties:
+        uid:
+          description: Unique identifier
+          type: string
+        org:
+          description: Organization ID
+          type: string
+        timestamp:
+          description: Timestamp of the event (ISO 8601)
+          example: '2024-10-21T17:35:26Z'
+          type: string
+        category:
+          description: Event category
+          example: Node Action
+          type: string
+        expires:
+          description: Unix epoch timestamp (seconds) when this audit record expires
+          type: integer
+        fqdn:
+          description: FQDN of the node
+          type: string
+        value:
+          description: Human-readable description of the action taken
+          type: string
       type: object
     BGPConfig:
       description: BGP plugin configuration stored in `config._bgp` on a node
