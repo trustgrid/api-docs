@@ -20,6 +20,9 @@ jobs:
         run: |
           go run github.com/getkin/kin-openapi/cmd/validate@latest --defaults -- index.yaml
 
+      - name: Validate GitHub Actions workflows
+        run: make actionlint
+
   redocly-lint:
     runs-on: ubuntu-22.04
     steps:
