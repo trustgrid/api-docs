@@ -1,0 +1,50 @@
+approval:
+  auto_approve: true
+  whole_repo: true
+  judgement:
+    - id: whole-repo
+      description: >-
+        The whole repository is in scope. Say outside only when the change
+        reaches beyond it - a credential, a production endpoint, or a
+        deployment it can trigger elsewhere.
+review:
+  prompts:
+    - id: spec-unit-tests
+      paths:
+        - tests/**
+      context: >-
+        These Node tests parse the local index.yaml file and assert the
+        documented API contract without contacting Trustgrid services.
+      instructions: |
+        Do not flag missing CORS or CSP controls in these spec-only tests: they
+        do not implement an HTTP server. Treat a credential-like value as a
+        disposable fixture only when the changed test clearly proves it is
+        nonfunctional. Continue to report real credentials, production
+        endpoints, security-contract regressions, or tests that weaken a
+        production expectation. Do not apply this exception to index.yaml or
+        other production API documentation.
+    - id: dependency-only-devcontainer
+      paths:
+        - .devcontainer/**
+      context: >-
+        This Node 22 devcontainer installs development dependencies and defines
+        no application server, forwarded port, or credential.
+      instructions: |
+        Do not report absent production CORS or CSP controls for this
+        dependency-install-only container. Report a newly added exposed service,
+        production endpoint, or real credential when there is concrete impact.
+tasks:
+  - id: test
+    name: Run API spec tests
+    description: Parse index.yaml and run the Node contract tests
+    type: script
+    script: make test
+  - id: lint
+    name: Lint OpenAPI spec
+    type: script
+    script: make lint
+  - id: validate
+    name: Validate OpenAPI spec
+    description: Check the OpenAPI document with kin-openapi
+    type: script
+    script: go run github.com/getkin/kin-openapi/cmd/validate@latest --defaults -- index.yaml
