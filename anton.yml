@@ -9,6 +9,23 @@ approval:
         deployment it can trigger elsewhere.
 review:
   prompts:
+    - id: api-spec-validation
+      paths:
+        - "**/*.yaml"
+        - "**/*.yml"
+      context: >-
+        The changed YAML contains an OpenAPI or Swagger API specification or
+        referenced API schema, such as index.yaml. This excludes application,
+        runtime, build, CI, and reviewer configuration.
+      instructions: |
+        Spec-only YAML changes should not get unit tests: do not request or add
+        unit tests solely for those changes, or flag their absence. Retain
+        applicable schema/spec validation and lint checks, including YAML
+        parsing, OpenAPI/Swagger validity, reference resolution, and API contract
+        compatibility. Keep existing repository validation and CI requirements.
+        This exemption does not cover runtime or generator implementation
+        changes, including those in the same PR; require appropriate tests for
+        those implementation changes.
     - id: spec-unit-tests
       paths:
         - tests/**
