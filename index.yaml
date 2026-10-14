@@ -11420,6 +11420,10 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OK'
         '403':
           description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
           content:
@@ -11603,6 +11607,10 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OK'
         '403':
           description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
           content:
@@ -11637,6 +11645,10 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OK'
         '403':
           description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
           content:
@@ -11671,6 +11683,10 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OK'
         '403':
           description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
           content:
@@ -17083,6 +17099,17 @@ components:
           type: string
           nullable: true
       title: UserModel
+      type: object
+    OK:
+      description: Acknowledgement sent by a successful mutation that has nothing else to return
+      properties:
+        ok:
+          description: Always true
+          example: true
+          type: boolean
+      required:
+        - ok
+      title: OK
       type: object
     ValidationFailed:
       description: ValidationFailed

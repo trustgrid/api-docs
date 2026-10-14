@@ -136,7 +136,7 @@ describe('Observability request bodies', () => {
     }
   });
 
-  it('enable, disable and delete document no body (backend returns { ok: true })', () => {
+  it('enable, disable and delete return the OK acknowledgement (backend sends { ok: true })', () => {
     for (const [path, verb] of [
       ['/v2/observability/pipelines/{uid}/enable', 'post'],
       ['/v2/observability/pipelines/{uid}/disable', 'post'],
@@ -145,8 +145,15 @@ describe('Observability request bodies', () => {
     ]) {
       const res = op(path, verb)?.responses?.['200'];
       assert.ok(res, `${verb} ${path} 200 should exist`);
-      assert.equal(res.content, undefined);
+      assert.equal(res.content?.['application/json']?.schema?.$ref, '#/components/schemas/OK');
     }
+  });
+
+  it('OK is { ok: boolean } with ok required', () => {
+    const schema = spec.components.schemas.OK;
+    assert.ok(schema, 'OK schema should exist');
+    assert.equal(schema.properties.ok.type, 'boolean');
+    assert.deepEqual(schema.required, ['ok']);
   });
 });
 
