@@ -118,6 +118,12 @@ tags:
   - name: ObservabilityCatalog
     description: |
       The observability attribute catalog lists the node attributes and organization tags a pipeline can attach to exported telemetry, with their default emitted names. Requires `observability::read` permission. Requires `observability` feature flag.
+  - name: ObservabilityActivity
+    description: |
+      [Observability activity](https://docs.trustgrid.io/docs/observability/) is the record of what happened to the organization's telemetry export: destination tests, delivery retries, rejections and drops reported by the Portal, the collector and Ray. Search groups activity into issues by fingerprint, and the category catalog lists the categories you can filter by. Retention, the default and maximum search window and page sizes are configurable and are returned in `limits`. Requires `observability::read` permission. Requires `observability` feature flag.
+  - name: ObservabilityOperatorActivity
+    description: |
+      Trustgrid operator view of [observability activity](https://docs.trustgrid.io/docs/observability/) that is not attributed to any organization (operator-only activity). These routes have no tenant scope and no feature flag check. Requires `trustgrid::portal:operator-activity:read` permission.
   - name: DNS
     description: |
       DNS configuration within virtual networks, including zone and record management for resolving names across the overlay network. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
@@ -190,8 +196,10 @@ x-tagGroups:
       - Certificate
       - Group
       - IDP
+      - ObservabilityActivity
       - ObservabilityCatalog
       - ObservabilityDestination
+      - ObservabilityOperatorActivity
       - ObservabilityPipeline
       - Org
       - Order
@@ -11234,6 +11242,325 @@ paths:
       tags:
         - ServiceUser
 
+  /v2/observability/activity/categories:
+    get:
+      operationId: listObservabilityActivityCategories
+      summary: List the activity categories you can filter activity search by
+      description: |-
+        Returns the current activity category catalog. Use an entry's `id` as a `categories` value in activity search, and show `label` and `description` to people. The catalog is configuration, not a fixed list; read it instead of hard-coding categories.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/ObservabilityActivityCategory'
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '503':
+          description: The category catalog is missing or invalid. Retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivityCatalogUnavailable'
+      tags:
+        - ObservabilityActivity
+  /v2/observability/activity/operator/categories:
+    get:
+      operationId: listObservabilityOperatorActivityCategories
+      summary: List the activity categories for operator activity search
+      description: |-
+        Returns the same activity category catalog as `listObservabilityActivityCategories`, for Trustgrid operators. There is no `observability` feature check on this route.
+
+        ---
+
+        Requires `trustgrid::portal:operator-activity:read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/ObservabilityActivityCategory'
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission. The body is plain text, `Permission denied`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '503':
+          description: The category catalog is missing or invalid. Retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivityCatalogUnavailable'
+      tags:
+        - ObservabilityOperatorActivity
+  /v2/observability/activity/operator/search:
+    get:
+      operationId: searchObservabilityOperatorActivity
+      summary: Search operator-only observability activity that is not attributed to an organization
+      description: |-
+        Searches operator-only activity: activity that is not attributed to any organization. Results are not scoped to a tenant and never include tenant activity. Every returned issue has `operatorOnly: true`. Parameters, paging, fingerprint history and the response are the same as `searchObservabilityActivity`. There is no `observability` feature check on this route. `sort=destination` and `sort=pipeline` order by uid, because there is no organization to look up names in.
+
+        ---
+
+        Requires `trustgrid::portal:operator-activity:read` permission.
+      parameters:
+        - $ref: '#/components/parameters/ObservabilityActivitySources'
+        - $ref: '#/components/parameters/ObservabilityActivitySource'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverities'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverity'
+        - $ref: '#/components/parameters/ObservabilityActivitySignals'
+        - $ref: '#/components/parameters/ObservabilityActivitySignal'
+        - $ref: '#/components/parameters/ObservabilityActivityCategories'
+        - $ref: '#/components/parameters/ObservabilityActivityCategory'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationID'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineID'
+        - $ref: '#/components/parameters/ObservabilityActivityComponents'
+        - $ref: '#/components/parameters/ObservabilityActivityComponent'
+        - $ref: '#/components/parameters/ObservabilityActivityText'
+        - $ref: '#/components/parameters/ObservabilityActivityStart'
+        - $ref: '#/components/parameters/ObservabilityActivityEnd'
+        - $ref: '#/components/parameters/ObservabilityActivityPageSize'
+        - $ref: '#/components/parameters/ObservabilityActivityCursor'
+        - $ref: '#/components/parameters/ObservabilityActivityFingerprint'
+        - $ref: '#/components/parameters/ObservabilityActivitySort'
+        - $ref: '#/components/parameters/ObservabilityActivityOrder'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivitySearchResponse'
+        '400':
+          description: A query parameter is invalid, or the activity store rejected the request (for example the window is too long or the cursor does not match). `error` lists the problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivityError'
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission. The body is plain text, `Permission denied`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: The activity store is unavailable, timed out or returned an invalid response. Retry the same request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivityInternalError'
+      tags:
+        - ObservabilityOperatorActivity
+  /v2/observability/activity/search:
+    get:
+      operationId: searchObservabilityActivity
+      summary: Search the organization's observability activity, grouped into issues
+      description: |-
+        Searches telemetry export activity for the caller's organization. The organization comes from authentication; there is no organization parameter. Matching activity is grouped into issues by `fingerprint`, and each page is ordered by `sort` and `order`.
+
+        **Filters.** `sources`, `severities`, `signals`, `categories`, `destinationIDs`, `pipelineIDs` and `components` can be repeated. Values of one parameter are combined with OR; different parameters are combined with AND. For example, `GET /v2/observability/activity/search?signals=logs&signals=metrics&severities=error` returns errors for logs or metrics. Each has a single-value alias (`source`, `severity`, `signal`, `category`, `destinationID`, `pipelineID`, `component`). Sending the alias and the repeatable parameter together, such as `signal=logs&signals=metrics`, is rejected with 400 `Use either signal or signals, not both`. `text` searches only the safe activity message.
+
+        **Paging.** When `hasMore` is true, request the next page with `cursor` set to `nextCursor`, for example `GET /v2/observability/activity/search?severities=error&cursor=eyJ2IjoxfQ`. Keep the same filters, `sort` and `order`. Pages are computed per request, so an issue that changes (for example a new occurrence) can move between pages.
+
+        **History.** To see the detail and history of one issue, send its `fingerprint` with a window, for example `GET /v2/observability/activity/search?fingerprint=sha256:3f5a…&start=2026-11-16T00:00:00Z&end=2026-11-17T00:00:00Z`. The response has that issue with `buckets` and `bucketSeconds`. Do not send the list cursor.
+
+        **Limits.** Retention, the default window, the maximum window and page sizes are configurable. `limits` in the response reports the values in effect; do not assume a fixed retention period.
+
+        **Reading results.**
+        - Activity is recorded and indexed asynchronously. New activity, including a destination test reported as `recorded`, can take time to appear.
+        - `incomplete: true` means the search timed out or could not read everything; the page can be missing issues.
+        - `matchingDocuments` counts the documents behind the returned page, not a global total.
+        - Activity keeps the uids of destinations and pipelines that were later deleted.
+        - An empty result, or no newer errors, does not prove that a destination or pipeline has recovered. `outcome` describes the recorded activity, not current health.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/ObservabilityActivitySources'
+        - $ref: '#/components/parameters/ObservabilityActivitySource'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverities'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverity'
+        - $ref: '#/components/parameters/ObservabilityActivitySignals'
+        - $ref: '#/components/parameters/ObservabilityActivitySignal'
+        - $ref: '#/components/parameters/ObservabilityActivityCategories'
+        - $ref: '#/components/parameters/ObservabilityActivityCategory'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationID'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineID'
+        - $ref: '#/components/parameters/ObservabilityActivityComponents'
+        - $ref: '#/components/parameters/ObservabilityActivityComponent'
+        - $ref: '#/components/parameters/ObservabilityActivityText'
+        - $ref: '#/components/parameters/ObservabilityActivityStart'
+        - $ref: '#/components/parameters/ObservabilityActivityEnd'
+        - $ref: '#/components/parameters/ObservabilityActivityPageSize'
+        - $ref: '#/components/parameters/ObservabilityActivityCursor'
+        - $ref: '#/components/parameters/ObservabilityActivityFingerprint'
+        - $ref: '#/components/parameters/ObservabilityActivitySort'
+        - $ref: '#/components/parameters/ObservabilityActivityOrder'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivitySearchResponse'
+              examples:
+                multiValueSearchPage:
+                  summary: First page of signals=logs&signals=metrics&severities=error, with more pages
+                  value:
+                    limits:
+                      retentionDays: 7
+                      defaultWindowSeconds: 3600
+                      maxWindowDays: 7
+                      defaultPageSize: 50
+                      maxPageSize: 100
+                    windowStart: '2026-11-17T09:00:00Z'
+                    windowEnd: '2026-11-17T10:00:00Z'
+                    issues:
+                      - fingerprint: sha256:3f5a0c9e7b1d2468ace0135792468ace0135792468ace0135792468ace013579
+                        outcome: rejected
+                        source: collector
+                        component: destination
+                        objectID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        signal: logs
+                        severity: error
+                        category: export
+                        reasonCode: exporter_rejected
+                        message: Exporter rejected
+                        destinationID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        pipelineID: 7d1f0c52-3a8e-4b8a-9c11-2e5f4a6b7c8d
+                        firstSeen: '2026-11-17T09:05:00Z'
+                        lastSeen: '2026-11-17T09:55:00Z'
+                        documentCount: 4
+                        observedCount: 37
+                        buckets: []
+                    matchingDocuments: 4
+                    documentCountIsLowerBound: true
+                    hasMore: true
+                    nextCursor: eyJ2IjoxfQ
+                    incomplete: false
+                fingerprintHistory:
+                  summary: History of one issue (fingerprint with start and end)
+                  value:
+                    limits:
+                      retentionDays: 7
+                      defaultWindowSeconds: 3600
+                      maxWindowDays: 7
+                      defaultPageSize: 50
+                      maxPageSize: 100
+                    windowStart: '2026-11-17T09:00:00Z'
+                    windowEnd: '2026-11-17T10:00:00Z'
+                    bucketSeconds: 300
+                    issues:
+                      - fingerprint: sha256:3f5a0c9e7b1d2468ace0135792468ace0135792468ace0135792468ace013579
+                        outcome: rejected
+                        source: collector
+                        component: destination
+                        objectID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        signal: logs
+                        severity: error
+                        category: export
+                        reasonCode: exporter_rejected
+                        message: Exporter rejected
+                        destinationID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        pipelineID: 7d1f0c52-3a8e-4b8a-9c11-2e5f4a6b7c8d
+                        firstSeen: '2026-11-17T09:05:00Z'
+                        lastSeen: '2026-11-17T09:55:00Z'
+                        documentCount: 4
+                        observedCount: 37
+                        buckets:
+                          - bucketStart: '2026-11-17T09:05:00Z'
+                            firstSeen: '2026-11-17T09:05:12Z'
+                            lastSeen: '2026-11-17T09:09:41Z'
+                            documentCount: 1
+                            observedCount: 12
+                          - bucketStart: '2026-11-17T09:55:00Z'
+                            firstSeen: '2026-11-17T09:55:03Z'
+                            lastSeen: '2026-11-17T09:55:58Z'
+                            documentCount: 3
+                            observedCount: 25
+                    matchingDocuments: 4
+                    documentCountIsLowerBound: true
+                    hasMore: false
+                    incomplete: false
+        '400':
+          description: A query parameter is invalid, or the activity store rejected the request (for example the window is too long or the cursor does not match). `error` lists the problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivityError'
+              examples:
+                singularAndPlural:
+                  summary: signal and signals sent together
+                  value:
+                    error:
+                      - Use either signal or signals, not both
+                badFingerprint:
+                  summary: fingerprint does not match ^sha256:[0-9a-f]{64}$
+                  value:
+                    error:
+                      - Invalid activity fingerprint
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: The activity store is unavailable, timed out or returned an invalid response. Retry the same request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivityInternalError'
+      tags:
+        - ObservabilityActivity
   /v2/observability/destinations:
     get:
       operationId: listObservabilityDestinations
@@ -11790,6 +12117,269 @@ components:
       required: true
       schema:
         type: string
+    ObservabilityActivitySources:
+      description: |-
+        Only return activity reported by these sources. Repeat the parameter for more than one value (`sources=portal&sources=ray`); a value matches if it equals any of them. Up to 100 values. Cannot be combined with `source`.
+
+        - `portal`: the Trustgrid Portal (for example destination tests)
+        - `collector`: the telemetry collector that exports to destinations
+        - `ray`: Trustgrid's telemetry processing service
+      in: query
+      name: sources
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/components/schemas/ObservabilityActivitySource'
+      example:
+        - collector
+        - ray
+    ObservabilityActivitySource:
+      description: Single-value alias of `sources`. Cannot be combined with `sources` and cannot be repeated.
+      in: query
+      name: source
+      required: false
+      schema:
+        $ref: '#/components/schemas/ObservabilityActivitySource'
+    ObservabilityActivitySeverities:
+      description: |-
+        Only return activity with one of these severities. Repeat the parameter for more than one value (`severities=warn&severities=error`). Up to 100 values. Cannot be combined with `severity`.
+      in: query
+      name: severities
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/components/schemas/ObservabilityActivitySeverity'
+      example:
+        - warn
+        - error
+    ObservabilityActivitySeverity:
+      description: Single-value alias of `severities`. Cannot be combined with `severities` and cannot be repeated.
+      in: query
+      name: severity
+      required: false
+      schema:
+        $ref: '#/components/schemas/ObservabilityActivitySeverity'
+    ObservabilityActivitySignals:
+      description: |-
+        Only return activity for one of these telemetry signals. Repeat the parameter for both (`signals=logs&signals=metrics`). Cannot be combined with `signal`.
+
+        - `metrics`: metrics export
+        - `logs`: logs & events export
+      in: query
+      name: signals
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/components/schemas/ObservabilityActivitySignal'
+      example:
+        - logs
+        - metrics
+    ObservabilityActivitySignal:
+      description: Single-value alias of `signals`. Cannot be combined with `signals` and cannot be repeated.
+      in: query
+      name: signal
+      required: false
+      schema:
+        $ref: '#/components/schemas/ObservabilityActivitySignal'
+    ObservabilityActivityCategories:
+      description: |-
+        Only return activity in one of these categories. Use the `id` values returned by the activity category catalog; the catalog can change, so do not hard-code a list. The Portal does not check the values against the catalog. Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `category`.
+      in: query
+      name: categories
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ObservabilityActivityCategory:
+      description: Single-value alias of `categories`. Cannot be combined with `categories` and cannot be repeated.
+      in: query
+      name: category
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+    ObservabilityActivityDestinationIDs:
+      description: |-
+        Only return activity for one of these destination uids. Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `destinationID`. Activity keeps the uid of a destination that was later deleted, so you can still filter by it.
+      in: query
+      name: destinationIDs
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+      example:
+        - 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+    ObservabilityActivityDestinationID:
+      description: Single-value alias of `destinationIDs`. Cannot be combined with `destinationIDs` and cannot be repeated.
+      in: query
+      name: destinationID
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+    ObservabilityActivityPipelineIDs:
+      description: |-
+        Only return activity for one of these pipeline uids. Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `pipelineID`. Activity keeps the uid of a pipeline that was later deleted, so you can still filter by it.
+      in: query
+      name: pipelineIDs
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+      example:
+        - 7d1f0c52-3a8e-4b8a-9c11-2e5f4a6b7c8d
+    ObservabilityActivityPipelineID:
+      description: Single-value alias of `pipelineIDs`. Cannot be combined with `pipelineIDs` and cannot be repeated.
+      in: query
+      name: pipelineID
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+    ObservabilityActivityComponents:
+      description: |-
+        Only return activity from one of these reporting components (the `component` field of an issue). Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `component`.
+      in: query
+      name: components
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ObservabilityActivityComponent:
+      description: Single-value alias of `components`. Cannot be combined with `components` and cannot be repeated.
+      in: query
+      name: component
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+    ObservabilityActivityText:
+      description: Search the safe activity `message` text. This does not search destination or pipeline names; use `destinationIDs` or `pipelineIDs` for that. At most 256 characters.
+      in: query
+      name: text
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+      example: timeout
+    ObservabilityActivityStart:
+      description: |-
+        Start of the search window, as an RFC3339 timestamp with a time zone (`Z` or `±hh:mm`), for example `2026-11-16T00:00:00Z`. Must not be later than `end`. When omitted, `start` is `end` minus `limits.defaultWindowSeconds`. A window longer than `limits.maxWindowDays` is rejected with 400, not shortened. Activity older than `limits.retentionDays` is no longer stored. The window that was searched is returned in `windowStart` and `windowEnd`.
+      in: query
+      name: start
+      required: false
+      schema:
+        type: string
+        format: date-time
+      example: '2026-11-16T00:00:00Z'
+    ObservabilityActivityEnd:
+      description: End of the search window, as an RFC3339 timestamp with a time zone (`Z` or `±hh:mm`). Must not be earlier than `start`. When omitted, the current time is used.
+      in: query
+      name: end
+      required: false
+      schema:
+        type: string
+        format: date-time
+      example: '2026-11-17T00:00:00Z'
+    ObservabilityActivityPageSize:
+      description: Number of issues per page. Must be a positive integer. When omitted, `limits.defaultPageSize` applies. A value above `limits.maxPageSize` is rejected with 400. A page can hold fewer issues than requested, for example when the response would be too large; use `hasMore`, not the page length, to decide whether to fetch another page.
+      in: query
+      name: pageSize
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      example: 50
+    ObservabilityActivityCursor:
+      description: Opaque cursor from `nextCursor` of the previous page. The cursor keeps the window of the first page. Send the same filters, `sort` and `order` as the request that returned it; you can leave out `start` and `end` or repeat the returned `windowStart` and `windowEnd`. A cursor that does not match the request is rejected with 400. Do not send a cursor with `fingerprint`. At most 4096 characters.
+      in: query
+      name: cursor
+      required: false
+      schema:
+        type: string
+        maxLength: 4096
+    ObservabilityActivityFingerprint:
+      description: |-
+        Return the detail and history of one issue, identified by its `fingerprint`. Combine it with `start` and `end` to choose the period (for example the `windowStart` and `windowEnd` of the list response). Only a fingerprint request returns `buckets` and `bucketSeconds`; they show when the issue occurred inside that window. There is no separate history endpoint.
+      in: query
+      name: fingerprint
+      required: false
+      schema:
+        type: string
+        pattern: '^sha256:[0-9a-f]{64}$'
+      example: sha256:3f5a0c9e7b1d2468ace0135792468ace0135792468ace0135792468ace013579
+    ObservabilityActivitySort:
+      description: |-
+        Sort field for issues. Default `lastSeen`. Issues with no value for the field (for example no destination) come last. Ties are broken by newest first.
+
+        - `lastSeen`: most recent occurrence
+        - `activity`: activity message
+        - `destination`: destination, by name where the Portal knows it, otherwise by uid
+        - `pipeline`: pipeline, by name where the Portal knows it, otherwise by uid
+        - `signal`: telemetry signal
+        - `category`: category, by catalog label where known
+        - `severity`: severity rank, `info` < `warn` < `error`
+        - `outcome`: outcome rank, `succeeded` < `unknown` < `retrying` < `dropped` < `rejected` < `error`
+      in: query
+      name: sort
+      required: false
+      schema:
+        type: string
+        enum:
+          - lastSeen
+          - activity
+          - destination
+          - pipeline
+          - signal
+          - category
+          - severity
+          - outcome
+    ObservabilityActivityOrder:
+      description: Sort direction. `asc` is ascending, `desc` is descending. Default `desc` for `sort=lastSeen` (newest first) and `asc` for the other sort fields.
+      in: query
+      name: order
+      required: false
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
   requestBodies:
     VpnDnsUpdateModel:
       content:
@@ -17541,6 +18131,317 @@ components:
         orgId:
           description: Organization ID
           type: string
+    ObservabilityActivitySource:
+      description: |-
+        The service that reported the activity.
+
+        - `portal`: the Trustgrid Portal (for example destination tests)
+        - `collector`: the telemetry collector that exports to destinations
+        - `ray`: Trustgrid's telemetry processing service
+      enum:
+        - portal
+        - collector
+        - ray
+      type: string
+    ObservabilityActivitySeverity:
+      description: |-
+        Severity of the activity.
+
+        - `info`: informational
+        - `warn`: a problem that may resolve itself, such as retries
+        - `error`: a failure
+      enum:
+        - info
+        - warn
+        - error
+      type: string
+    ObservabilityActivitySignal:
+      description: |-
+        Telemetry signal filter value.
+
+        - `metrics`: metrics export
+        - `logs`: logs & events export
+      enum:
+        - metrics
+        - logs
+      type: string
+    ObservabilityActivityOutcome:
+      description: |-
+        What happened to the telemetry in the recorded activity. It describes the recorded event, not current health or later recovery.
+
+        - `succeeded`: a destination test succeeded
+        - `retrying`: delivery failed and is being retried
+        - `rejected`: the destination rejected the telemetry
+        - `dropped`: the telemetry was dropped
+        - `error`: an export error, or a failed destination test
+        - `unknown`: the activity has no recognised outcome; show it as is
+      enum:
+        - retrying
+        - rejected
+        - dropped
+        - succeeded
+        - error
+        - unknown
+      type: string
+    ObservabilityActivityCategory:
+      description: An activity category catalog entry
+      properties:
+        id:
+          description: Category id. Use it as a `categories` value in activity search.
+          pattern: '^[a-z][a-z0-9_]{0,63}$'
+          type: string
+          example: export
+        label:
+          description: Display name, at most 128 bytes
+          maxLength: 128
+          minLength: 1
+          type: string
+        description:
+          description: Explanation of the category, at most 512 bytes
+          maxLength: 512
+          minLength: 1
+          type: string
+        sources:
+          description: Sources that report activity in this category
+          items:
+            $ref: '#/components/schemas/ObservabilityActivitySource'
+          maxItems: 3
+          minItems: 1
+          type: array
+          uniqueItems: true
+      required:
+        - id
+        - label
+        - description
+        - sources
+      title: ObservabilityActivityCategory
+      type: object
+    ObservabilityActivityBucket:
+      description: Activity of one issue inside one time bucket of `bucketSeconds`
+      properties:
+        bucketStart:
+          description: Start of the bucket, aligned to `bucketSeconds` in UTC
+          format: date-time
+          type: string
+        firstSeen:
+          description: First occurrence in the bucket
+          format: date-time
+          type: string
+        lastSeen:
+          description: Last occurrence in the bucket
+          format: date-time
+          type: string
+        documentCount:
+          description: Stored activity documents in the bucket
+          minimum: 0
+          type: integer
+        observedCount:
+          description: Occurrences reported by those documents
+          minimum: 0
+          type: integer
+      required:
+        - bucketStart
+        - firstSeen
+        - lastSeen
+        - documentCount
+        - observedCount
+      title: ObservabilityActivityBucket
+      type: object
+    ObservabilityActivityIssue:
+      description: Activity grouped by fingerprint. Each stored document summarizes the occurrences one reporter saw in one time bucket.
+      properties:
+        fingerprint:
+          description: Stable id of the issue. Send it as `fingerprint` to get its detail and history.
+          pattern: '^sha256:[0-9a-f]{64}$'
+          type: string
+        operatorOnly:
+          description: Present and `true` on operator activity search results. Not set on tenant results.
+          type: boolean
+        orgID:
+          description: Organization of the activity. Can be present on tenant results, where it is always the caller's organization. Never present on operator results.
+          type: string
+        outcome:
+          $ref: '#/components/schemas/ObservabilityActivityOutcome'
+        source:
+          $ref: '#/components/schemas/ObservabilityActivitySource'
+        component:
+          description: Part of the source that reported the activity. Filter with `components`.
+          type: string
+          example: destination
+        objectType:
+          description: Type of the object the activity is about, when known
+          type: string
+        objectID:
+          description: Id of the object the activity is about, when known
+          type: string
+        signal:
+          description: Telemetry signal of the activity, usually `metrics` or `logs`
+          type: string
+        severity:
+          $ref: '#/components/schemas/ObservabilityActivitySeverity'
+        category:
+          description: Category id from the activity category catalog
+          type: string
+        reasonCode:
+          description: Machine-readable reason. Safe to show; it contains no secrets or telemetry payload.
+          type: string
+          example: exporter_retrying
+        message:
+          description: Human-readable message. Safe to show; it contains no secrets or telemetry payload.
+          type: string
+        destinationID:
+          description: Uid of the destination, when the activity concerns one. The destination can since have been deleted.
+          type: string
+        pipelineID:
+          description: Uid of the pipeline, when the activity concerns one. The pipeline can since have been deleted.
+          type: string
+        firstSeen:
+          description: First occurrence in the window
+          format: date-time
+          type: string
+        lastSeen:
+          description: Last occurrence in the window
+          format: date-time
+          type: string
+        documentCount:
+          description: Number of stored activity documents grouped into this issue. One document can summarize many occurrences.
+          minimum: 0
+          type: integer
+        observedCount:
+          description: Total occurrences reported by those documents. Compare with `documentCount`, which counts documents, not occurrences.
+          minimum: 0
+          type: integer
+        buckets:
+          description: Per-bucket history. Empty in list results; filled only when the request sets `fingerprint`.
+          items:
+            $ref: '#/components/schemas/ObservabilityActivityBucket'
+          type: array
+      required:
+        - fingerprint
+        - outcome
+        - source
+        - component
+        - signal
+        - severity
+        - category
+        - reasonCode
+        - message
+        - firstSeen
+        - lastSeen
+        - documentCount
+        - observedCount
+        - buckets
+      title: ObservabilityActivityIssue
+      type: object
+    ObservabilityActivityLimits:
+      description: Configured activity search limits in effect. Operators can change them; read them from each response instead of assuming fixed values.
+      properties:
+        retentionDays:
+          description: Days of activity that are kept
+          minimum: 1
+          type: integer
+        defaultWindowSeconds:
+          description: Window length used when `start` is omitted
+          minimum: 1
+          type: integer
+        maxWindowDays:
+          description: Longest allowed search window. Never more than `retentionDays`.
+          minimum: 1
+          type: integer
+        defaultPageSize:
+          description: Page size used when `pageSize` is omitted
+          minimum: 1
+          type: integer
+        maxPageSize:
+          description: Largest allowed `pageSize`
+          minimum: 1
+          type: integer
+      required:
+        - retentionDays
+        - defaultWindowSeconds
+        - maxWindowDays
+        - defaultPageSize
+        - maxPageSize
+      title: ObservabilityActivityLimits
+      type: object
+    ObservabilityActivitySearchResponse:
+      description: One page of activity issues
+      properties:
+        limits:
+          $ref: '#/components/schemas/ObservabilityActivityLimits'
+        windowStart:
+          description: Start of the window that was searched
+          format: date-time
+          type: string
+        windowEnd:
+          description: End of the window that was searched
+          format: date-time
+          type: string
+        issues:
+          description: Issues on this page, in `sort` and `order` order
+          items:
+            $ref: '#/components/schemas/ObservabilityActivityIssue'
+          type: array
+        matchingDocuments:
+          description: Stored documents behind the issues on this page. This is not a total for the whole search.
+          minimum: 0
+          type: integer
+        documentCountIsLowerBound:
+          description: When `true`, `matchingDocuments` is a lower bound, not an exact count. This alone does not mean results are missing.
+          type: boolean
+        hasMore:
+          description: '`true` when more issues follow. Then `nextCursor` is set.'
+          type: boolean
+        nextCursor:
+          description: Opaque cursor for the next page. Present when `hasMore` is `true`.
+          type: string
+        incomplete:
+          description: '`true` when the search timed out or could not read all stored activity, or too many issues matched to order them all. The page can be missing issues; narrow the filters or window and retry.'
+          type: boolean
+        bucketSeconds:
+          description: Width of each `buckets` entry in seconds. Set on fingerprint requests.
+          minimum: 1
+          type: integer
+      required:
+        - issues
+        - matchingDocuments
+        - documentCountIsLowerBound
+        - hasMore
+        - incomplete
+      title: ObservabilityActivitySearchResponse
+      type: object
+    ObservabilityActivityError:
+      description: Request rejected. `error` lists the problems.
+      properties:
+        error:
+          description: Error messages, for example `Use either signal or signals, not both`
+          items:
+            type: string
+          type: array
+      required:
+        - error
+      title: ObservabilityActivityError
+      type: object
+    ObservabilityActivityInternalError:
+      description: Unexpected server error. `error` is a single string.
+      properties:
+        error:
+          description: Always `Internal server error`
+          type: string
+      required:
+        - error
+      title: ObservabilityActivityInternalError
+      type: object
+    ObservabilityActivityCatalogUnavailable:
+      description: The activity category catalog cannot be read. Unlike other observability errors, the text is in `message`.
+      properties:
+        message:
+          description: Always `Activity category catalog is unavailable`
+          type: string
+      required:
+        - message
+      title: ObservabilityActivityCatalogUnavailable
+      type: object
     ObservabilitySignal:
       description: A telemetry signal. `logs` covers logs & events (node events, config changes and audits).
       enum:
