@@ -11641,6 +11641,174 @@ paths:
                   - Splunk token is required
       tags:
         - ObservabilityDestination
+  /v2/observability/destinations/test:
+    post:
+      operationId: testObservabilityDestinationDraft
+      summary: Send test data with unsaved destination settings
+      description: |-
+        Sends one synthetic record for each requested signal to the destination described in the body, and returns one result per signal. Nothing is saved. Use it to check settings before you create or update a destination.
+
+        The body is a destination, with the same fields as `createObservabilityDestination`, plus an optional `signals` list. It is validated with the same field rules as a create or update, and 422 lists every broken rule. The name does not have to be unique.
+        - Without `uid`, every secret the destination needs must be sent with its real value.
+        - With `uid`, the saved destination with that uid must exist, or the response is 404. A secret sent as `""` or left out reuses the saved value, under the same rules as `updateObservabilityDestination`: a change to the endpoint origin (scheme, host or port) requires re-entering every secret, and a change to `tls.certPem` requires re-entering `tls.keyPem`.
+
+        `signals` is optional. When it is left out or `null`, every signal in `accepts` is tested. Results are in the order of `accepts`.
+
+        The test is sent the same way as `testObservabilityDestination`: one OTLP log record or OTLP metric named `trustgrid.test` (a HEC event or metric for Splunk), only to `https://` endpoints that resolve to public addresses, without following redirects, within a budget of about 24 seconds. A refused endpoint is not an HTTP error; the result has `ok: false` and a `message` that starts with `The portal will not send to this endpoint:`. Secrets are never returned.
+
+        A destination-test activity is recorded only when the body names the `uid` of a saved destination. The activity is attributed to that saved destination, even though the draft settings were tested. Without `uid`, `activityStatus` is always `unavailable`.
+
+        Tests are limited per organization; see the 429 response.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservabilityDestinationTestDraft'
+            examples:
+              newDestination:
+                summary: Test a destination that is not saved yet
+                description: There is no `uid`, so the bearer token and header value must be sent with their real values.
+                value:
+                  name: OTLP Collector
+                  type: http
+                  accepts:
+                    - metrics
+                    - logs
+                  endpoint: https://otel.example.com:4318
+                  auth:
+                    type: bearer
+                    token: example-bearer-token
+                  headers:
+                    X-Scope-OrgID: tenant-a
+                  encoding: proto
+                  compression: gzip
+                  timeoutSeconds: 10
+              editedDestination:
+                summary: Test edits to a saved destination with its stored secrets
+                description: The `uid` names a saved destination. The bearer token and header value are sent as `""`, so the stored values are used. The endpoint origin is unchanged, so no secret has to be re-entered. Only `logs` is tested.
+                value:
+                  uid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                  name: OTLP Collector
+                  type: http
+                  accepts:
+                    - metrics
+                    - logs
+                  endpoint: https://otel.example.com:4318/otlp
+                  auth:
+                    type: bearer
+                    token: ''
+                  headers:
+                    X-Scope-OrgID: ''
+                  encoding: json
+                  compression: gzip
+                  timeoutSeconds: 10
+                  signals:
+                    - logs
+              blockedEndpoint:
+                summary: A draft whose endpoint is a private IP address
+                value:
+                  name: Internal Splunk
+                  type: splunk
+                  accepts:
+                    - logs
+                  endpoint: https://10.0.0.5:8088/services/collector
+                  splunk:
+                    token: example-hec-token
+                    logs:
+                      index: trustgrid_logs
+      responses:
+        '200':
+          description: OK. One result per tested signal. A failed test is still a 200; check `ok` in each result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityDestinationTestResponse'
+              examples:
+                accepted:
+                  summary: A draft without uid was accepted; no activity is recorded
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: true
+                        status: 200
+                        durationMs: 431
+                        message: The destination accepted the test metric (HTTP 200).
+                        activityStatus: unavailable
+                      - signal: logs
+                        ok: true
+                        status: 200
+                        durationMs: 402
+                        message: The destination accepted the test log record (HTTP 200).
+                        activityStatus: unavailable
+                editedRecorded:
+                  summary: A draft with uid; the activity is recorded for the saved destination
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        status: 404
+                        durationMs: 377
+                        message: The destination returned HTTP 404 for /otlp/v1/logs. Enter the base URL; /v1/logs and /v1/metrics are appended automatically.
+                        response: 404 page not found
+                        activityStatus: recorded
+                blockedAddress:
+                  summary: The endpoint is a private IP address
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        durationMs: 1
+                        message: 'The portal will not send to this endpoint: endpoint IP address 10.0.0.5 is not allowed.'
+                        activityStatus: unavailable
+                blockedHostname:
+                  summary: The endpoint hostname resolves to a private address
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        durationMs: 23
+                        message: 'The portal will not send to this endpoint: endpoint resolves to a private, loopback, link-local or reserved address.'
+                        activityStatus: unavailable
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
+        '422':
+          description: Validation failed; `error` lists every broken rule in the destination, for example a missing body, an endpoint that is not an `https://` URL, a missing secret or a secret that must be re-entered. When the destination is valid, `signals` is checked next.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              examples:
+                invalidDraft:
+                  summary: The draft destination is invalid
+                  value:
+                    error:
+                      - endpoint must be an https:// URL
+                      - Splunk token is required
+                reEnter:
+                  summary: The endpoint moved, so the stored secrets cannot be reused
+                  value:
+                    error:
+                      - bearer token must be re-entered when the endpoint changes
+                notAccepted:
+                  summary: The draft does not accept a requested signal
+                  value:
+                    error:
+                      - destination does not accept metrics
+        '429':
+          $ref: '#/components/responses/ObservabilityTestTooManyRequests'
+        '503':
+          $ref: '#/components/responses/ObservabilityTestUnavailable'
+      tags:
+        - ObservabilityDestination
   /v2/observability/destinations/{uid}:
     get:
       operationId: getObservabilityDestination
@@ -11830,6 +11998,143 @@ paths:
                       - destination was changed by another request; reload and try again
       tags:
         - ObservabilityDestination
+  /v2/observability/destinations/{uid}/test:
+    post:
+      operationId: testObservabilityDestination
+      summary: Send test data to a saved telemetry export destination
+      description: |-
+        Sends one synthetic record for each requested signal to a saved destination, with its saved settings, and returns one result per signal. Use `testObservabilityDestinationDraft` to test settings before you save them.
+
+        `signals` is optional. When the body or `signals` is left out or `null`, every signal the destination accepts is tested. Results are in the order of the destination's `accepts`.
+
+        How the test is sent:
+        - `logs` sends one OTLP log record and `metrics` sends one OTLP metric named `trustgrid.test`. Splunk destinations get the same data as a HEC event or HEC metric.
+        - The test uses the destination's transport settings: auth, headers, TLS, encoding, compression and `timeoutSeconds`, capped at 20 seconds. `http` destinations get `/v1/logs` or `/v1/metrics` appended to `endpoint`. `splunk` endpoints are used as entered.
+        - The portal sends only to `https://` endpoints. It resolves the hostname and refuses `localhost` and any hostname or IP address that is private, loopback, link-local, multicast or reserved, including the cloud metadata addresses `169.254.169.254`, `100.100.100.200` and `fd00:ec2::254`. The connection is made to the addresses that were checked. Redirects are not followed; the result tells you to enter the final URL.
+        - A refused endpoint is not an HTTP error. The result has `ok: false` and a `message` that starts with `The portal will not send to this endpoint:`.
+        - The request has a budget of about 24 seconds. A signal that does not finish in time gets `ok: false` and `The test did not finish within N seconds.`
+        - Secrets are never returned. They are removed from `message` and `response`.
+
+        Each result records a destination-test activity (category `destination_test`) for this destination. `activityStatus` tells you what happened to it.
+
+        Tests are limited per organization; see the 429 response. A passing test shows that the destination accepted one test record. It does not prove that a pipeline delivers telemetry to it; use `checkObservabilityPipeline` to check a pipeline.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityDestinationUid'
+      requestBody:
+        description: Optional. Leave out the body, or `signals`, to test every signal the destination accepts.
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservabilityDestinationTestOptions'
+            examples:
+              allSignals:
+                summary: Test every signal the destination accepts
+                value: {}
+              logsOnly:
+                summary: Test only logs & events
+                value:
+                  signals:
+                    - logs
+      responses:
+        '200':
+          description: OK. One result per tested signal. A failed test is still a 200; check `ok` in each result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityDestinationTestResponse'
+              examples:
+                recorded:
+                  summary: Both signals accepted; the activity was recorded
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: true
+                        status: 200
+                        durationMs: 412
+                        message: The destination accepted the test metric (HTTP 200).
+                        activityStatus: recorded
+                      - signal: logs
+                        ok: true
+                        status: 200
+                        durationMs: 398
+                        message: The destination accepted the test log record (HTTP 200).
+                        activityStatus: recorded
+                pending:
+                  summary: A repeated failure; the activity will be published later
+                  description: The same result was recorded moments ago, so this activity is merged with it and published at the next publish interval.
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        status: 403
+                        durationMs: 287
+                        message: 'Splunk rejected the HEC token (HTTP 403, code 4: Invalid token). Check the token.'
+                        response: '{"text":"Invalid token","code":4}'
+                        activityStatus: pending
+                disabled:
+                  summary: Activity publishing is turned off
+                  value:
+                    results:
+                      - signal: logs
+                        ok: true
+                        status: 200
+                        durationMs: 351
+                        message: 'Splunk accepted the test log record (HTTP 200, code 0: Success).'
+                        response: '{"text":"Success","code":0}'
+                        activityStatus: disabled
+                unavailable:
+                  summary: DNS lookups were busy; the activity was not published
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: false
+                        durationMs: 4
+                        message: DNS lookups are busy; try again shortly.
+                        retryable: true
+                        activityStatus: unavailable
+                timedOut:
+                  summary: The destination did not answer in time
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: false
+                        durationMs: 23998
+                        message: The test did not finish within 24 seconds.
+                        activityStatus: recorded
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
+        '422':
+          description: Validation of `signals` failed. `signals` must be a non-empty list of signals that the destination accepts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              examples:
+                notAccepted:
+                  summary: The destination does not accept a requested signal
+                  value:
+                    error:
+                      - destination does not accept metrics
+                empty:
+                  summary: signals is empty or not a list of strings
+                  value:
+                    error:
+                      - signals must be a non-empty list of signals
+        '429':
+          $ref: '#/components/responses/ObservabilityTestTooManyRequests'
+        '503':
+          $ref: '#/components/responses/ObservabilityTestUnavailable'
+      tags:
+        - ObservabilityDestination
   /v2/observability/pipelines:
     get:
       operationId: listObservabilityPipelines
@@ -11999,6 +12304,268 @@ paths:
           $ref: '#/components/responses/ObservabilityForbidden'
         '404':
           $ref: '#/components/responses/ObservabilityPipelineNotFound'
+      tags:
+        - ObservabilityPipeline
+  /v2/observability/pipelines/{uid}/check:
+    post:
+      operationId: checkObservabilityPipeline
+      summary: Check whether the collector would run a pipeline and deliver a sample record
+      description: |-
+        Evaluates the saved pipeline, its saved destinations and the attribute catalog, and reports what the collector would do with them. Nothing is sent and nothing is saved. The result evaluates saved settings only. It is not proof that real telemetry reached a destination; use `testObservabilityDestination` to send test data.
+
+        Without `record`, the check covers only the pipeline. `verdict` is `ok` when the collector would run the pipeline, and `skipped` when it would skip it: the pipeline is disabled, has no usable destination, has a malformed node selection or id, or (for a `logs` pipeline) has no enabled log source.
+
+        With `record`, the check also follows one sample record through the pipeline's sources, node selection and event filters. `verdict` is:
+        - `skipped`: the collector would skip the pipeline, so no record is delivered;
+        - `dropped`: a `record` check failed;
+        - `unknown`: delivery depends on node selection for a node you cannot read;
+        - `delivered`: every check passed. An `info` check `record.timing` notes that node tag and lifecycle changes usually reach telemetry within seconds, and at most five minutes.
+
+        Destination endpoints are checked without DNS. A destination whose endpoint is a hostname gets a `warning`, because the collector resolves it when it starts and skips it if it does not resolve to a public address.
+
+        Node data is read with your permissions. If you do not have `nodes::read` on `record.nodeId`, the request still succeeds: node selection checks are `warning` or `skipped`, and the verdict can be `unknown`. A node that does not exist is treated as not found, so selection checks fail when the pipeline selects nodes. Org-level records ignore node selection: changes and audits without `nodeId`, and events whose type is not a node event, such as `Certificate Expiring` or `Upgrade Started`.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityPipelineUid'
+      requestBody:
+        description: Optional. Leave out the body, or `record`, to check only the pipeline.
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservabilityPipelineCheckRequest'
+            examples:
+              pipelineOnly:
+                summary: Check only the pipeline
+                value: {}
+              nodeEvent:
+                summary: Check a node event against a logs pipeline
+                value:
+                  record:
+                    source: events
+                    nodeId: 3c9a1f0e-6b2d-4e7a-9c15-8d4f2a7b6e01
+                    eventType: Node Disconnect
+                    level: ERROR
+              nodeMetrics:
+                summary: Check node metrics against a metrics pipeline
+                value:
+                  record:
+                    source: metrics
+                    nodeId: 8e2b5d14-0f3a-4c69-b7d8-1a6e9c3f4b22
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityPipelineCheckResult'
+              examples:
+                delivered:
+                  summary: A node event would be delivered
+                  description: The `Prod logs` pipeline selects production nodes and events at WARNING or above. The node is in production and the event is ERROR. The Splunk endpoint is a hostname, so its destination check is a `warning`, but it is still usable.
+                  value:
+                    verdict: delivered
+                    checks:
+                      - id: enabled
+                        group: pipeline
+                        label: Enabled
+                        status: pass
+                        detail: The pipeline is enabled.
+                      - id: sources
+                        group: pipeline
+                        label: Log sources
+                        status: pass
+                        detail: Sends node events, changes.
+                      - id: destination:0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
+                        group: pipeline
+                        label: Destination "Splunk Prod"
+                        status: warning
+                        detail: Ready to receive logs & events. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
+                        destinationUid: 0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
+                      - id: destinations
+                        group: pipeline
+                        label: Valid destinations
+                        status: pass
+                        detail: The collector delivers to 1 destination(s).
+                      - id: record.subject
+                        group: record
+                        label: Event subject
+                        status: pass
+                        detail: Node, certificate, alarm suppression and upgrade events are exported.
+                      - id: record.source
+                        group: record
+                        label: Source
+                        status: pass
+                        detail: Node events are enabled in this pipeline.
+                      - id: record.node
+                        group: record
+                        label: Node
+                        status: pass
+                        detail: Found edge-1.
+                      - id: record.lifecycle
+                        group: record
+                        label: Lifecycle
+                        status: pass
+                        detail: The node's lifecycle is production; the pipeline selects production.
+                      - id: record.tags
+                        group: record
+                        label: Tags
+                        status: pass
+                        detail: The pipeline selects every tag.
+                      - id: record.eventType
+                        group: record
+                        label: Event type
+                        status: pass
+                        detail: The pipeline selects every event type.
+                      - id: record.severity
+                        group: record
+                        label: Severity
+                        status: pass
+                        detail: ERROR is at or above the minimum severity WARNING.
+                      - id: record.timing
+                        group: record
+                        label: Timing
+                        status: info
+                        detail: Node tag and lifecycle changes usually reach telemetry within seconds, and at most five minutes.
+                    destinations:
+                      total: 1
+                      usable: 1
+                dropped:
+                  summary: Node metrics would be dropped
+                  description: The `Prod metrics` pipeline selects production nodes, and the node is in maintenance.
+                  value:
+                    verdict: dropped
+                    checks:
+                      - id: enabled
+                        group: pipeline
+                        label: Enabled
+                        status: pass
+                        detail: The pipeline is enabled.
+                      - id: destination:4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                        group: pipeline
+                        label: Destination "OTLP Collector"
+                        status: warning
+                        detail: Ready to receive metrics. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
+                        destinationUid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                      - id: destinations
+                        group: pipeline
+                        label: Valid destinations
+                        status: pass
+                        detail: The collector delivers to 1 destination(s).
+                      - id: record.node
+                        group: record
+                        label: Node
+                        status: pass
+                        detail: Found edge-2.
+                      - id: record.lifecycle
+                        group: record
+                        label: Lifecycle
+                        status: fail
+                        detail: The node's lifecycle is maintenance; the pipeline selects production.
+                      - id: record.tag.region
+                        group: record
+                        label: Tag "region"
+                        status: pass
+                        detail: The node's "region" tag is "us-east"; the pipeline selects "us-east", "us-west".
+                    destinations:
+                      total: 1
+                      usable: 1
+                unknown:
+                  summary: The caller cannot read the node
+                  description: The caller lacks `nodes::read` on the node, so node selection cannot be evaluated.
+                  value:
+                    verdict: unknown
+                    checks:
+                      - id: enabled
+                        group: pipeline
+                        label: Enabled
+                        status: pass
+                        detail: The pipeline is enabled.
+                      - id: destination:4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                        group: pipeline
+                        label: Destination "OTLP Collector"
+                        status: warning
+                        detail: Ready to receive metrics. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
+                        destinationUid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                      - id: destinations
+                        group: pipeline
+                        label: Valid destinations
+                        status: pass
+                        detail: The collector delivers to 1 destination(s).
+                      - id: record.node
+                        group: record
+                        label: Node
+                        status: warning
+                        detail: This node can't be evaluated without node read access, so it can't be checked against node selection.
+                      - id: record.lifecycle
+                        group: record
+                        label: Lifecycle
+                        status: skipped
+                        detail: This node can't be evaluated without node read access.
+                      - id: record.tag.region
+                        group: record
+                        label: Tag "region"
+                        status: skipped
+                        detail: This node can't be evaluated without node read access.
+                    destinations:
+                      total: 1
+                      usable: 1
+                skipped:
+                  summary: A disabled pipeline, checked without a record
+                  value:
+                    verdict: skipped
+                    checks:
+                      - id: enabled
+                        group: pipeline
+                        label: Enabled
+                        status: fail
+                        detail: The collector skips disabled pipelines.
+                      - id: destination:4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                        group: pipeline
+                        label: Destination "OTLP Collector"
+                        status: warning
+                        detail: Ready to receive metrics. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
+                        destinationUid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                      - id: destinations
+                        group: pipeline
+                        label: Valid destinations
+                        status: pass
+                        detail: The collector delivers to 1 destination(s).
+                    destinations:
+                      total: 1
+                      usable: 1
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+        '422':
+          description: Validation of `record` failed; `error` lists every broken rule. A `metrics` pipeline accepts only `metrics` records, and a `logs` pipeline accepts only `events`, `changes` and `audits` records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              examples:
+                wrongSource:
+                  summary: An events record for a metrics pipeline
+                  value:
+                    error:
+                      - record.source must be metrics for a metrics pipeline
+                missingEventFields:
+                  summary: An events record without event type and level
+                  value:
+                    error:
+                      - record.eventType is required for events
+                      - record.level must be one of INFO, WARNING, ERROR, CRITICAL
+                notAnObject:
+                  summary: record is not an object
+                  value:
+                    error:
+                      - record must be an object
       tags:
         - ObservabilityPipeline
   /v2/observability/pipelines/{uid}/disable:
@@ -13462,6 +14029,43 @@ components:
         text/html:
           schema:
             type: string
+    ObservabilityTestTooManyRequests:
+      description: |-
+        Too many destination tests for the organization. Nothing was sent. `error` has one message:
+        - `another test for this org is still running; try again when it finishes`: the organization already has 2 tests running on the Portal instance that took the request. No `Retry-After` header is sent; try again when a test finishes.
+        - `too many test requests, try again in a minute`: the organization has used its 10 test requests in the current 60-second window. The window starts with the first test request after the previous window ended. `Retry-After` gives the seconds until the window ends.
+
+        The concurrency limit is checked first, then the rate limit. Each request counts once, whatever the number of signals. Requests rejected with 400, 404 or 422 are not counted.
+      headers:
+        Retry-After:
+          description: Whole seconds, at least 1, until the organization's test window ends. Sent only with the `too many test requests` message, not with the concurrency message.
+          schema:
+            minimum: 1
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityErrors'
+          examples:
+            rateLimit:
+              summary: 10 tests in the current window (Retry-After is set)
+              value:
+                error:
+                  - too many test requests, try again in a minute
+            concurrency:
+              summary: 2 tests are already running (no Retry-After)
+              value:
+                error:
+                  - another test for this org is still running; try again when it finishes
+    ObservabilityTestUnavailable:
+      description: The portal could not check the test rate limit, so it did not run the test. Nothing was sent. Try again shortly.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityErrors'
+          example:
+            error:
+              - tests are unavailable right now, try again shortly
   securitySchemes:
     JWTAuthorizer:
       description: >-
@@ -19091,3 +19695,242 @@ components:
       example: Permission denied
       title: ObservabilityForbidden
       type: string
+    ObservabilityDestinationTestSignals:
+      description: Signals to test, at least one. Each must be in the destination's `accepts`; duplicates are ignored. Leave it out or send `null` to test every signal the destination accepts.
+      items:
+        $ref: '#/components/schemas/ObservabilitySignal'
+      minItems: 1
+      nullable: true
+      type: array
+    ObservabilityDestinationTestOptions:
+      description: Options for a destination test.
+      properties:
+        signals:
+          $ref: '#/components/schemas/ObservabilityDestinationTestSignals'
+      title: ObservabilityDestinationTestOptions
+      type: object
+    ObservabilityDestinationTestDraft:
+      description: |-
+        Unsaved destination settings to test, plus the signals to test. The destination fields are the same as for create and update, and `orgId` is ignored.
+
+        `uid` is optional. Without it, every secret must be sent with its real value. With it, it names a saved destination whose stored secrets are reused when a secret is sent as `""` or left out, under the same re-entry rules as an update.
+      allOf:
+        - $ref: '#/components/schemas/ObservabilityDestination'
+        - $ref: '#/components/schemas/ObservabilityDestinationTestOptions'
+      title: ObservabilityDestinationTestDraft
+    ObservabilityDestinationTestActivityStatus:
+      description: |-
+        What happened to the destination-test activity for this result. The activity has category `destination_test`, code `destination_test_succeeded` (severity `info`), `destination_test_retrying` (`warn`) or `destination_test_failed` (`error`), and is attributed to the tested destination's uid.
+        - `recorded`: the activity was handed to the activity queue. It may not be searchable yet.
+        - `pending`: the activity was kept and will be published later, because an identical result was published recently or the publish rate limit was reached.
+        - `disabled`: activity publishing is turned off.
+        - `unavailable`: the activity was not published. Draft tests without `uid` always get this. Other causes are a publisher at capacity, a publisher error or a publish that took longer than 1 second.
+      enum:
+        - recorded
+        - pending
+        - disabled
+        - unavailable
+      type: string
+    ObservabilityDestinationTestResult:
+      description: The result of sending test data for one signal.
+      properties:
+        signal:
+          $ref: '#/components/schemas/ObservabilitySignal'
+        ok:
+          description: Whether the destination accepted the test record.
+          type: boolean
+        status:
+          description: HTTP status the destination returned. Left out when no response was received, for example when the endpoint was refused or the connection failed.
+          example: 200
+          type: integer
+        durationMs:
+          description: Time spent testing this signal, in milliseconds.
+          example: 412
+          minimum: 0
+          type: integer
+        message:
+          description: |-
+            What happened, in plain English, with secrets removed. Examples:
+            - `The destination accepted the test log record (HTTP 200).`
+            - `The destination rejected the credentials (HTTP 401). Check the authentication settings and headers.`
+            - `The destination redirected the request (HTTP 301). Redirects are not followed; enter the final URL.`
+            - `The portal will not send to this endpoint: <reason>.`, where the reason is for example `the collector only sends to https:// endpoints`, `hostname "localhost" is not allowed`, `endpoint IP address 10.0.0.5 is not allowed` or `endpoint resolves to a private, loopback, link-local or reserved address`.
+            - `DNS lookups are busy; try again shortly.` (with `retryable`)
+            - `The test did not finish within N seconds.`
+          type: string
+        response:
+          description: The start of the destination's response body, at most 300 characters, with secrets redacted. Left out when the body is empty or binary, or no response was received.
+          maxLength: 300
+          type: string
+        retryable:
+          description: Present, and true, only when the test failed for a temporary reason on the portal side, such as busy DNS lookups. Try again shortly.
+          enum:
+            - true
+          type: boolean
+        activityStatus:
+          $ref: '#/components/schemas/ObservabilityDestinationTestActivityStatus'
+      required:
+        - signal
+        - ok
+        - durationMs
+        - message
+        - activityStatus
+      title: ObservabilityDestinationTestResult
+      type: object
+    ObservabilityDestinationTestResponse:
+      description: Destination test results, one per tested signal, in the order of the destination's `accepts`.
+      properties:
+        results:
+          items:
+            $ref: '#/components/schemas/ObservabilityDestinationTestResult'
+          minItems: 1
+          type: array
+      required:
+        - results
+      title: ObservabilityDestinationTestResponse
+      type: object
+    ObservabilityPipelineCheckRequest:
+      description: Options for a pipeline check.
+      properties:
+        record:
+          $ref: '#/components/schemas/ObservabilityPipelineCheckRecord'
+      title: ObservabilityPipelineCheckRequest
+      type: object
+    ObservabilityPipelineCheckRecord:
+      description: |-
+        A sample record to follow through the pipeline. Leave it out or send `null` to check only the pipeline.
+
+        Org-level records ignore node selection: `changes` and `audits` records without `nodeId`, and `events` records whose `eventType` is not a node event, such as `Certificate Expiring`, `Alarm Suppression Begin` or `Upgrade Started`. `nodeId` is ignored for org-level records.
+      nullable: true
+      properties:
+        source:
+          description: |-
+            Where the record comes from. A `metrics` pipeline accepts only `metrics`; a `logs` pipeline accepts `events`, `changes` and `audits`.
+            - `metrics`: node metrics
+            - `events`: node and org events
+            - `changes`: configuration changes made in the portal
+            - `audits`: node audit records
+          enum:
+            - metrics
+            - events
+            - changes
+            - audits
+          type: string
+        nodeId:
+          description: Uid of the node the record comes from, at most 128 characters after trimming. Required for `metrics` and `audits` records. You need `nodes::read` on the node for node selection to be evaluated; otherwise the node is treated as unreadable and the verdict can be `unknown`.
+          example: 3c9a1f0e-6b2d-4e7a-9c15-8d4f2a7b6e01
+          maxLength: 128
+          type: string
+        eventType:
+          description: The portal's event type name, for example `Node Disconnect`, at most 128 characters after trimming. Required for `events` records; ignored for other sources.
+          example: Node Disconnect
+          maxLength: 128
+          type: string
+        level:
+          description: Event severity. Required for `events` records; ignored for other sources.
+          enum:
+            - INFO
+            - WARNING
+            - ERROR
+            - CRITICAL
+          type: string
+      required:
+        - source
+      title: ObservabilityPipelineCheckRecord
+      type: object
+    ObservabilityPipelineCheckResult:
+      description: |-
+        What the collector would do with a saved pipeline and, when a record was sent, with that record. This evaluates saved settings. It is not proof that real telemetry reached a destination.
+      properties:
+        verdict:
+          description: |-
+            The overall result.
+            - `ok`: no record was sent, and the collector would run the pipeline.
+            - `skipped`: the collector would skip the pipeline, for example because it is disabled, has no usable destination, has a malformed node selection or id, or has no enabled log source.
+            - `delivered`: the record passes every check and would be delivered.
+            - `dropped`: a `record` check failed, so the record would not be delivered.
+            - `unknown`: delivery depends on node selection for a node the caller cannot read.
+          enum:
+            - ok
+            - skipped
+            - delivered
+            - dropped
+            - unknown
+          type: string
+        checks:
+          description: Pipeline checks, then record checks.
+          items:
+            $ref: '#/components/schemas/ObservabilityPipelineCheckItem'
+          type: array
+        destinations:
+          description: How many of the pipeline's destinations the collector can use.
+          properties:
+            total:
+              description: Distinct destinations in `destinationUids`
+              minimum: 0
+              type: integer
+            usable:
+              description: Destinations whose check did not fail
+              minimum: 0
+              type: integer
+          required:
+            - total
+            - usable
+          type: object
+      required:
+        - verdict
+        - checks
+        - destinations
+      title: ObservabilityPipelineCheckResult
+      type: object
+    ObservabilityPipelineCheckItem:
+      description: One check in a pipeline check result.
+      properties:
+        id:
+          description: |-
+            Stable check id. Pipeline checks: `enabled`, `pipelineId`, `sources`, `destination:<uid>`, `destinations`, `filters.<key>`, `attribute:<id>` (or `attributes[<index>]`) and `constants.<key>`. Record checks: `record.subject`, `record.source`, `record.node`, `record.lifecycle`, `record.tags`, `record.tag.<name>`, `record.selection`, `record.orgLevel`, `record.eventType`, `record.severity` and `record.timing`.
+          example: record.lifecycle
+          type: string
+        group:
+          description: |-
+            - `pipeline`: a check of the saved pipeline and its destinations
+            - `record`: a check of the sample record
+          enum:
+            - pipeline
+            - record
+          type: string
+        label:
+          description: Short human-readable name of the check
+          example: Lifecycle
+          type: string
+        status:
+          description: |-
+            - `pass`: the check passed.
+            - `fail`: the check failed. A failed `enabled`, `pipelineId`, `sources`, `destinations` or `filters.*` check makes the collector skip the pipeline; a failed `destination:<uid>` check skips only that destination; a failed record check drops the record.
+            - `warning`: a problem that does not stop delivery, for example an attribute the collector skips, a destination hostname that is resolved only when the collector starts, or a node the caller cannot read.
+            - `skipped`: the check was not evaluated, for example node selection for an org-level record.
+            - `info`: information only, for example `record.timing`.
+          enum:
+            - pass
+            - fail
+            - warning
+            - skipped
+            - info
+          type: string
+        detail:
+          description: What was found, in plain English
+          type: string
+        destinationUid:
+          description: Destination uid, on `destination:<uid>` checks
+          type: string
+        attributeId:
+          description: Catalog attribute id, on attribute checks
+          type: string
+      required:
+        - id
+        - group
+        - label
+        - status
+        - detail
+      title: ObservabilityPipelineCheckItem
+      type: object
