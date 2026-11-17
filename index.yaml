@@ -12340,19 +12340,17 @@ paths:
       operationId: checkObservabilityPipeline
       summary: Check whether the collector would run a pipeline and deliver a sample record
       description: |-
-        Evaluates the saved pipeline, its saved destinations and the attribute catalog, and reports what the collector would do with them. Nothing is sent and nothing is saved. The result evaluates saved settings only. It is not proof that real telemetry reached a destination; use `testObservabilityDestination` to send test data.
+        Evaluates the saved pipeline against the organization's saved destinations and the attribute catalog, and reports what the collector would do. Nothing is sent and nothing is saved. The result evaluates saved settings only. It is not proof that real telemetry reached a destination; use `testObservabilityDestination` to send test data.
 
-        Without `record`, the check covers only the pipeline. `verdict` is `ok` when the collector would run the pipeline, and `skipped` when it would skip it: the pipeline is disabled, has no usable destination, has a malformed node selection or id, or (for a `logs` pipeline) has no enabled log source.
+        Without `record`, only the pipeline is checked. `verdict` is `ok` when the collector would run the pipeline, and `skipped` when it would skip it.
 
-        With `record`, the check also follows one sample record through the pipeline's sources, node selection and event filters. `verdict` is:
-        - `skipped`: the collector would skip the pipeline, so no record is delivered;
-        - `dropped`: a `record` check failed;
+        With `record`, the check also follows one sample record through the pipeline. `verdict` is:
+        - `skipped`: the collector would skip the pipeline, so the record is not delivered;
+        - `dropped`: the checks show the record would not be delivered;
         - `unknown`: delivery depends on node selection for a node you cannot read;
-        - `delivered`: every check passed. An `info` check `record.timing` notes that node tag and lifecycle changes usually reach telemetry within seconds, and at most five minutes.
+        - `delivered`: the record would be delivered. An `info` check `record.timing` then notes that node tag and lifecycle changes usually reach telemetry within seconds, and at most five minutes.
 
-        Destination endpoints are checked without DNS. A destination whose endpoint is a hostname gets a `warning`, because the collector resolves it when it starts and skips it if it does not resolve to a public address.
-
-        Node data is read with your permissions. If you do not have `nodes::read` on `record.nodeId`, the request still succeeds: node selection checks are `warning` or `skipped`, and the verdict can be `unknown`. A node that does not exist is treated as not found, so selection checks fail when the pipeline selects nodes. Org-level records ignore node selection: changes and audits without `nodeId`, and events whose type is not a node event, such as `Certificate Expiring` or `Upgrade Started`.
+        Node data is read with your permissions. If you do not have `nodes::read` on `record.nodeId`, the request still succeeds: the node is treated as unreadable and the verdict can be `unknown`. A node that does not exist is treated as not found.
 
         ---
 
@@ -12393,67 +12391,11 @@ paths:
                 $ref: '#/components/schemas/ObservabilityPipelineCheckResult'
               examples:
                 delivered:
-                  summary: A node event would be delivered
-                  description: The `Prod logs` pipeline selects production nodes and events at WARNING or above. The node is in production and the event is ERROR. The Splunk endpoint is a hostname, so its destination check is a `warning`, but it is still usable.
+                  summary: A record would be delivered (excerpt)
+                  description: Excerpt. A real response lists every pipeline and record check; only the `record.timing` check added to a `delivered` verdict is shown.
                   value:
                     verdict: delivered
                     checks:
-                      - id: enabled
-                        group: pipeline
-                        label: Enabled
-                        status: pass
-                        detail: The pipeline is enabled.
-                      - id: sources
-                        group: pipeline
-                        label: Log sources
-                        status: pass
-                        detail: Sends node events, changes.
-                      - id: destination:0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
-                        group: pipeline
-                        label: Destination "Splunk Prod"
-                        status: warning
-                        detail: Ready to receive logs & events. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
-                        destinationUid: 0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
-                      - id: destinations
-                        group: pipeline
-                        label: Valid destinations
-                        status: pass
-                        detail: The collector delivers to 1 destination(s).
-                      - id: record.subject
-                        group: record
-                        label: Event subject
-                        status: pass
-                        detail: Node, certificate, alarm suppression and upgrade events are exported.
-                      - id: record.source
-                        group: record
-                        label: Source
-                        status: pass
-                        detail: Node events are enabled in this pipeline.
-                      - id: record.node
-                        group: record
-                        label: Node
-                        status: pass
-                        detail: Found edge-1.
-                      - id: record.lifecycle
-                        group: record
-                        label: Lifecycle
-                        status: pass
-                        detail: The node's lifecycle is production; the pipeline selects production.
-                      - id: record.tags
-                        group: record
-                        label: Tags
-                        status: pass
-                        detail: The pipeline selects every tag.
-                      - id: record.eventType
-                        group: record
-                        label: Event type
-                        status: pass
-                        detail: The pipeline selects every event type.
-                      - id: record.severity
-                        group: record
-                        label: Severity
-                        status: pass
-                        detail: ERROR is at or above the minimum severity WARNING.
                       - id: record.timing
                         group: record
                         label: Timing
@@ -12462,107 +12404,12 @@ paths:
                     destinations:
                       total: 1
                       usable: 1
-                dropped:
-                  summary: Node metrics would be dropped
-                  description: The `Prod metrics` pipeline selects production nodes, and the node is in maintenance.
-                  value:
-                    verdict: dropped
-                    checks:
-                      - id: enabled
-                        group: pipeline
-                        label: Enabled
-                        status: pass
-                        detail: The pipeline is enabled.
-                      - id: destination:4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
-                        group: pipeline
-                        label: Destination "OTLP Collector"
-                        status: warning
-                        detail: Ready to receive metrics. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
-                        destinationUid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
-                      - id: destinations
-                        group: pipeline
-                        label: Valid destinations
-                        status: pass
-                        detail: The collector delivers to 1 destination(s).
-                      - id: record.node
-                        group: record
-                        label: Node
-                        status: pass
-                        detail: Found edge-2.
-                      - id: record.lifecycle
-                        group: record
-                        label: Lifecycle
-                        status: fail
-                        detail: The node's lifecycle is maintenance; the pipeline selects production.
-                      - id: record.tag.region
-                        group: record
-                        label: Tag "region"
-                        status: pass
-                        detail: The node's "region" tag is "us-east"; the pipeline selects "us-east", "us-west".
-                    destinations:
-                      total: 1
-                      usable: 1
                 unknown:
-                  summary: The caller cannot read the node
-                  description: The caller lacks `nodes::read` on the node, so node selection cannot be evaluated.
+                  summary: The caller cannot read the record's node (excerpt)
+                  description: Excerpt. The caller lacks `nodes::read` on `record.nodeId`, so node selection cannot be evaluated. The checks are left out.
                   value:
                     verdict: unknown
-                    checks:
-                      - id: enabled
-                        group: pipeline
-                        label: Enabled
-                        status: pass
-                        detail: The pipeline is enabled.
-                      - id: destination:4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
-                        group: pipeline
-                        label: Destination "OTLP Collector"
-                        status: warning
-                        detail: Ready to receive metrics. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
-                        destinationUid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
-                      - id: destinations
-                        group: pipeline
-                        label: Valid destinations
-                        status: pass
-                        detail: The collector delivers to 1 destination(s).
-                      - id: record.node
-                        group: record
-                        label: Node
-                        status: warning
-                        detail: This node can't be evaluated without node read access, so it can't be checked against node selection.
-                      - id: record.lifecycle
-                        group: record
-                        label: Lifecycle
-                        status: skipped
-                        detail: This node can't be evaluated without node read access.
-                      - id: record.tag.region
-                        group: record
-                        label: Tag "region"
-                        status: skipped
-                        detail: This node can't be evaluated without node read access.
-                    destinations:
-                      total: 1
-                      usable: 1
-                skipped:
-                  summary: A disabled pipeline, checked without a record
-                  value:
-                    verdict: skipped
-                    checks:
-                      - id: enabled
-                        group: pipeline
-                        label: Enabled
-                        status: fail
-                        detail: The collector skips disabled pipelines.
-                      - id: destination:4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
-                        group: pipeline
-                        label: Destination "OTLP Collector"
-                        status: warning
-                        detail: Ready to receive metrics. The collector resolves this hostname when it starts and skips the destination if it doesn't resolve to a public address; use Send Test Data to confirm it's reachable.
-                        destinationUid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
-                      - id: destinations
-                        group: pipeline
-                        label: Valid destinations
-                        status: pass
-                        detail: The collector delivers to 1 destination(s).
+                    checks: []
                     destinations:
                       total: 1
                       usable: 1
@@ -12573,23 +12420,12 @@ paths:
         '404':
           $ref: '#/components/responses/ObservabilityPipelineNotFound'
         '422':
-          description: Validation of `record` failed; `error` lists every broken rule. A `metrics` pipeline accepts only `metrics` records, and a `logs` pipeline accepts only `events`, `changes` and `audits` records.
+          description: Validation of `record` failed; `error` lists every broken rule. The record is validated against the pipeline and its source.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityValidationFailed'
               examples:
-                wrongSource:
-                  summary: An events record for a metrics pipeline
-                  value:
-                    error:
-                      - record.source must be metrics for a metrics pipeline
-                missingEventFields:
-                  summary: An events record without event type and level
-                  value:
-                    error:
-                      - record.eventType is required for events
-                      - record.level must be one of INFO, WARNING, ERROR, CRITICAL
                 notAnObject:
                   summary: record is not an object
                   value:
@@ -19460,8 +19296,6 @@ components:
     ObservabilitySelector:
       description: |-
         Which nodes the pipeline exports from. An empty or omitted selector selects every node. Org-level logs records are not tied to a node, so the selector never applies to them; see `logs.includeOrgLevel`.
-
-        A node is selected when its lifecycle state is in `lifecycleStates` (if set) and it matches `tagMatches` (if set) as `matchMode` describes.
       properties:
         lifecycleStates:
           description: Node lifecycle states to select, without duplicates. Empty or omitted selects every lifecycle state. `unset` selects nodes that have no lifecycle state.
@@ -19495,9 +19329,9 @@ components:
           type: object
         matchMode:
           description: |-
-            How the entries in `tagMatches` combine. Defaults to `all`. Lifecycle states always apply in addition.
-            - `all`: the node must match every listed tag.
-            - `any`: the node must match at least one listed tag.
+            Whether a node must match all selector conditions or any of them. Defaults to `all`.
+            - `all`: the node must match every condition.
+            - `any`: the node must match at least one condition.
           enum:
             - all
             - any
@@ -19798,14 +19632,14 @@ components:
       type: object
     ObservabilityPipelineCheckRecord:
       description: |-
-        A sample record to follow through the pipeline. Leave it out or send `null` to check only the pipeline.
+        A sample record to follow through the pipeline. Leave it out or send `null` to check only the pipeline. The record is validated against the pipeline and its source; a record that does not fit is rejected with 422.
 
-        Org-level records ignore node selection: `changes` and `audits` records without `nodeId`, and `events` records whose `eventType` is not a node event, such as `Certificate Expiring`, `Alarm Suppression Begin` or `Upgrade Started`. `nodeId` is ignored for org-level records.
+        Org-level records are `changes` and `audits` records without `nodeId`, and `events` records whose `eventType` is not a node event. As with `logs.includeOrgLevel`, node selection does not apply to them.
       nullable: true
       properties:
         source:
           description: |-
-            Where the record comes from. A `metrics` pipeline accepts only `metrics`; a `logs` pipeline accepts `events`, `changes` and `audits`.
+            Where the record comes from.
             - `metrics`: node metrics
             - `events`: node and org events
             - `changes`: configuration changes made in the portal
@@ -19817,17 +19651,15 @@ components:
             - audits
           type: string
         nodeId:
-          description: Uid of the node the record comes from, at most 128 characters after trimming. Required for `metrics` and `audits` records. You need `nodes::read` on the node for node selection to be evaluated; otherwise the node is treated as unreadable and the verdict can be `unknown`.
+          description: Uid of the node the record comes from. You need `nodes::read` on the node for node selection to be evaluated; otherwise the node is treated as unreadable and the verdict can be `unknown`.
           example: 3c9a1f0e-6b2d-4e7a-9c15-8d4f2a7b6e01
-          maxLength: 128
           type: string
         eventType:
-          description: The portal's event type name, for example `Node Disconnect`, at most 128 characters after trimming. Required for `events` records; ignored for other sources.
+          description: The portal's event type name, for example `Node Disconnect`, for `events` records
           example: Node Disconnect
-          maxLength: 128
           type: string
         level:
-          description: Event severity. Required for `events` records; ignored for other sources.
+          description: Event severity, for `events` records
           enum:
             - INFO
             - WARNING
@@ -19846,9 +19678,9 @@ components:
           description: |-
             The overall result.
             - `ok`: no record was sent, and the collector would run the pipeline.
-            - `skipped`: the collector would skip the pipeline, for example because it is disabled, has no usable destination, has a malformed node selection or id, or has no enabled log source.
-            - `delivered`: the record passes every check and would be delivered.
-            - `dropped`: a `record` check failed, so the record would not be delivered.
+            - `skipped`: the collector would skip the pipeline.
+            - `delivered`: the record would be delivered.
+            - `dropped`: the record would not be delivered.
             - `unknown`: delivery depends on node selection for a node the caller cannot read.
           enum:
             - ok
@@ -19863,14 +19695,14 @@ components:
             $ref: '#/components/schemas/ObservabilityPipelineCheckItem'
           type: array
         destinations:
-          description: How many of the pipeline's destinations the collector can use.
+          description: Destination counts for the pipeline.
           properties:
             total:
-              description: Distinct destinations in `destinationUids`
+              description: Destinations checked
               minimum: 0
               type: integer
             usable:
-              description: Destinations whose check did not fail
+              description: Checked destinations the collector can use
               minimum: 0
               type: integer
           required:
@@ -19888,7 +19720,7 @@ components:
       properties:
         id:
           description: |-
-            Stable check id. Pipeline checks: `enabled`, `pipelineId`, `sources`, `destination:<uid>`, `destinations`, `filters.<key>`, `attribute:<id>` (or `attributes[<index>]`) and `constants.<key>`. Record checks: `record.subject`, `record.source`, `record.node`, `record.lifecycle`, `record.tags`, `record.tag.<name>`, `record.selection`, `record.orgLevel`, `record.eventType`, `record.severity` and `record.timing`.
+            Check id, for example `destinations` for a pipeline check, or `record.source`, `record.node`, `record.lifecycle`, `record.selection`, `record.orgLevel`, `record.subject`, `record.eventType`, `record.severity` or `record.timing` for a record check.
           example: record.lifecycle
           type: string
         group:
@@ -19906,9 +19738,9 @@ components:
         status:
           description: |-
             - `pass`: the check passed.
-            - `fail`: the check failed. A failed `enabled`, `pipelineId`, `sources`, `destinations` or `filters.*` check makes the collector skip the pipeline; a failed `destination:<uid>` check skips only that destination; a failed record check drops the record.
-            - `warning`: a problem that does not stop delivery, for example an attribute the collector skips, a destination hostname that is resolved only when the collector starts, or a node the caller cannot read.
-            - `skipped`: the check was not evaluated, for example node selection for an org-level record.
+            - `fail`: the check failed.
+            - `warning`: the check found a possible problem.
+            - `skipped`: the check was not evaluated.
             - `info`: information only, for example `record.timing`.
           enum:
             - pass
@@ -19921,7 +19753,7 @@ components:
           description: What was found, in plain English
           type: string
         destinationUid:
-          description: Destination uid, on `destination:<uid>` checks
+          description: Destination uid, on checks of one destination
           type: string
         attributeId:
           description: Catalog attribute id, on attribute checks

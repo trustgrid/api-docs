@@ -412,9 +412,10 @@ describe('Observability pipeline schema', () => {
     assert.match(states.description, /`unset` selects nodes that have no lifecycle state/);
   });
 
-  // data/OtelPipelineCheck.ts: matchMode only combines tagMatches; lifecycle is always ANDed
-  it('matchMode combines tagMatches only', () => {
-    assert.match(schemas.ObservabilitySelector.properties.matchMode.description, /How the entries in `tagMatches` combine/);
+  it('matchMode is all or any and defaults to all', () => {
+    const matchMode = schemas.ObservabilitySelector.properties.matchMode;
+    assert.deepEqual(matchMode.enum, ['all', 'any']);
+    assert.match(matchMode.description, /Defaults to `all`/);
   });
 
   it('attributes carry id, emitAs and promoteToMetricLabel', () => {

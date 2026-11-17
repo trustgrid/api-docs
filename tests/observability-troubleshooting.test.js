@@ -2,7 +2,7 @@
  * Tests for the observability troubleshooting API (WOR-13071): destination tests and pipeline checks
  * Validates that the spec matches the portal backend
  * (ObservabilityTroubleshootingController, OtelDestination.resolve, OtelDestinationTest,
- * OtelActivityPublisher, OtelPipelineCheck)
+ * OtelActivityPublisher) and types.ts for the pipeline check shapes
  */
 
 import { describe, it } from 'node:test';
@@ -293,13 +293,12 @@ describe('Pipeline check', () => {
     assert.equal(schemas.ObservabilityPipelineCheckRecord.nullable, true);
   });
 
-  // parseCheckRecord in OtelPipelineCheck
+  // types.ts OtelCheckRecord; per-source requirements and length limits are not documented (unverified)
   it('record has source, nodeId, eventType and level', () => {
     const record = schemas.ObservabilityPipelineCheckRecord;
     assert.deepEqual(record.required, ['source']);
+    assert.deepEqual(Object.keys(record.properties), ['source', 'nodeId', 'eventType', 'level']);
     assert.deepEqual(record.properties.source.enum, ['metrics', 'events', 'changes', 'audits']);
-    assert.equal(record.properties.nodeId.maxLength, 128);
-    assert.equal(record.properties.eventType.maxLength, 128);
     assert.deepEqual(record.properties.level.enum, ['INFO', 'WARNING', 'ERROR', 'CRITICAL']);
   });
 
@@ -318,10 +317,16 @@ describe('Pipeline check', () => {
     assert.deepEqual(check.properties.status.enum, ['pass', 'fail', 'warning', 'skipped', 'info']);
   });
 
-  it('examples show delivered and dropped verdicts', () => {
-    const verdicts = namedExamples(jsonMedia(PIPELINE_CHECK, '200')).map(([, v]) => v.verdict);
-    assert.ok(verdicts.includes('delivered'));
-    assert.ok(verdicts.includes('dropped'));
+  it('examples show delivered and unknown verdicts and say they are excerpts', () => {
+    const examples = jsonMedia(PIPELINE_CHECK, '200').examples;
+    assert.equal(examples.delivered.value.verdict, 'delivered');
+    assert.equal(examples.unknown.value.verdict, 'unknown');
+    for (const example of Object.values(examples)) assert.match(example.description, /^Excerpt\./);
+  });
+
+  it('the only 422 example is the confirmed record must be an object message', () => {
+    const examples = op(PIPELINE_CHECK).responses['422'].content['application/json'].examples;
+    assert.deepEqual(Object.values(examples).map((e) => e.value.error), [['record must be an object']]);
   });
 
   // the timing note is added only when the verdict is delivered
@@ -336,7 +341,7 @@ describe('Pipeline check', () => {
     const description = op(PIPELINE_CHECK).description;
     assert.ok(description.includes('not proof that real telemetry reached a destination'));
     assert.ok(description.includes('`nodes::read`'));
-    assert.ok(description.includes('without DNS'));
+    assert.ok(description.includes('the request still succeeds'));
   });
 });
 
