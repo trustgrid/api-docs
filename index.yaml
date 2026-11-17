@@ -11565,6 +11565,35 @@ paths:
                 type: string
       tags:
         - ObservabilityActivity
+  /v2/observability/attribute-catalog:
+    get:
+      operationId: listObservabilityAttributeCatalog
+      summary: List the node attributes and tags a pipeline can attach to exported telemetry
+      description: |-
+        Returns the built-in node attributes, in the order Trustgrid publishes them, followed by one `tag.<name>` entry for each organization tag name made of letters, digits, `_` and `-`, sorted case-insensitively. A tag entry has `label` set to the tag name, `emitAs` set to `tg.tag.<name>`, `type` set to `string` and `promotable` set to true. If Trustgrid has published no built-in attributes, only tag entries are returned.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ObservabilityCatalogEntry'
+              example:
+                - id: tag.region
+                  label: region
+                  emitAs: tg.tag.region
+                  type: string
+                  promotable: true
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+      tags:
+        - ObservabilityCatalog
   /v2/observability/destinations:
     get:
       operationId: listObservabilityDestinations
@@ -12618,35 +12647,6 @@ paths:
           $ref: '#/components/responses/ObservabilityPipelineNotFound'
       tags:
         - ObservabilityPipeline
-  /v2/observability/attribute-catalog:
-    get:
-      operationId: listObservabilityAttributeCatalog
-      summary: List the node attributes and tags a pipeline can attach to exported telemetry
-      description: |-
-        Returns the built-in node attributes, in the order Trustgrid publishes them, followed by one `tag.<name>` entry for each organization tag name made of letters, digits, `_` and `-`, sorted case-insensitively. A tag entry has `label` set to the tag name, `emitAs` set to `tg.tag.<name>`, `type` set to `string` and `promotable` set to true. If Trustgrid has published no built-in attributes, only tag entries are returned.
-
-        ---
-
-        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ObservabilityCatalogEntry'
-              example:
-                - id: tag.region
-                  label: region
-                  emitAs: tg.tag.region
-                  type: string
-                  promotable: true
-        '403':
-          $ref: '#/components/responses/ObservabilityForbidden'
-      tags:
-        - ObservabilityCatalog
 security:
   - JWTAuthorizer: []
 servers:
@@ -19721,7 +19721,7 @@ components:
     ObservabilityDestinationTestActivityStatus:
       description: |-
         What happened to the destination-test activity for this result. The activity has category `destination_test`, code `destination_test_succeeded` (severity `info`), `destination_test_retrying` (`warn`) or `destination_test_failed` (`error`), and is attributed to the tested destination's uid.
-        - `recorded`: the activity was handed to the activity queue. It may not be searchable yet.
+        - `recorded`: the activity was handed to the activity queue. Publication was accepted; this does not mean the activity is searchable yet or was indexed downstream.
         - `pending`: the activity was kept and will be published later, because an identical result was published recently or the publish rate limit was reached.
         - `disabled`: activity publishing is turned off.
         - `unavailable`: the activity was not published. Draft tests without `uid` always get this. Other causes are a publisher at capacity, a publisher error or a publish that took longer than 1 second.
