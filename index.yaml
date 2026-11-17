@@ -11239,7 +11239,7 @@ paths:
       operationId: listObservabilityDestinations
       summary: List the telemetry export destinations configured for the organization
       description: |-
-        Destinations are sorted by name. A secret (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` or a `headers` value) that is set is returned as `""`; a secret that is not set is left out. `""` therefore means "set but hidden", not "empty".
+        Destinations are sorted by name. Secrets are redacted: a secret (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` or a `headers` value) that is stored is returned as `""`, and a secret that is not stored is left out. `""` therefore means "set but hidden", not "empty". No API returns a stored secret.
 
         ---
 
@@ -11254,18 +11254,16 @@ paths:
                 items:
                   $ref: '#/components/schemas/ObservabilityDestination'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
       tags:
         - ObservabilityDestination
     post:
       operationId: createObservabilityDestination
       summary: Create a Splunk HEC or OTLP/HTTP destination for exported telemetry
       description: |-
-        `uid` is optional; when omitted a UUID is generated. `type` cannot be changed after creation. Every secret the destination needs must be sent with its real value. No string in the body may contain `${`.
+        `uid` is optional. When it is omitted or `""`, the server generates a UUID. When it is set, it must be a UUID; uids are scoped to the organization, and a uid that the organization already uses returns 409. `type` cannot be changed after creation. Every secret the destination needs must be sent with its real value. Saving checks the form of `endpoint` but does not resolve or contact the host.
+
+        No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
 
         ---
 
@@ -11283,26 +11281,33 @@ paths:
                   uid:
                     description: The uid of the new destination
                     type: string
+                    example: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
                 required:
                   - uid
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '409':
-          description: A destination with the requested `uid` already exists
+          description: The organization already has a destination with the requested `uid`. The body has no `references`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityConflict'
+              example:
+                error:
+                  - a destination with uid 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10 already exists
         '422':
-          description: Validation failed; `error` lists every broken rule, for example a missing body, a duplicate name, an invalid endpoint or certificate, a missing secret or Splunk index, a value over its size limit or a string containing `${`.
+          description: Validation failed; `error` lists every broken rule, for example a missing body, a `uid` that is not a UUID, a duplicate name, an endpoint that is not an `https://` URL, an invalid certificate, a missing secret or Splunk index, a value over its size limit or a string containing `${`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - a destination named "Splunk Prod" already exists
+                  - endpoint must be an https:// URL
+                  - Splunk token is required
       tags:
         - ObservabilityDestination
   /v2/observability/destinations/{uid}:
@@ -11310,18 +11315,13 @@ paths:
       operationId: getObservabilityDestination
       summary: Retrieve a telemetry export destination
       description: |-
-        A secret (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` or a `headers` value) that is set is returned as `""`; a secret that is not set is left out. `""` therefore means "set but hidden", not "empty".
+        Secrets are redacted: a secret (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` or a `headers` value) that is stored is returned as `""`, and a secret that is not stored is left out. `""` therefore means "set but hidden", not "empty". A redacted secret cannot be recovered through the API.
 
         ---
 
         Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability destination
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityDestinationUid'
       responses:
         '200':
           description: OK
@@ -11329,94 +11329,138 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityDestination'
+              examples:
+                redactedHttp:
+                  summary: OTLP/HTTP destination with redacted secrets
+                  description: The bearer token, client key and header value are stored, so each is returned as `""`.
+                  value:
+                    uid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                    orgId: 9b1d6c1e-2f4a-4c55-8a0e-3d7f2b6a9c41
+                    name: OTLP Collector
+                    type: http
+                    accepts:
+                      - metrics
+                      - logs
+                    endpoint: https://otel.example.com:4318
+                    auth:
+                      type: bearer
+                      token: ''
+                    headers:
+                      X-Scope-OrgID: ''
+                    tls:
+                      certPem: |-
+                        -----BEGIN CERTIFICATE-----
+                        MIIB...
+                        -----END CERTIFICATE-----
+                      keyPem: ''
+                    encoding: proto
+                    compression: gzip
+                    timeoutSeconds: 30
+                redactedSplunk:
+                  summary: Splunk HEC destination with a redacted token
+                  value:
+                    uid: 0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
+                    orgId: 9b1d6c1e-2f4a-4c55-8a0e-3d7f2b6a9c41
+                    name: Splunk Prod
+                    type: splunk
+                    accepts:
+                      - logs
+                    endpoint: https://splunk.example.com:8088/services/collector
+                    splunk:
+                      token: ''
+                      metrics: {}
+                      logs:
+                        index: trustgrid_logs
+                        sourcetype: trustgrid:otel
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability destination not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
       tags:
         - ObservabilityDestination
     put:
       operationId: updateObservabilityDestination
       summary: Replace the configuration of a telemetry export destination
       description: |-
-        This is a full replacement: fields left out of the body are cleared, and `type` cannot be changed. To change one field, GET the destination, edit it and PUT the whole object back.
+        This is a full replacement, not a patch: fields left out of the body are cleared, and `type` cannot be changed. To change one field, GET the destination, edit it and PUT the whole object back. The `uid` in the path selects the destination; a `uid` in the body is ignored.
 
-        Secrets read back as `""`. Send a stored secret back as `""` (or leave the secret field out) to keep it, but keep sending the object that holds it:
+        Secrets read back as `""`. Send a stored secret back as `""` (or leave the secret field out) to keep the stored value, but keep sending the object that holds it:
         - a header name left out of `headers` removes that header;
         - leaving out `auth` resets it to `none` and drops the bearer token and basic auth password;
         - leaving out `tls` removes the TLS settings, and leaving out `tls.certPem` drops the client key.
 
-        Every secret must be re-entered with its real value when the endpoint scheme, host or port changes, and `tls.keyPem` must be re-entered when `tls.certPem` changes; otherwise the update fails with 422. Removing a signal from `accepts` that a pipeline still exports is rejected with 409. No string in the body may contain `${`.
+        Some changes require every stored secret to be re-entered with its real value, and the update fails with 422 if one is left blank:
+        - a change to the endpoint origin (scheme, host or port) requires re-entering the bearer token, basic auth password, Splunk token, every header value and the client key;
+        - a change to `tls.certPem` requires re-entering `tls.keyPem`.
+
+        Removing a signal from `accepts` while a pipeline of that kind still sends to this destination returns 409 with the blocking pipelines in `references`. No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
 
         ---
 
         Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability destination
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityDestinationUid'
       requestBody:
-        $ref: '#/components/requestBodies/ObservabilityDestination'
+        $ref: '#/components/requestBodies/ObservabilityDestinationUpdate'
       responses:
         '200':
-          description: OK
+          description: OK. The stored destination, redacted like a GET.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityDestination'
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability destination not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
         '409':
-          description: The update removes an accepted signal that the pipelines in `references` still export to this destination
+          description: |-
+            The update conflicts with stored state:
+            - it removes a signal from `accepts` that the pipelines in `references` still send to this destination;
+            - another request changed the destination, or a pipeline that uses it, at the same time. This body has no `references`; reload and try again.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityConflict'
+              examples:
+                signalInUse:
+                  summary: A pipeline still sends the removed signal
+                  value:
+                    error:
+                      - destination must keep accepting logs & events while pipelines send it
+                    references:
+                      - uid: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
+                        name: Prod logs
+                concurrentChange:
+                  summary: Another request changed the destination
+                  value:
+                    error:
+                      - destination was changed by another request; reload and try again
         '422':
-          description: Validation failed; `error` lists every broken rule, for example a missing body, a changed `type`, a secret that must be re-entered, an invalid endpoint or certificate, a value over its size limit or a string containing `${`.
+          description: Validation failed; `error` lists every broken rule, for example a missing body, a changed `type`, a secret that must be re-entered, an endpoint that is not an `https://` URL, an invalid certificate, a value over its size limit or a string containing `${`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - bearer token must be re-entered when the endpoint changes
+                  - type cannot be changed
       tags:
         - ObservabilityDestination
     delete:
       operationId: deleteObservabilityDestination
       summary: Delete a telemetry export destination that no pipeline uses
       description: |-
-        A destination still used by a pipeline cannot be deleted; the 409 response lists those pipelines.
+        A destination that a pipeline still uses cannot be deleted; the 409 response lists those pipelines in `references`.
 
         ---
 
         Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability destination
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityDestinationUid'
       responses:
         '200':
           description: OK
@@ -11425,23 +11469,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/OK'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability destination not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
         '409':
-          description: The destination is used by the pipelines in `references`
+          description: |-
+            The destination cannot be deleted:
+            - the pipelines in `references` still use it;
+            - another request changed the destination, or a pipeline started to use it, at the same time. This body has no `references`; reload and try again.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityConflict'
+              examples:
+                inUse:
+                  summary: Pipelines still use the destination
+                  value:
+                    error:
+                      - destination is used by one or more pipelines
+                    references:
+                      - uid: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
+                        name: Prod logs
+                      - uid: c41d2e8a-0b3f-4a6c-9d7e-1f2a3b4c5d6e
+                        name: Prod metrics
+                concurrentChange:
+                  summary: Another request changed the destination
+                  value:
+                    error:
+                      - destination was changed by another request; reload and try again
       tags:
         - ObservabilityDestination
   /v2/observability/pipelines:
@@ -11464,18 +11519,16 @@ paths:
                 items:
                   $ref: '#/components/schemas/ObservabilityPipeline'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
       tags:
         - ObservabilityPipeline
     post:
       operationId: createObservabilityPipeline
       summary: Create a pipeline that exports node metrics or logs & events to destinations
       description: |-
-        `uid` is optional; when omitted a UUID is generated. `enabled` defaults to true. `kind` cannot be changed after creation. Attribute ids come from `listObservabilityAttributeCatalog`. No string in the body may contain `${`.
+        `uid` is optional. When it is omitted or `""`, the server generates a UUID. When it is set, it must be a UUID; uids are scoped to the organization, and a uid that the organization already uses returns 409. `enabled` defaults to true. `kind` cannot be changed after creation. Attribute ids come from `listObservabilityAttributeCatalog`.
+
+        No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
 
         ---
 
@@ -11493,40 +11546,49 @@ paths:
                   uid:
                     description: The uid of the new pipeline
                     type: string
+                    example: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
                 required:
                   - uid
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '409':
-          description: A pipeline with the requested `uid` already exists
+          description: |-
+            The pipeline conflicts with stored state. The body has no `references`:
+            - the organization already has a pipeline with the requested `uid`;
+            - a destination in `destinationUids` changed while the pipeline was being saved; try again.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityConflict'
+              example:
+                error:
+                  - a pipeline with uid 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f already exists
         '422':
-          description: Validation failed; `error` lists every broken rule, for example a missing body, a duplicate name, an unknown destination or one that does not accept `kind`, an unknown attribute, a reserved or colliding emitted name, no enabled logs source, a value over its size limit or a string containing `${`.
+          description: Validation failed; `error` lists every broken rule, for example a missing body, a `uid` that is not a UUID, a duplicate name, an unknown destination or one that does not accept `kind`, an unknown attribute, a reserved or colliding emitted name, no enabled logs source, a value over its size limit or a string containing `${`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - Destination 'Splunk Prod' does not accept metrics
+                  - attribute "node.unknown" is not in the attribute catalog
       tags:
         - ObservabilityPipeline
   /v2/observability/pipelines/{uid}:
     get:
       operationId: getObservabilityPipeline
       summary: Retrieve a telemetry export pipeline
-      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      description: |-
+        Returns the stored pipeline. `selector` and `attributes` are always present, as `{}` and `[]` when empty.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability pipeline
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityPipelineUid'
       responses:
         '200':
           description: OK
@@ -11535,62 +11597,58 @@ paths:
               schema:
                 $ref: '#/components/schemas/ObservabilityPipeline'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability pipeline not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
       tags:
         - ObservabilityPipeline
     put:
       operationId: updateObservabilityPipeline
       summary: Replace the configuration of a telemetry export pipeline
       description: |-
-        This is a full replacement: fields left out of the body are cleared, except `enabled`, which keeps its stored value when omitted. `kind` cannot be changed. Use `enableObservabilityPipeline` or `disableObservabilityPipeline` to only enable or disable a pipeline. No string in the body may contain `${`.
+        This is a full replacement, not a patch: fields left out of the body are cleared, except `enabled`, which keeps its stored value when omitted. For example, leaving out `selector` selects every node, and leaving out `constants` removes them. `kind` cannot be changed. The `uid` in the path selects the pipeline; a `uid` in the body is ignored. Use `enableObservabilityPipeline` or `disableObservabilityPipeline` to only enable or disable a pipeline.
+
+        No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
 
         ---
 
         Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability pipeline
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityPipelineUid'
       requestBody:
-        $ref: '#/components/requestBodies/ObservabilityPipeline'
+        $ref: '#/components/requestBodies/ObservabilityPipelineUpdate'
       responses:
         '200':
-          description: OK
+          description: OK. The stored pipeline after normalization.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityPipeline'
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability pipeline not found
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+        '409':
+          description: A destination in `destinationUids` changed while the pipeline was being saved; try again. The body has no `references`.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
+                $ref: '#/components/schemas/ObservabilityConflict'
+              example:
+                error:
+                  - a destination changed while the pipeline was being saved; try again
         '422':
           description: Validation failed; `error` lists every broken rule, for example a missing body, a changed `kind`, a duplicate name, an unknown destination or one that does not accept `kind`, an unknown attribute, a reserved or colliding emitted name, no enabled logs source, a value over its size limit or a string containing `${`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - kind cannot be changed
+                  - enable at least one of events, changes or audits
       tags:
         - ObservabilityPipeline
     delete:
@@ -11598,12 +11656,7 @@ paths:
       summary: Delete a telemetry export pipeline and stop its exports
       description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability pipeline
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityPipelineUid'
       responses:
         '200':
           description: OK
@@ -11612,55 +11665,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/OK'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability pipeline not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
-      tags:
-        - ObservabilityPipeline
-  /v2/observability/pipelines/{uid}/enable:
-    post:
-      operationId: enableObservabilityPipeline
-      summary: Enable a telemetry export pipeline
-      description: |-
-        Only `enabled` changes and the rest of the pipeline is not re-validated.
-
-        ---
-
-        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
-      parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability pipeline
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OK'
-        '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
-        '404':
-          description: Observability pipeline not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
       tags:
         - ObservabilityPipeline
   /v2/observability/pipelines/{uid}/disable:
@@ -11668,18 +11675,13 @@ paths:
       operationId: disableObservabilityPipeline
       summary: Disable a telemetry export pipeline
       description: |-
-        Only `enabled` changes and the rest of the pipeline is not re-validated, so a pipeline can be disabled even after its destinations or the attribute catalog changed.
+        Sets only `enabled` to false. The rest of the pipeline is not re-validated, so a pipeline can be disabled even after its destinations or the attribute catalog changed. No request body is needed.
 
         ---
 
         Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: uid
-          in: path
-          required: true
-          description: The uid of the observability pipeline
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityPipelineUid'
       responses:
         '200':
           description: OK
@@ -11688,17 +11690,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/OK'
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability pipeline not found
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+      tags:
+        - ObservabilityPipeline
+  /v2/observability/pipelines/{uid}/enable:
+    post:
+      operationId: enableObservabilityPipeline
+      summary: Enable a telemetry export pipeline
+      description: |-
+        Sets only `enabled` to true. The rest of the pipeline is not re-validated. No request body is needed.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityPipelineUid'
+      responses:
+        '200':
+          description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ObservabilityNotFound'
+                $ref: '#/components/schemas/OK'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
       tags:
         - ObservabilityPipeline
   /v2/observability/attribute-catalog:
@@ -11706,7 +11725,7 @@ paths:
       operationId: listObservabilityAttributeCatalog
       summary: List the node attributes and tags a pipeline can attach to exported telemetry
       description: |-
-        Returns the built-in node attributes followed by one `tag.<name>` entry per organization tag.
+        Returns the built-in node attributes, in the order Trustgrid publishes them, followed by one `tag.<name>` entry for each organization tag name made of letters, digits, `_` and `-`, sorted case-insensitively. A tag entry has `label` set to the tag name, `emitAs` set to `tg.tag.<name>`, `type` set to `string` and `promotable` set to true. If Trustgrid has published no built-in attributes, only tag entries are returned.
 
         ---
 
@@ -11720,12 +11739,14 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ObservabilityCatalogEntry'
+              example:
+                - id: tag.region
+                  label: region
+                  emitAs: tg.tag.region
+                  type: string
+                  promotable: true
         '403':
-          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: '#/components/responses/ObservabilityForbidden'
       tags:
         - ObservabilityCatalog
 security:
@@ -11787,6 +11808,20 @@ components:
       description: BGP prefix entry ID
       in: path
       name: prefixId
+      required: true
+      schema:
+        type: string
+    observabilityDestinationUid:
+      description: The uid of the observability destination
+      in: path
+      name: uid
+      required: true
+      schema:
+        type: string
+    observabilityPipelineUid:
+      description: The uid of the observability pipeline
+      in: path
+      name: uid
       required: true
       schema:
         type: string
@@ -12647,15 +12682,192 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ObservabilityDestination'
-      description: Observability destination configuration
+          examples:
+            splunk:
+              summary: Splunk HEC destination for logs & events
+              value:
+                name: Splunk Prod
+                type: splunk
+                accepts:
+                  - logs
+                endpoint: https://splunk.example.com:8088/services/collector
+                splunk:
+                  token: example-hec-token
+                  logs:
+                    index: trustgrid_logs
+                    sourcetype: trustgrid:otel
+            http:
+              summary: OTLP/HTTP destination with a caller-chosen uid
+              value:
+                uid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                name: OTLP Collector
+                type: http
+                accepts:
+                  - metrics
+                  - logs
+                endpoint: https://otel.example.com:4318
+                auth:
+                  type: bearer
+                  token: example-bearer-token
+                headers:
+                  X-Scope-OrgID: tenant-a
+                encoding: proto
+                compression: gzip
+                timeoutSeconds: 30
+      description: Observability destination to create
+      required: true
+    ObservabilityDestinationUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityDestination'
+          examples:
+            keepSecrets:
+              summary: Full replacement that keeps the stored secrets
+              description: The body is the whole destination as read by GET, with `timeoutSeconds` changed. The redacted bearer token and header value are sent back as `""`, so the stored values are kept. The endpoint origin is unchanged, so no secret has to be re-entered.
+              value:
+                name: OTLP Collector
+                type: http
+                accepts:
+                  - metrics
+                  - logs
+                endpoint: https://otel.example.com:4318
+                auth:
+                  type: bearer
+                  token: ''
+                headers:
+                  X-Scope-OrgID: ''
+                encoding: proto
+                compression: gzip
+                timeoutSeconds: 60
+            newEndpoint:
+              summary: Full replacement that moves the endpoint
+              description: The endpoint host changes, so the bearer token and every header value must be sent with their real values. Sending `""` here returns 422.
+              value:
+                name: OTLP Collector
+                type: http
+                accepts:
+                  - metrics
+                  - logs
+                endpoint: https://otel-eu.example.com:4318
+                auth:
+                  type: bearer
+                  token: example-bearer-token
+                headers:
+                  X-Scope-OrgID: tenant-a
+                encoding: proto
+                compression: gzip
+                timeoutSeconds: 30
+      description: The complete replacement destination. Fields left out are cleared.
       required: true
     ObservabilityPipeline:
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ObservabilityPipeline'
-      description: Observability pipeline configuration
+          examples:
+            metrics:
+              summary: Metrics pipeline for tagged production nodes
+              value:
+                name: Prod metrics
+                kind: metrics
+                destinationUids:
+                  - 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                selector:
+                  lifecycleStates:
+                    - production
+                  tagMatches:
+                    region:
+                      - us-east
+                      - us-west
+                  matchMode: all
+                attributes:
+                  - id: tag.region
+                    promoteToMetricLabel: true
+                constants:
+                  environment: prod
+            logs:
+              summary: Logs & events pipeline that excludes org-level records
+              value:
+                name: Prod logs
+                kind: logs
+                destinationUids:
+                  - 0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
+                selector:
+                  lifecycleStates:
+                    - production
+                    - unset
+                logs:
+                  includeOrgLevel: false
+                  events:
+                    enabled: true
+                    minimumSeverity: WARNING
+                  changes:
+                    enabled: true
+                  audits:
+                    enabled: false
+      description: Observability pipeline to create
       required: true
+    ObservabilityPipelineUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityPipeline'
+          examples:
+            fullReplace:
+              summary: Full replacement of a metrics pipeline
+              description: The body is the whole pipeline. It adds a destination and a second tag value. `constants` is left out, so the stored constants are removed. `enabled` is left out, so the stored value is kept.
+              value:
+                name: Prod metrics
+                kind: metrics
+                destinationUids:
+                  - 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                  - 9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b
+                selector:
+                  lifecycleStates:
+                    - production
+                  tagMatches:
+                    region:
+                      - us-east
+                      - eu-west
+                attributes:
+                  - id: tag.region
+                    promoteToMetricLabel: true
+      description: The complete replacement pipeline. Fields left out are cleared, except `enabled`.
+      required: true
+  responses:
+    ObservabilityForbidden:
+      description: |-
+        Forbidden. The caller lacks the required permission, the organization does not have the `observability` feature enabled, or the user or source IP is not allowed. The body is plain text, not JSON, and no `Content-Type` header is set.
+      content:
+        text/plain:
+          schema:
+            $ref: '#/components/schemas/ObservabilityForbidden'
+          examples:
+            permission:
+              summary: Missing permission
+              value: Permission denied
+            feature:
+              summary: Feature not enabled
+              value: Feature not enabled
+    ObservabilityDestinationNotFound:
+      description: Observability destination not found in the organization
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityNotFound'
+    ObservabilityPipelineNotFound:
+      description: Observability pipeline not found in the organization
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityNotFound'
+    ObservabilityMalformedJSON:
+      description: The request body is not valid JSON. The JSON parser rejects it before validation, and the portal returns its generic HTML error page, not a JSON body.
+      content:
+        text/html:
+          schema:
+            type: string
   securitySchemes:
     JWTAuthorizer:
       description: >-
@@ -17548,17 +17760,17 @@ components:
         - logs
       type: string
     ObservabilityDestination:
-      description: |
-        A Splunk HEC (`splunk`) or OTLP/HTTP (`http`) endpoint that pipelines export telemetry to.
+      description: |-
+        A Splunk HEC (`splunk`) or OTLP/HTTP (`http`) endpoint that pipelines export telemetry to. The same fields are used for create, full-replace update and read.
 
-        Secrets (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` and every `headers` value) are write-only. Reads return a stored secret as `""` and leave out a secret that is not set, so `""` means "set but hidden", not "empty".
+        Secrets (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` and every `headers` value) are write-only. Reads return a stored secret as `""` and leave out a secret that is not stored, so `""` means "set but hidden", not "empty". A redacted secret cannot be recovered through the API.
 
-        An update replaces the whole destination. Send a stored secret back as `""` (or leave the secret field out) to keep it, but keep sending the object that holds it: a header name left out of `headers` is removed, leaving out `auth` resets it to `none`, leaving out `tls` removes the TLS settings and leaving out `tls.certPem` drops the client key. Every secret must be re-entered when the endpoint scheme, host or port changes, and `tls.keyPem` must be re-entered when `tls.certPem` changes.
+        An update replaces the whole destination. Send a stored secret back as `""` (or leave the secret field out) to keep the stored value, but keep sending the object that holds it: a header name left out of `headers` is removed, leaving out `auth` resets it to `none`, leaving out `tls` removes the TLS settings and leaving out `tls.certPem` drops the client key. Every secret must be re-entered with its real value when the endpoint origin (scheme, host or port) changes, and `tls.keyPem` must be re-entered when `tls.certPem` changes.
 
-        No string, secrets and PEMs included, may contain `${`.
+        No string or object key, secrets and PEMs included, may contain `${`.
       properties:
         uid:
-          description: Destination uid. Optional on create, where it must be a UUID and one is generated when omitted; on update it selects the destination.
+          description: Destination uid. Optional on create, where it must be a UUID; when it is omitted or `""`, a UUID is generated. Uids are scoped to the organization, and creating a destination with a uid the organization already uses returns 409. On update the path selects the destination and this field is ignored.
           type: string
         orgId:
           description: Organization ID, set by the server
@@ -17571,13 +17783,16 @@ components:
           pattern: ^[A-Za-z0-9][A-Za-z0-9 _.&-]*$
           type: string
         type:
-          description: Destination type, `splunk` (Splunk HEC) or `http` (OTLP/HTTP). Cannot be changed after creation.
+          description: |-
+            Destination transport. Cannot be changed after creation.
+            - `http`: OTLP/HTTP. Uses `auth`, `readBufferSize` and `writeBufferSize`.
+            - `splunk`: Splunk HEC. Uses `splunk`; `auth`, `readBufferSize` and `writeBufferSize` are ignored and not stored.
           enum:
             - splunk
             - http
           type: string
         accepts:
-          description: Signals this destination accepts, at least one and without duplicates. A signal cannot be removed while a pipeline of that kind sends to this destination.
+          description: Signals this destination accepts, at least one and without duplicates. A signal cannot be removed while a pipeline of that kind sends to this destination (409 with `references`).
           items:
             $ref: '#/components/schemas/ObservabilitySignal'
           maxItems: 2
@@ -17585,12 +17800,13 @@ components:
           type: array
           uniqueItems: true
         endpoint:
-          description: Absolute `http://` or `https://` URL without credentials. Changing its scheme, host or port requires re-entering every secret.
+          description: Absolute `https://` URL with a hostname and without credentials. Saving checks only the form of the URL; it does not resolve or contact the host. Changing its origin (scheme, host or port) requires re-entering every secret.
+          example: https://otel.example.com:4318
           type: string
         auth:
           $ref: '#/components/schemas/ObservabilityDestinationAuth'
         headers:
-          description: Extra HTTP headers sent with every export, at most 50, keyed by header name (RFC 7230 token characters). Values must not contain line breaks and are write-only. On create every value is required; on update send `""` to keep a stored value. A header name left out is removed.
+          description: Extra HTTP headers sent with every export, for both types, at most 50, keyed by header name (RFC 7230 token characters). Values must not contain line breaks and are write-only. On create every value is required. On update send `""` to keep a stored value of the same header name; a header name left out is removed.
           additionalProperties:
             type: string
           maxProperties: 50
@@ -17598,13 +17814,13 @@ components:
         tls:
           $ref: '#/components/schemas/ObservabilityDestinationTLS'
         encoding:
-          description: OTLP payload encoding
+          description: OTLP payload encoding. Leave it out to use the collector default; `null` is rejected.
           enum:
             - proto
             - json
           type: string
         compression:
-          description: Payload compression
+          description: Payload compression. Leave it out to use the collector default; `null` is rejected.
           enum:
             - gzip
             - zstd
@@ -17612,17 +17828,17 @@ components:
             - none
           type: string
         timeoutSeconds:
-          description: Export request timeout in seconds, an integer from 1 to 2147483647. Leave it out to use the collector default of 30.
+          description: Export request timeout in seconds, an integer from 1 to 2147483647. Leave it out to use the collector default; `null` is rejected.
           maximum: 2147483647
           minimum: 1
           type: integer
         readBufferSize:
-          description: HTTP client read buffer size in bytes for `http` destinations, an integer from 0 to 2147483647. Leave it out to use the collector default of 0. Ignored for `splunk` destinations.
+          description: HTTP client read buffer size in bytes for `http` destinations, an integer from 0 to 2147483647. Leave it out to use the collector default; `null` is rejected. Ignored and not stored for `splunk` destinations.
           maximum: 2147483647
           minimum: 0
           type: integer
         writeBufferSize:
-          description: HTTP client write buffer size in bytes for `http` destinations, an integer from 0 to 2147483647. Leave it out to use the collector default of 524288 (512 KiB). Ignored for `splunk` destinations.
+          description: HTTP client write buffer size in bytes for `http` destinations, an integer from 0 to 2147483647. Leave it out to use the collector default; `null` is rejected. Ignored and not stored for `splunk` destinations.
           maximum: 2147483647
           minimum: 0
           type: integer
@@ -17636,23 +17852,27 @@ components:
       title: ObservabilityDestination
       type: object
     ObservabilityDestinationAuth:
-      description: Authentication for `http` destinations; ignored for `splunk` destinations. Leaving `auth` out of an update resets it to `none` and drops the stored token and password.
+      description: Authentication for `http` destinations; ignored and not stored for `splunk` destinations. When `auth` is left out of an `http` destination, `type` is `none`, so leaving it out of an update drops the stored token and password.
       properties:
         type:
-          description: Authentication type. Defaults to `none`.
+          description: |-
+            Authentication type. Defaults to `none` when `auth` is left out; required when `auth` is sent.
+            - `none`: no authentication
+            - `bearer`: sends `token` as a bearer token
+            - `basic`: sends `username` and `password` as HTTP basic auth
           enum:
             - none
             - bearer
             - basic
           type: string
         token:
-          description: Bearer token, required for `bearer` on create. On update, `""` or leaving it out keeps the stored token. Write-only.
+          description: Bearer token, required for `bearer`. On update, `""` or leaving it out keeps the stored token unless the endpoint origin changes. Write-only.
           type: string
         username:
-          description: Username, required for `basic`
+          description: Username, required for `basic`. Leading and trailing spaces are trimmed. Not a secret; reads return it.
           type: string
         password:
-          description: Password, required for `basic` on create. On update, `""` or leaving it out keeps the stored password. Write-only.
+          description: Password, required for `basic`. On update, `""` or leaving it out keeps the stored password unless the endpoint origin changes. Write-only.
           type: string
       type: object
     ObservabilityDestinationTLS:
@@ -17660,22 +17880,26 @@ components:
       properties:
         insecureSkipVerify:
           description: Skip verification of the server certificate. `caPem` is not validated when this is true.
+          nullable: true
           type: boolean
         caPem:
-          description: PEM CA certificate chain used to verify the server. Must not contain a private key.
+          description: PEM CA certificate chain used to verify the server. Must not contain a private key. Not a secret; reads return it.
+          nullable: true
           type: string
         certPem:
-          description: PEM client certificate. Must be sent together with `keyPem` and must not contain a private key. Leaving it out of an update drops the stored client key.
+          description: PEM client certificate. Must be sent together with `keyPem`, must not contain a private key and must match `keyPem`. Not a secret; reads return it. Leaving it out of an update drops the stored client key.
+          nullable: true
           type: string
         keyPem:
-          description: PEM private key matching `certPem`, required with `certPem` on create. On update, `""` or leaving it out keeps the stored key while `certPem` is sent unchanged. Write-only.
+          description: PEM private key matching `certPem`. On update, `""` or leaving it out keeps the stored key only while `certPem` and the endpoint origin are unchanged; otherwise it must be re-entered. Write-only.
+          nullable: true
           type: string
       type: object
     ObservabilitySplunkDestination:
-      description: Splunk HEC settings, required for `splunk` destinations and ignored for `http` destinations.
+      description: Splunk HEC settings, required for `splunk` destinations and ignored and not stored for `http` destinations.
       properties:
         token:
-          description: Splunk HEC token, required on create. On update, `""` or leaving it out keeps the stored token. Write-only.
+          description: Splunk HEC token, required. On update, `""` or leaving it out keeps the stored token unless the endpoint origin changes. Write-only; reads return `""`.
           type: string
         metrics:
           $ref: '#/components/schemas/ObservabilitySplunkSignal'
@@ -17683,7 +17907,7 @@ components:
           $ref: '#/components/schemas/ObservabilitySplunkSignal'
       type: object
     ObservabilitySplunkSignal:
-      description: Splunk index and metadata for one signal. `index` is required when the destination accepts the signal.
+      description: Splunk index and metadata for one signal. `index` is required when the destination accepts the signal. Values are trimmed, and blank values are not stored, so reads can return `{}`.
       properties:
         index:
           description: Splunk index that receives the signal
@@ -17696,10 +17920,15 @@ components:
           type: string
       type: object
     ObservabilityPipeline:
-      description: Exports one signal (`kind`, which cannot be changed after creation) from the selected nodes to one or more destinations.
+      description: |-
+        Exports one signal (`kind`, which cannot be changed after creation) from the selected nodes to one or more destinations. The same fields are used for create, full-replace update and read.
+
+        The server normalizes what it stores and returns: `name` is trimmed, `selector` and `attributes` are always returned (as `{}` and `[]` when empty), empty selector lists and maps are dropped, an `emitAs` equal to the catalog default is dropped, `promoteToMetricLabel` is kept only when true, empty `constants` are dropped and `logs` sources always carry `enabled`.
+
+        No string or object key may contain `${`.
       properties:
         uid:
-          description: Pipeline uid. Optional on create, where it must be a UUID and one is generated when omitted; on update it selects the pipeline.
+          description: Pipeline uid. Optional on create, where it must be a UUID; when it is omitted or `""`, a UUID is generated. Uids are scoped to the organization, and creating a pipeline with a uid the organization already uses returns 409. On update the path selects the pipeline and this field is ignored.
           type: string
         orgId:
           description: Organization ID, set by the server
@@ -17712,12 +17941,12 @@ components:
           pattern: ^[A-Za-z0-9][A-Za-z0-9 _.&-]*$
           type: string
         enabled:
-          description: Whether the pipeline exports telemetry. Defaults to true on create; kept when omitted on update. `enableObservabilityPipeline` and `disableObservabilityPipeline` change only this field.
+          description: Whether the pipeline exports telemetry. Defaults to true on create; keeps the stored value when omitted on update. `enableObservabilityPipeline` and `disableObservabilityPipeline` change only this field.
           type: boolean
         kind:
           $ref: '#/components/schemas/ObservabilitySignal'
         destinationUids:
-          description: Uids of the destinations to export to, 1-50 without duplicates. Each must exist and accept `kind`.
+          description: Uids of the destinations to export to, 1-50 without duplicates. Each must exist in the organization and accept `kind`.
           items:
             type: string
           maxItems: 50
@@ -17736,7 +17965,7 @@ components:
           description: |-
             Constant attributes attached to every exported item, at most 50, keyed by emitted name. Values are 1-256 characters. Keys are 1-128 characters, start with a letter, contain only letters, digits, `_` and `.`, and must not be reserved or collide with another emitted name.
 
-            Reserved names: `nodeID`, `nodeName`, `orgID`, `dataType`, `host.name`, `timestamp`, `eventType`, `state`, `category`, `itemType`, `itemID`, `auditType`, `ip`, `userName`, `tg.lifecycle`, `routeKey`, and any name starting with `tg.internal.`. Names are compared after every `.` and `-` becomes `_`, so `host_name` is reserved too, and two emitted names (attributes or constants) that differ only in `.`, `-` and `_` collide.
+            Reserved names: `nodeID`, `nodeName`, `orgID`, `dataType`, `host.name`, `timestamp`, `eventType`, `state`, `category`, `itemType`, `itemID`, `auditType`, `ip`, `userName`, `interface`, `network`, `service.name`, `service.version`, `tg.lifecycle`, `routeKey`, and any name starting with `tg.internal.`. Names are compared after every `.` and `-` becomes `_`, so `host_name` is reserved too, and two emitted names (attributes or constants) that differ only in `.`, `-` and `_` collide.
           additionalProperties:
             maxLength: 256
             minLength: 1
@@ -17752,10 +17981,13 @@ components:
       title: ObservabilityPipeline
       type: object
     ObservabilitySelector:
-      description: Which nodes the pipeline exports from. An empty selector matches all nodes.
+      description: |-
+        Which nodes the pipeline exports from. An empty or omitted selector selects every node. Org-level logs records are not tied to a node, so the selector never applies to them; see `logs.includeOrgLevel`.
+
+        A node is selected when its lifecycle state is in `lifecycleStates` (if set) and it matches `tagMatches` (if set) as `matchMode` describes.
       properties:
         lifecycleStates:
-          description: Node lifecycle states to match, without duplicates. `unset` matches nodes without a lifecycle state.
+          description: Node lifecycle states to select, without duplicates. Empty or omitted selects every lifecycle state. `unset` selects nodes that have no lifecycle state.
           items:
             enum:
               - pre-production
@@ -17767,7 +17999,7 @@ components:
           type: array
           uniqueItems: true
         tagMatches:
-          description: Tag name to accepted values, at most 50 tags. Tag names contain only letters, digits, `_` and `-`. Each tag lists 1-100 non-empty values of at most 256 characters; a node matches a tag when its value is in the list.
+          description: Tag name to a list of accepted values, at most 50 tags. Tag names contain only letters, digits, `_` and `-`. Each tag lists 1-100 non-empty values of at most 256 characters; a node matches a tag when it has the tag and its value is one of the listed values. Each value must be a list, even for one value. Empty or omitted selects every tag.
           additionalProperties:
             items:
               maxLength: 256
@@ -17776,10 +18008,19 @@ components:
             maxItems: 100
             minItems: 1
             type: array
+          example:
+            region:
+              - us-east
+              - us-west
+            role:
+              - edge
           maxProperties: 50
           type: object
         matchMode:
-          description: Whether a node must match all selector conditions or any of them. Defaults to `all`.
+          description: |-
+            How the entries in `tagMatches` combine. Defaults to `all`. Lifecycle states always apply in addition.
+            - `all`: the node must match every listed tag.
+            - `any`: the node must match at least one listed tag.
           enum:
             - all
             - any
@@ -17789,28 +18030,28 @@ components:
       description: A catalog attribute attached to exported telemetry.
       properties:
         id:
-          description: Entry id from `listObservabilityAttributeCatalog`, for example `node.name`. `tag.<name>` is accepted for any tag name of letters, digits, `_` and `-`, even one the organization does not use yet.
+          description: Entry id from `listObservabilityAttributeCatalog`, for example `tag.region`. `tag.<name>` is accepted for any tag name of letters, digits, `_` and `-`, even one the organization does not use yet.
           type: string
         emitAs:
           description: |-
-            Emitted attribute name overriding the catalog default (`tg.tag.<name>` for tags). 1-128 characters, starts with a letter and contains only letters, digits, `_` and `.`. Must not be reserved or collide with another emitted name.
+            Emitted attribute name overriding the catalog default (`tg.tag.<name>` for tags). 1-128 characters, starts with a letter and contains only letters, digits, `_` and `.`. Must not be reserved or collide with another emitted name. A value equal to the catalog default is not stored, so reads leave it out.
 
-            Reserved names: `nodeID`, `nodeName`, `orgID`, `dataType`, `host.name`, `timestamp`, `eventType`, `state`, `category`, `itemType`, `itemID`, `auditType`, `ip`, `userName`, `tg.lifecycle`, `routeKey`, and any name starting with `tg.internal.`. Names are compared after every `.` and `-` becomes `_`, so `host_name` is reserved too, and two emitted names (attributes or constants) that differ only in `.`, `-` and `_` collide.
+            Reserved names: `nodeID`, `nodeName`, `orgID`, `dataType`, `host.name`, `timestamp`, `eventType`, `state`, `category`, `itemType`, `itemID`, `auditType`, `ip`, `userName`, `interface`, `network`, `service.name`, `service.version`, `tg.lifecycle`, `routeKey`, and any name starting with `tg.internal.`. Names are compared after every `.` and `-` becomes `_`, so `host_name` is reserved too, and two emitted names (attributes or constants) that differ only in `.`, `-` and `_` collide.
           maxLength: 128
           minLength: 1
           pattern: ^[A-Za-z][A-Za-z0-9_.]*$
           type: string
         promoteToMetricLabel:
-          description: Also attach the attribute as a metric label. Only on `metrics` pipelines, and only for catalog entries with `promotable` set.
+          description: Also attach the attribute as a metric label. Rejected on `logs` pipelines, and on `metrics` pipelines for built-in entries whose `promotable` is false; tag entries are always promotable. Only `true` is stored, so reads leave out `false`.
           type: boolean
       required:
         - id
       type: object
     ObservabilityLogSources:
-      description: Logs & events sources. Only allowed, and then required, on `logs` pipelines; at least one source must be enabled. `events` are node and org events such as connectivity and cluster changes, `changes` are configuration changes made in the portal, and `audits` are node audit records such as package upgrades, OS updates and commands run on a node.
+      description: Logs & events sources. Required on `logs` pipelines, where at least one of `events`, `changes` and `audits` must be enabled. Must be left out (or `null`) on `metrics` pipelines. `events` are node and org events such as connectivity and cluster changes, `changes` are configuration changes made in the portal, and `audits` are node audit records such as package upgrades, OS updates and commands run on a node.
       properties:
         includeOrgLevel:
-          description: Include organization-level events and changes that are not tied to a node; the selector never applies to them. Defaults to true.
+          description: Include org-level records, which are not tied to a node, for example events whose subject is not a node and changes or audits without a node. The selector never applies to them. Only `false` excludes them; omitted means true.
           type: boolean
         events:
           $ref: '#/components/schemas/ObservabilityEventSource'
@@ -17823,16 +18064,14 @@ components:
       description: The `changes` or `audits` logs & events source. Change and node audit records are always INFO, so these sources have no minimum severity.
       properties:
         enabled:
-          description: Whether this source is exported
+          description: Whether this source is exported. Omitted means false; reads always include it.
           type: boolean
-      required:
-        - enabled
       type: object
     ObservabilityEventSource:
       description: The node events source
       properties:
         enabled:
-          description: Whether node events are exported
+          description: Whether node events are exported. Omitted means false; reads always include it.
           type: boolean
         minimumSeverity:
           $ref: '#/components/schemas/ObservabilitySeverity'
@@ -17844,11 +18083,9 @@ components:
             type: string
           maxItems: 100
           type: array
-      required:
-        - enabled
       type: object
     ObservabilitySeverity:
-      description: Lowest severity exported
+      description: Lowest severity exported. Omitted exports every severity.
       enum:
         - INFO
         - WARNING
@@ -17859,19 +18096,19 @@ components:
       description: A node attribute or organization tag that pipelines can attach to exported telemetry.
       properties:
         id:
-          description: Entry id used in `attributes[].id`, for example `node.name` or `tag.<tag name>`
+          description: Entry id used in `attributes[].id`, for example `tag.region` for the `region` tag
           type: string
         label:
-          description: Human-readable name shown in the portal
+          description: Human-readable name shown in the portal. For a tag entry, the tag name.
           type: string
         emitAs:
-          description: Emitted attribute name used when a pipeline does not set `emitAs`
+          description: Emitted attribute name used when a pipeline does not set `emitAs`. Never empty. For a tag entry, `tg.tag.<name>`.
           type: string
         type:
           description: Value type of the attribute, for example `string`
           type: string
         promotable:
-          description: Whether `promoteToMetricLabel` is allowed for this entry
+          description: Whether `promoteToMetricLabel` is allowed for this entry on `metrics` pipelines. Always true for tag entries.
           type: boolean
       required:
         - id
@@ -17881,7 +18118,8 @@ components:
         - promotable
       type: object
     ObservabilityConflict:
-      description: The request conflicts with stored state
+      description: |-
+        409 body for observability requests that conflict with stored state. `error` is a list of messages. `references` is present only when other objects block the operation; for destination conflicts these are the pipelines that use the destination or still send the signal being removed.
       properties:
         error:
           description: Conflict messages
@@ -17889,26 +18127,51 @@ components:
             type: string
           type: array
         references:
-          description: Objects that block the operation, when it is blocked by other objects. For destination conflicts these are the pipelines that use the destination.
+          description: Objects that block the operation. Left out when nothing else blocks it, for example on a uid collision or a concurrent change.
           items:
-            properties:
-              uid:
-                description: Uid of the blocking object
-                type: string
-              name:
-                description: Name of the blocking object
-                type: string
-            required:
-              - uid
-              - name
-            type: object
+            $ref: '#/components/schemas/ObservabilityConflictReference'
           type: array
       required:
         - error
+      example:
+        error:
+          - destination is used by one or more pipelines
+        references:
+          - uid: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
+            name: Prod logs
       title: ObservabilityConflict
       type: object
+    ObservabilityConflictReference:
+      description: An object that blocks a conflicting operation, such as a pipeline that uses a destination.
+      properties:
+        uid:
+          description: Uid of the blocking object
+          type: string
+        name:
+          description: Name of the blocking object
+          type: string
+      required:
+        - uid
+        - name
+      title: ObservabilityConflictReference
+      type: object
+    ObservabilityErrors:
+      description: Generic observability JSON error body whose `error` is a list of messages. The portal uses this shape for 400 (bad request parameters), 429 (rate or concurrency limit) and some 503 responses. The 409 and 422 bodies have the same `error` list; see `ObservabilityConflict` and `ObservabilityValidationFailed`.
+      properties:
+        error:
+          description: Error messages
+          items:
+            type: string
+          type: array
+      required:
+        - error
+      example:
+        error:
+          - too many test requests, try again in a minute
+      title: ObservabilityErrors
+      type: object
     ObservabilityValidationFailed:
-      description: Validation failures. `error` lists every broken rule.
+      description: 422 body. `error` lists every broken rule, ordered by the field it concerns.
       properties:
         error:
           $ref: '#/components/schemas/ValidationFailed'
@@ -17917,12 +18180,41 @@ components:
       title: ObservabilityValidationFailed
       type: object
     ObservabilityNotFound:
-      description: The resource does not exist in the organization. Unlike the 409 and 422 bodies, `error` is a single string.
+      description: 404 body. The resource does not exist in the organization. Unlike the 409 and 422 bodies, `error` is a single string.
       properties:
         error:
           description: Always `Not found`
+          enum:
+            - Not found
           type: string
       required:
         - error
+      example:
+        error: Not found
       title: ObservabilityNotFound
       type: object
+    ObservabilityMessageError:
+      description: JSON error body whose `message` is a single string. The portal sends it when a supporting catalog is unavailable (503).
+      properties:
+        message:
+          description: Error message
+          type: string
+      required:
+        - message
+      title: ObservabilityMessageError
+      type: object
+    ObservabilityForbidden:
+      description: |-
+        Plain-text 403 body. The portal ends the response with the message and sets no `Content-Type` header. Possible values:
+        - `Permission denied`: the caller lacks the required permission.
+        - `Feature not enabled`: the organization does not have the `observability` feature.
+        - `Disabled user; access denied`: the user is inactive.
+        - `Disallowed IP`: the request comes from an IP address the organization does not allow.
+      enum:
+        - Permission denied
+        - Feature not enabled
+        - Disabled user; access denied
+        - Disallowed IP
+      example: Permission denied
+      title: ObservabilityForbidden
+      type: string
