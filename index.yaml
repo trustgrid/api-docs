@@ -109,15 +109,21 @@ tags:
   - name: ServiceUser
     description: |
       Machine accounts for API-only access, used for automation and integrations. Each service user can have API tokens generated without portal access. Requires `users::read` to view.
-  - name: ObservabilityExporter
+  - name: ObservabilityDestination
     description: |
-      [Observability exporters](https://docs.trustgrid.io/docs/observability/) configure telemetry data forwarding to external monitoring systems (Splunk, HTTP endpoints) via OpenTelemetry. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
-  - name: SplunkExporter
+      [Observability destinations](https://docs.trustgrid.io/docs/observability/) are the Splunk HEC or OTLP/HTTP endpoints that observability pipelines export OpenTelemetry metrics and logs to. Secrets (Splunk token, bearer token, basic auth password, TLS client key and custom header values) are write-only: reads return a stored secret as an empty string and leave out a secret that is not set. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
+  - name: ObservabilityPipeline
     description: |
-      Splunk-specific observability exporter configuration for forwarding Trustgrid telemetry to a Splunk HEC endpoint. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
-  - name: HTTPExporter
+      Observability pipelines select which nodes (by lifecycle state and tags) export metrics or logs & events to one or more observability destinations, which node attributes and constants are attached, and, for logs pipelines, which event, change and audit sources are included. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
+  - name: ObservabilityCatalog
     description: |
-      Generic HTTP observability exporter for forwarding telemetry to any OpenTelemetry-compatible HTTP endpoint. Requires `observability::read` to view, `observability::modify` to configure. Requires `observability` feature flag.
+      The observability attribute catalog lists the node attributes and organization tags a pipeline can attach to exported telemetry, with their default emitted names. Requires `observability::read` permission. Requires `observability` feature flag.
+  - name: ObservabilityActivity
+    description: |
+      [Observability activity](https://docs.trustgrid.io/docs/observability/) is the record of what happened to the organization's telemetry export: destination tests, delivery retries, rejections and drops reported by the Portal, the collector and Ray. Search groups activity into issues by fingerprint, and the category catalog lists the categories you can filter by. Retention, the default and maximum search window and page sizes are configurable and are returned in `limits`. Requires `observability::read` permission. Requires `observability` feature flag.
+  - name: ObservabilityOperatorActivity
+    description: |
+      Trustgrid operator view of [observability activity](https://docs.trustgrid.io/docs/observability/) that is not attributed to any organization (operator-only activity). These routes have no tenant scope and no feature flag check. Requires `trustgrid::portal:operator-activity:read` permission.
   - name: DNS
     description: |
       DNS configuration within virtual networks, including zone and record management for resolving names across the overlay network. Requires `virtual-networks::read` to view, `virtual-networks::modify` to manage.
@@ -189,14 +195,16 @@ x-tagGroups:
       - Auth Group
       - Certificate
       - Group
-      - HTTPExporter
       - IDP
-      - ObservabilityExporter
+      - ObservabilityActivity
+      - ObservabilityCatalog
+      - ObservabilityDestination
+      - ObservabilityOperatorActivity
+      - ObservabilityPipeline
       - Org
       - Order
       - Permissions
       - ServiceUser
-      - SplunkExporter
       - Tag
       - User
 
@@ -11234,228 +11242,1247 @@ paths:
       tags:
         - ServiceUser
 
-  /v2/observability-exporter:
+  /v2/observability/activity/categories:
     get:
-      operationId: listObservabilityExporters
-      summary: Retrieve all configured telemetry data exporters for external monitoring systems
-      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      operationId: listObservabilityActivityCategories
+      summary: List the activity categories you can filter activity search by
+      description: |-
+        Returns the current activity category catalog. Use an entry's `id` as a `categories` value in activity search, and show `label` and `description` to people. The catalog is configuration, not a fixed list; read it instead of hard-coding categories.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       responses:
         '200':
-          description: A list of observability exporters
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/ObservabilityActivityCategory'
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '503':
+          description: The category catalog is missing or invalid. Unlike other observability errors, the text is in `message`. Retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityMessageError'
+              example:
+                message: Activity category catalog is unavailable
+      tags:
+        - ObservabilityActivity
+  /v2/observability/activity/operator/categories:
+    get:
+      operationId: listObservabilityOperatorActivityCategories
+      summary: List the activity categories for operator activity search
+      description: |-
+        Returns the same activity category catalog as `listObservabilityActivityCategories`, for Trustgrid operators. There is no `observability` feature check on this route.
+
+        ---
+
+        Requires `trustgrid::portal:operator-activity:read` permission.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/ObservabilityActivityCategory'
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission. The body is plain text, `Permission denied`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '503':
+          description: The category catalog is missing or invalid. Unlike other observability errors, the text is in `message`. Retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityMessageError'
+              example:
+                message: Activity category catalog is unavailable
+      tags:
+        - ObservabilityOperatorActivity
+  /v2/observability/activity/operator/search:
+    get:
+      operationId: searchObservabilityOperatorActivity
+      summary: Search operator-only observability activity that is not attributed to an organization
+      description: |-
+        Searches operator-only activity: activity that is not attributed to any organization. Results are not scoped to a tenant and never include tenant activity. Every returned issue has `operatorOnly: true`. Parameters, paging, fingerprint history and the response are the same as `searchObservabilityActivity`. There is no `observability` feature check on this route. `sort=destination` and `sort=pipeline` order by uid, because there is no organization to look up names in.
+
+        ---
+
+        Requires `trustgrid::portal:operator-activity:read` permission.
+      parameters:
+        - $ref: '#/components/parameters/ObservabilityActivitySources'
+        - $ref: '#/components/parameters/ObservabilityActivitySource'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverities'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverity'
+        - $ref: '#/components/parameters/ObservabilityActivitySignals'
+        - $ref: '#/components/parameters/ObservabilityActivitySignal'
+        - $ref: '#/components/parameters/ObservabilityActivityCategories'
+        - $ref: '#/components/parameters/ObservabilityActivityCategory'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationID'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineID'
+        - $ref: '#/components/parameters/ObservabilityActivityComponents'
+        - $ref: '#/components/parameters/ObservabilityActivityComponent'
+        - $ref: '#/components/parameters/ObservabilityActivityText'
+        - $ref: '#/components/parameters/ObservabilityActivityStart'
+        - $ref: '#/components/parameters/ObservabilityActivityEnd'
+        - $ref: '#/components/parameters/ObservabilityActivityPageSize'
+        - $ref: '#/components/parameters/ObservabilityActivityCursor'
+        - $ref: '#/components/parameters/ObservabilityActivityFingerprint'
+        - $ref: '#/components/parameters/ObservabilityActivitySort'
+        - $ref: '#/components/parameters/ObservabilityActivityOrder'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivitySearchResponse'
+        '400':
+          description: A query parameter is invalid, or the activity store rejected the request (for example the window is too long or the cursor does not match). `error` lists the problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityErrors'
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission. The body is plain text, `Permission denied`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: The activity store is unavailable, timed out or returned an invalid response. The production portal returns its HTML error page, not JSON. Retry the same request.
+          content:
+            text/html:
+              schema:
+                type: string
+      tags:
+        - ObservabilityOperatorActivity
+  /v2/observability/activity/search:
+    get:
+      operationId: searchObservabilityActivity
+      summary: Search the organization's observability activity, grouped into issues
+      description: |-
+        Searches telemetry export activity for the caller's organization. The organization comes from authentication; there is no organization parameter. Matching activity is grouped into issues by `fingerprint`, and each page is ordered by `sort` and `order`.
+
+        **Filters.** `sources`, `severities`, `signals`, `categories`, `destinationIDs`, `pipelineIDs` and `components` can be repeated. Values of one parameter are combined with OR; different parameters are combined with AND. For example, `GET /v2/observability/activity/search?signals=logs&signals=metrics&severities=error` returns errors for logs or metrics. Each has a single-value alias (`source`, `severity`, `signal`, `category`, `destinationID`, `pipelineID`, `component`). Sending the alias and the repeatable parameter together, such as `signal=logs&signals=metrics`, is rejected with 400 `Use either signal or signals, not both`. `text` searches only the safe activity message.
+
+        **Paging.** When `hasMore` is true, request the next page with `cursor` set to `nextCursor`, for example `GET /v2/observability/activity/search?severities=error&cursor=eyJ2IjoxfQ`. Keep the same filters, `sort` and `order`. Pages are computed per request, so an issue that changes (for example a new occurrence) can move between pages.
+
+        **History.** To see the detail and history of one issue, send its `fingerprint` with a window, for example `GET /v2/observability/activity/search?fingerprint=sha256:3f5a…&start=2026-11-16T00:00:00Z&end=2026-11-17T00:00:00Z`. The response has that issue with `buckets` and `bucketSeconds`. Do not send the list cursor.
+
+        **Limits.** Retention, the default window, the maximum window and page sizes are configurable. `limits` in the response reports the values in effect; do not assume a fixed retention period.
+
+        **Reading results.**
+        - Activity is recorded and indexed asynchronously. New activity, including a destination test reported as `recorded`, can take time to appear.
+        - `incomplete: true` means the search timed out or could not read everything; the page can be missing issues.
+        - `matchingDocuments` counts the documents behind the returned page, not a global total.
+        - Activity keeps the uids of destinations and pipelines that were later deleted.
+        - An empty result, or no newer errors, does not prove that a destination or pipeline has recovered. `outcome` describes the recorded activity, not current health.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/ObservabilityActivitySources'
+        - $ref: '#/components/parameters/ObservabilityActivitySource'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverities'
+        - $ref: '#/components/parameters/ObservabilityActivitySeverity'
+        - $ref: '#/components/parameters/ObservabilityActivitySignals'
+        - $ref: '#/components/parameters/ObservabilityActivitySignal'
+        - $ref: '#/components/parameters/ObservabilityActivityCategories'
+        - $ref: '#/components/parameters/ObservabilityActivityCategory'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityDestinationID'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineIDs'
+        - $ref: '#/components/parameters/ObservabilityActivityPipelineID'
+        - $ref: '#/components/parameters/ObservabilityActivityComponents'
+        - $ref: '#/components/parameters/ObservabilityActivityComponent'
+        - $ref: '#/components/parameters/ObservabilityActivityText'
+        - $ref: '#/components/parameters/ObservabilityActivityStart'
+        - $ref: '#/components/parameters/ObservabilityActivityEnd'
+        - $ref: '#/components/parameters/ObservabilityActivityPageSize'
+        - $ref: '#/components/parameters/ObservabilityActivityCursor'
+        - $ref: '#/components/parameters/ObservabilityActivityFingerprint'
+        - $ref: '#/components/parameters/ObservabilityActivitySort'
+        - $ref: '#/components/parameters/ObservabilityActivityOrder'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityActivitySearchResponse'
+              examples:
+                multiValueSearchPage:
+                  summary: First page of signals=logs&signals=metrics&severities=error, with more pages
+                  value:
+                    limits:
+                      retentionDays: 7
+                      defaultWindowSeconds: 3600
+                      maxWindowDays: 7
+                      defaultPageSize: 50
+                      maxPageSize: 100
+                    windowStart: '2026-11-17T09:00:00Z'
+                    windowEnd: '2026-11-17T10:00:00Z'
+                    issues:
+                      - fingerprint: sha256:3f5a0c9e7b1d2468ace0135792468ace0135792468ace0135792468ace013579
+                        outcome: rejected
+                        source: collector
+                        component: destination
+                        objectID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        signal: logs
+                        severity: error
+                        category: export
+                        reasonCode: exporter_rejected
+                        message: Exporter rejected
+                        destinationID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        pipelineID: 7d1f0c52-3a8e-4b8a-9c11-2e5f4a6b7c8d
+                        firstSeen: '2026-11-17T09:05:00Z'
+                        lastSeen: '2026-11-17T09:55:00Z'
+                        documentCount: 4
+                        observedCount: 37
+                        buckets: []
+                    matchingDocuments: 4
+                    documentCountIsLowerBound: true
+                    hasMore: true
+                    nextCursor: eyJ2IjoxfQ
+                    incomplete: false
+                fingerprintHistory:
+                  summary: History of one issue (fingerprint with start and end)
+                  value:
+                    limits:
+                      retentionDays: 7
+                      defaultWindowSeconds: 3600
+                      maxWindowDays: 7
+                      defaultPageSize: 50
+                      maxPageSize: 100
+                    windowStart: '2026-11-17T09:00:00Z'
+                    windowEnd: '2026-11-17T10:00:00Z'
+                    bucketSeconds: 300
+                    issues:
+                      - fingerprint: sha256:3f5a0c9e7b1d2468ace0135792468ace0135792468ace0135792468ace013579
+                        outcome: rejected
+                        source: collector
+                        component: destination
+                        objectID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        signal: logs
+                        severity: error
+                        category: export
+                        reasonCode: exporter_rejected
+                        message: Exporter rejected
+                        destinationID: 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+                        pipelineID: 7d1f0c52-3a8e-4b8a-9c11-2e5f4a6b7c8d
+                        firstSeen: '2026-11-17T09:05:00Z'
+                        lastSeen: '2026-11-17T09:55:00Z'
+                        documentCount: 4
+                        observedCount: 37
+                        buckets:
+                          - bucketStart: '2026-11-17T09:05:00Z'
+                            firstSeen: '2026-11-17T09:05:12Z'
+                            lastSeen: '2026-11-17T09:09:41Z'
+                            documentCount: 1
+                            observedCount: 12
+                          - bucketStart: '2026-11-17T09:55:00Z'
+                            firstSeen: '2026-11-17T09:55:03Z'
+                            lastSeen: '2026-11-17T09:55:58Z'
+                            documentCount: 3
+                            observedCount: 25
+                    matchingDocuments: 4
+                    documentCountIsLowerBound: true
+                    hasMore: false
+                    incomplete: false
+        '400':
+          description: A query parameter is invalid, or the activity store rejected the request (for example the window is too long or the cursor does not match). `error` lists the problem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityErrors'
+              examples:
+                singularAndPlural:
+                  summary: signal and signals sent together
+                  value:
+                    error:
+                      - Use either signal or signals, not both
+                badFingerprint:
+                  summary: fingerprint does not match ^sha256:[0-9a-f]{64}$
+                  value:
+                    error:
+                      - Invalid activity fingerprint
+        '401':
+          description: Missing, expired or invalid credentials. The body is plain text or empty.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          description: The caller lacks the required permission, or the organization does not have the `observability` feature enabled. The body is plain text, `Permission denied` or `Feature not enabled`.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: The activity store is unavailable, timed out or returned an invalid response. The production portal returns its HTML error page, not JSON. Retry the same request.
+          content:
+            text/html:
+              schema:
+                type: string
+      tags:
+        - ObservabilityActivity
+  /v2/observability/attribute-catalog:
+    get:
+      operationId: listObservabilityAttributeCatalog
+      summary: List the node attributes and tags a pipeline can attach to exported telemetry
+      description: |-
+        Returns the built-in node attributes, in the order Trustgrid publishes them, followed by one `tag.<name>` entry for each organization tag name made of letters, digits, `_` and `-`, sorted case-insensitively. A tag entry has `label` set to the tag name, `emitAs` set to `tg.tag.<name>`, `type` set to `string` and `promotable` set to true. If Trustgrid has published no built-in attributes, only tag entries are returned.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      responses:
+        '200':
+          description: OK
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ObservabilityExporter'
+                  $ref: '#/components/schemas/ObservabilityCatalogEntry'
+              example:
+                - id: tag.region
+                  label: region
+                  emitAs: tg.tag.region
+                  type: string
+                  promotable: true
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
       tags:
-        - ObservabilityExporter
-    post:
-      summary: Configure a new telemetry data exporter for external monitoring integration
-      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
-      requestBody:
-        $ref: '#/components/requestBodies/ObservabilityExporter'
+        - ObservabilityCatalog
+  /v2/observability/destinations:
+    get:
+      operationId: listObservabilityDestinations
+      summary: List the telemetry export destinations configured for the organization
+      description: |-
+        Destinations are sorted by name. Secrets are redacted: a secret (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` or a `headers` value) that is stored is returned as `""`, and a secret that is not stored is left out. `""` therefore means "set but hidden", not "empty". No API returns a stored secret.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       responses:
         '200':
-          description: Observability exporter created
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ObservabilityDestination'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+      tags:
+        - ObservabilityDestination
+    post:
+      operationId: createObservabilityDestination
+      summary: Create a Splunk HEC or OTLP/HTTP destination for exported telemetry
+      description: |-
+        `uid` is optional. When it is omitted or `""`, the server generates a UUID. When it is set, it must be a UUID; uids are scoped to the organization, and a uid that the organization already uses returns 409. `type` cannot be changed after creation. Every secret the destination needs must be sent with its real value. Saving checks the form of `endpoint` but does not resolve or contact the host.
+
+        No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      requestBody:
+        $ref: '#/components/requestBodies/ObservabilityDestination'
+      responses:
+        '200':
+          description: OK
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   uid:
+                    description: The uid of the new destination
                     type: string
-        '422':
-          description: Validation failed
+                    example: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                required:
+                  - uid
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '409':
+          description: The organization already has a destination with the requested `uid`. The body has no `references`.
           content:
             application/json:
               schema:
-                description: ValidationFailed
-                items:
-                  description: Validation failure
-                  type: string
-                title: ValidationFailed
-                type: array
+                $ref: '#/components/schemas/ObservabilityConflict'
+              example:
+                error:
+                  - a destination with uid 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10 already exists
+        '422':
+          description: Validation failed; `error` lists every broken rule, for example a missing body, a `uid` that is not a UUID, a duplicate name, an endpoint that is not an `https://` URL, an invalid certificate, a missing secret or Splunk index, a value over its size limit or a string containing `${`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - a destination named "Splunk Prod" already exists
+                  - endpoint must be an https:// URL
+                  - Splunk token is required
       tags:
-        - ObservabilityExporter
-  /v2/observability-exporter/{id}:
-    get:
-      operationId: getObservabilityExporter
-      summary: Retrieve configuration details for a specific telemetry data exporter
-      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: The id of the observability exporter
-          schema:
-            type: string
+        - ObservabilityDestination
+  /v2/observability/destinations/test:
+    post:
+      operationId: testObservabilityDestinationDraft
+      summary: Send test data with unsaved destination settings
+      description: |-
+        Sends one synthetic record for each requested signal to the destination described in the body, and returns one result per signal. Nothing is saved. Use it to check settings before you create or update a destination.
+
+        The body is a destination, with the same fields as `createObservabilityDestination`, plus an optional `signals` list. It is validated with the same field rules as a create or update, and 422 lists every broken rule. The name does not have to be unique.
+        - Without `uid`, every secret the destination needs must be sent with its real value.
+        - With `uid`, the saved destination with that uid must exist, or the response is 404. A secret sent as `""` or left out reuses the saved value, under the same rules as `updateObservabilityDestination`: a change to the endpoint origin (scheme, host or port) requires re-entering every secret, and a change to `tls.certPem` requires re-entering `tls.keyPem`.
+
+        `signals` is optional. When it is left out or `null`, every signal in `accepts` is tested. Results are in the order of `accepts`.
+
+        The test is sent the same way as `testObservabilityDestination`: one OTLP log record or OTLP metric named `trustgrid.test` (a HEC event or metric for Splunk), only to `https://` endpoints that resolve to public addresses, without following redirects, within a budget of about 24 seconds. A refused endpoint is not an HTTP error; the result has `ok: false` and a `message` that starts with `The portal will not send to this endpoint:`. Secrets are never returned.
+
+        A destination-test activity is recorded only when the body names the `uid` of a saved destination. The activity is attributed to that saved destination, even though the draft settings were tested. Without `uid`, `activityStatus` is always `unavailable`.
+
+        Tests are limited per organization; see the 429 response.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservabilityDestinationTestDraft'
+            examples:
+              newDestination:
+                summary: Test a destination that is not saved yet
+                description: There is no `uid`, so the bearer token and header value must be sent with their real values.
+                value:
+                  name: OTLP Collector
+                  type: http
+                  accepts:
+                    - metrics
+                    - logs
+                  endpoint: https://otel.example.com:4318
+                  auth:
+                    type: bearer
+                    token: example-bearer-token
+                  headers:
+                    X-Scope-OrgID: tenant-a
+                  encoding: proto
+                  compression: gzip
+                  timeoutSeconds: 10
+              editedDestination:
+                summary: Test edits to a saved destination with its stored secrets
+                description: The `uid` names a saved destination. The bearer token and header value are sent as `""`, so the stored values are used. The endpoint origin is unchanged, so no secret has to be re-entered. Only `logs` is tested.
+                value:
+                  uid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                  name: OTLP Collector
+                  type: http
+                  accepts:
+                    - metrics
+                    - logs
+                  endpoint: https://otel.example.com:4318/otlp
+                  auth:
+                    type: bearer
+                    token: ''
+                  headers:
+                    X-Scope-OrgID: ''
+                  encoding: json
+                  compression: gzip
+                  timeoutSeconds: 10
+                  signals:
+                    - logs
+              blockedEndpoint:
+                summary: A draft whose endpoint is a private IP address
+                value:
+                  name: Internal Splunk
+                  type: splunk
+                  accepts:
+                    - logs
+                  endpoint: https://10.0.0.5:8088/services/collector
+                  splunk:
+                    token: example-hec-token
+                    logs:
+                      index: trustgrid_logs
       responses:
         '200':
-          description: An observability exporter
+          description: OK. One result per tested signal. A failed test is still a 200; check `ok` in each result.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ObservabilityExporter'
+                $ref: '#/components/schemas/ObservabilityDestinationTestResponse'
+              examples:
+                accepted:
+                  summary: A draft without uid was accepted; no activity is recorded
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: true
+                        status: 200
+                        durationMs: 431
+                        message: The destination accepted the test metric (HTTP 200).
+                        activityStatus: unavailable
+                      - signal: logs
+                        ok: true
+                        status: 200
+                        durationMs: 402
+                        message: The destination accepted the test log record (HTTP 200).
+                        activityStatus: unavailable
+                editedRecorded:
+                  summary: A draft with uid; the activity is recorded for the saved destination
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        status: 404
+                        durationMs: 377
+                        message: The destination returned HTTP 404 for /otlp/v1/logs. Enter the base URL; /v1/logs and /v1/metrics are appended automatically.
+                        response: 404 page not found
+                        activityStatus: recorded
+                blockedAddress:
+                  summary: The endpoint is a private IP address
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        durationMs: 1
+                        message: 'The portal will not send to this endpoint: endpoint IP address 10.0.0.5 is not allowed.'
+                        activityStatus: unavailable
+                blockedHostname:
+                  summary: The endpoint hostname resolves to a private address
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        durationMs: 23
+                        message: 'The portal will not send to this endpoint: endpoint resolves to a private, loopback, link-local or reserved address.'
+                        activityStatus: unavailable
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability exporter not found
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
+        '422':
+          description: Validation failed; `error` lists every broken rule in the destination, for example a missing body, an endpoint that is not an `https://` URL, a missing secret or a secret that must be re-entered. When the destination is valid, `signals` is checked next.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              examples:
+                invalidDraft:
+                  summary: The draft destination is invalid
+                  value:
+                    error:
+                      - endpoint must be an https:// URL
+                      - Splunk token is required
+                reEnter:
+                  summary: The endpoint moved, so the stored secrets cannot be reused
+                  value:
+                    error:
+                      - bearer token must be re-entered when the endpoint changes
+                notAccepted:
+                  summary: The draft does not accept a requested signal
+                  value:
+                    error:
+                      - destination does not accept metrics
+        '429':
+          $ref: '#/components/responses/ObservabilityTestTooManyRequests'
+        '503':
+          $ref: '#/components/responses/ObservabilityTestUnavailable'
       tags:
-        - ObservabilityExporter
-    put:
-      summary: Modify settings for an existing telemetry data exporter
-      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+        - ObservabilityDestination
+  /v2/observability/destinations/{uid}:
+    get:
+      operationId: getObservabilityDestination
+      summary: Retrieve a telemetry export destination
+      description: |-
+        Secrets are redacted: a secret (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` or a `headers` value) that is stored is returned as `""`, and a secret that is not stored is left out. `""` therefore means "set but hidden", not "empty". A redacted secret cannot be recovered through the API.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: The id of the observability exporter
-          schema:
-            type: string
-      requestBody:
-        $ref: '#/components/requestBodies/ObservabilityExporter'
+        - $ref: '#/components/parameters/observabilityDestinationUid'
       responses:
         '200':
           description: OK
-        '422':
-          description: Validation failed
           content:
             application/json:
               schema:
-                description: ValidationFailed
-                items:
-                  description: Validation failure
-                  type: string
-                title: ValidationFailed
-                type: array
+                $ref: '#/components/schemas/ObservabilityDestination'
+              examples:
+                redactedHttp:
+                  summary: OTLP/HTTP destination with redacted secrets
+                  description: The bearer token, client key and header value are stored, so each is returned as `""`.
+                  value:
+                    uid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                    orgId: 9b1d6c1e-2f4a-4c55-8a0e-3d7f2b6a9c41
+                    name: OTLP Collector
+                    type: http
+                    accepts:
+                      - metrics
+                      - logs
+                    endpoint: https://otel.example.com:4318
+                    auth:
+                      type: bearer
+                      token: ''
+                    headers:
+                      X-Scope-OrgID: ''
+                    tls:
+                      certPem: |-
+                        -----BEGIN CERTIFICATE-----
+                        MIIB...
+                        -----END CERTIFICATE-----
+                      keyPem: ''
+                    encoding: proto
+                    compression: gzip
+                    timeoutSeconds: 30
+                redactedSplunk:
+                  summary: Splunk HEC destination with a redacted token
+                  value:
+                    uid: 0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
+                    orgId: 9b1d6c1e-2f4a-4c55-8a0e-3d7f2b6a9c41
+                    name: Splunk Prod
+                    type: splunk
+                    accepts:
+                      - logs
+                    endpoint: https://splunk.example.com:8088/services/collector
+                    splunk:
+                      token: ''
+                      metrics: {}
+                      logs:
+                        index: trustgrid_logs
+                        sourcetype: trustgrid:otel
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability exporter not found
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
       tags:
-        - ObservabilityExporter
+        - ObservabilityDestination
+    put:
+      operationId: updateObservabilityDestination
+      summary: Replace the configuration of a telemetry export destination
+      description: |-
+        This is a full replacement, not a patch: fields left out of the body are cleared, and `type` cannot be changed. To change one field, GET the destination, edit it and PUT the whole object back. The `uid` in the path selects the destination; a `uid` in the body is ignored.
+
+        Secrets read back as `""`. Send a stored secret back as `""` (or leave the secret field out) to keep the stored value, but keep sending the object that holds it:
+        - a header name left out of `headers` removes that header;
+        - leaving out `auth` resets it to `none` and drops the bearer token and basic auth password;
+        - leaving out `tls` removes the TLS settings, and leaving out `tls.certPem` drops the client key.
+
+        Some changes require every stored secret to be re-entered with its real value, and the update fails with 422 if one is left blank:
+        - a change to the endpoint origin (scheme, host or port) requires re-entering the bearer token, basic auth password, Splunk token, every header value and the client key;
+        - a change to `tls.certPem` requires re-entering `tls.keyPem`.
+
+        Removing a signal from `accepts` while a pipeline of that kind still sends to this destination returns 409 with the blocking pipelines in `references`. No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityDestinationUid'
+      requestBody:
+        $ref: '#/components/requestBodies/ObservabilityDestinationUpdate'
+      responses:
+        '200':
+          description: OK. The stored destination, redacted like a GET.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityDestination'
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
+        '409':
+          description: |-
+            The update conflicts with stored state:
+            - it removes a signal from `accepts` that the pipelines in `references` still send to this destination;
+            - another request changed the destination, or a pipeline that uses it, at the same time. This body has no `references`; reload and try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityConflict'
+              examples:
+                signalInUse:
+                  summary: A pipeline still sends the removed signal
+                  value:
+                    error:
+                      - destination must keep accepting logs & events while pipelines send it
+                    references:
+                      - uid: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
+                        name: Prod logs
+                concurrentChange:
+                  summary: Another request changed the destination
+                  value:
+                    error:
+                      - destination was changed by another request; reload and try again
+        '422':
+          description: Validation failed; `error` lists every broken rule, for example a missing body, a changed `type`, a secret that must be re-entered, an endpoint that is not an `https://` URL, an invalid certificate, a value over its size limit or a string containing `${`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - bearer token must be re-entered when the endpoint changes
+                  - type cannot be changed
+      tags:
+        - ObservabilityDestination
     delete:
-      summary: Remove a telemetry data exporter and stop external monitoring integration
-      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      operationId: deleteObservabilityDestination
+      summary: Delete a telemetry export destination that no pipeline uses
+      description: |-
+        A destination that a pipeline still uses cannot be deleted; the 409 response lists those pipelines in `references`.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: The id of the observability exporter
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityDestinationUid'
       responses:
         '200':
           description: OK
-      tags:
-        - ObservabilityExporter
-  /v2/observability-exporter/splunk/{id}:
-    get:
-      operationId: getSplunkObservabilityExporter
-      summary: Retrieve Splunk-specific configuration for a telemetry data exporter
-      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: The id of the observability exporter
-          schema:
-            type: string
-      responses:
-        '200':
-          description: An observability exporter
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SplunkExporter'
+                $ref: '#/components/schemas/OK'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability exporter not found
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
+        '409':
+          description: |-
+            The destination cannot be deleted:
+            - the pipelines in `references` still use it;
+            - another request changed the destination, or a pipeline started to use it, at the same time. This body has no `references`; reload and try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityConflict'
+              examples:
+                inUse:
+                  summary: Pipelines still use the destination
+                  value:
+                    error:
+                      - destination is used by one or more pipelines
+                    references:
+                      - uid: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
+                        name: Prod logs
+                      - uid: c41d2e8a-0b3f-4a6c-9d7e-1f2a3b4c5d6e
+                        name: Prod metrics
+                concurrentChange:
+                  summary: Another request changed the destination
+                  value:
+                    error:
+                      - destination was changed by another request; reload and try again
       tags:
-        - ObservabilityExporter
-        - SplunkExporter
-    put:
-      summary: Modify Splunk-specific settings for a telemetry data exporter
-      description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+        - ObservabilityDestination
+  /v2/observability/destinations/{uid}/test:
+    post:
+      operationId: testObservabilityDestination
+      summary: Send test data to a saved telemetry export destination
+      description: |-
+        Sends one synthetic record for each requested signal to a saved destination, with its saved settings, and returns one result per signal. Use `testObservabilityDestinationDraft` to test settings before you save them.
+
+        `signals` is optional. When the body or `signals` is left out or `null`, every signal the destination accepts is tested. Results are in the order of the destination's `accepts`.
+
+        How the test is sent:
+        - `logs` sends one OTLP log record and `metrics` sends one OTLP metric named `trustgrid.test`. Splunk destinations get the same data as a HEC event or HEC metric.
+        - The test uses the destination's transport settings: auth, headers, TLS, encoding, compression and `timeoutSeconds`, capped at 20 seconds. `http` destinations get `/v1/logs` or `/v1/metrics` appended to `endpoint`. `splunk` endpoints are used as entered.
+        - The portal sends only to `https://` endpoints. It resolves the hostname and refuses `localhost` and any hostname or IP address that is private, loopback, link-local, multicast or reserved, including the cloud metadata addresses `169.254.169.254`, `100.100.100.200` and `fd00:ec2::254`. The connection is made to the addresses that were checked. Redirects are not followed; the result tells you to enter the final URL.
+        - A refused endpoint is not an HTTP error. The result has `ok: false` and a `message` that starts with `The portal will not send to this endpoint:`.
+        - The request has a budget of about 24 seconds. A signal that does not finish in time gets `ok: false` and `The test did not finish within N seconds.`
+        - Secrets are never returned. They are removed from `message` and `response`.
+
+        Each result records a destination-test activity (category `destination_test`) for this destination. `activityStatus` tells you what happened to it.
+
+        Tests are limited per organization; see the 429 response. A passing test shows that the destination accepted one test record. It does not prove that a pipeline delivers telemetry to it; use `checkObservabilityPipeline` to check a pipeline.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: The id of the observability exporter
-          schema:
-            type: string
+        - $ref: '#/components/parameters/observabilityDestinationUid'
       requestBody:
-        $ref: '#/components/requestBodies/SplunkExporter'
+        description: Optional. Leave out the body, or `signals`, to test every signal the destination accepts.
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservabilityDestinationTestOptions'
+            examples:
+              allSignals:
+                summary: Test every signal the destination accepts
+                value: {}
+              logsOnly:
+                summary: Test only logs & events
+                value:
+                  signals:
+                    - logs
+      responses:
+        '200':
+          description: OK. One result per tested signal. A failed test is still a 200; check `ok` in each result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityDestinationTestResponse'
+              examples:
+                recorded:
+                  summary: Both signals accepted; the activity was recorded
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: true
+                        status: 200
+                        durationMs: 412
+                        message: The destination accepted the test metric (HTTP 200).
+                        activityStatus: recorded
+                      - signal: logs
+                        ok: true
+                        status: 200
+                        durationMs: 398
+                        message: The destination accepted the test log record (HTTP 200).
+                        activityStatus: recorded
+                pending:
+                  summary: A repeated failure; the activity will be published later
+                  description: The same result was recorded moments ago, so this activity is merged with it and published at the next publish interval.
+                  value:
+                    results:
+                      - signal: logs
+                        ok: false
+                        status: 403
+                        durationMs: 287
+                        message: 'Splunk rejected the HEC token (HTTP 403, code 4: Invalid token). Check the token.'
+                        response: '{"text":"Invalid token","code":4}'
+                        activityStatus: pending
+                disabled:
+                  summary: Activity publishing is turned off
+                  value:
+                    results:
+                      - signal: logs
+                        ok: true
+                        status: 200
+                        durationMs: 351
+                        message: 'Splunk accepted the test log record (HTTP 200, code 0: Success).'
+                        response: '{"text":"Success","code":0}'
+                        activityStatus: disabled
+                unavailable:
+                  summary: DNS lookups were busy; the activity was not published
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: false
+                        durationMs: 4
+                        message: DNS lookups are busy; try again shortly.
+                        retryable: true
+                        activityStatus: unavailable
+                timedOut:
+                  summary: The destination did not answer in time
+                  value:
+                    results:
+                      - signal: metrics
+                        ok: false
+                        durationMs: 23998
+                        message: The test did not finish within 24 seconds.
+                        activityStatus: recorded
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityDestinationNotFound'
+        '422':
+          description: Validation of `signals` failed. `signals` must be a non-empty list of signals that the destination accepts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              examples:
+                notAccepted:
+                  summary: The destination does not accept a requested signal
+                  value:
+                    error:
+                      - destination does not accept metrics
+                empty:
+                  summary: signals is empty or not a list of strings
+                  value:
+                    error:
+                      - signals must be a non-empty list of signals
+        '429':
+          $ref: '#/components/responses/ObservabilityTestTooManyRequests'
+        '503':
+          $ref: '#/components/responses/ObservabilityTestUnavailable'
+      tags:
+        - ObservabilityDestination
+  /v2/observability/pipelines:
+    get:
+      operationId: listObservabilityPipelines
+      summary: List the telemetry export pipelines configured for the organization
+      description: |-
+        Pipelines are sorted by name.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
       responses:
         '200':
           description: OK
-        '422':
-          description: Validation failed
           content:
             application/json:
               schema:
-                description: ValidationFailed
-                items:
-                  description: Validation failure
-                  type: string
-                title: ValidationFailed
                 type: array
-        '404':
-          description: Observability exporter not found
+                items:
+                  $ref: '#/components/schemas/ObservabilityPipeline'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
       tags:
-        - ObservabilityExporter
-        - SplunkExporter
-  /v2/observability-exporter/http/{id}:
-    get:
-      operationId: getHttpObservabilityExporter
-      summary: Retrieve HTTP-specific configuration for a telemetry data exporter
-      description: Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: The id of the observability exporter
-          schema:
-            type: string
+        - ObservabilityPipeline
+    post:
+      operationId: createObservabilityPipeline
+      summary: Create a pipeline that exports node metrics or logs & events to destinations
+      description: |-
+        `uid` is optional. When it is omitted or `""`, the server generates a UUID. When it is set, it must be a UUID; uids are scoped to the organization, and a uid that the organization already uses returns 409. `enabled` defaults to true. `kind` cannot be changed after creation. Attribute ids come from `listObservabilityAttributeCatalog`.
+
+        No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      requestBody:
+        $ref: '#/components/requestBodies/ObservabilityPipeline'
       responses:
         '200':
-          description: An observability exporter
+          description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPExporter'
-        '404':
-          description: Observability exporter not found
+                type: object
+                properties:
+                  uid:
+                    description: The uid of the new pipeline
+                    type: string
+                    example: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
+                required:
+                  - uid
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '409':
+          description: |-
+            The pipeline conflicts with stored state. The body has no `references`:
+            - the organization already has a pipeline with the requested `uid`;
+            - a destination in `destinationUids` changed while the pipeline was being saved; try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityConflict'
+              example:
+                error:
+                  - a pipeline with uid 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f already exists
+        '422':
+          description: Validation failed; `error` lists every broken rule, for example a missing body, a `uid` that is not a UUID, a duplicate name, an unknown destination or one that does not accept `kind`, an unknown attribute, a reserved or colliding emitted name, no enabled logs source, a value over its size limit or a string containing `${`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - Destination 'Splunk Prod' does not accept metrics
+                  - attribute "node.unknown" is not in the attribute catalog
       tags:
-        - ObservabilityExporter
-        - HTTPExporter
+        - ObservabilityPipeline
+  /v2/observability/pipelines/{uid}:
+    get:
+      operationId: getObservabilityPipeline
+      summary: Retrieve a telemetry export pipeline
+      description: |-
+        Returns the stored pipeline. `selector` and `attributes` are always present, as `{}` and `[]` when empty.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityPipelineUid'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityPipeline'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+      tags:
+        - ObservabilityPipeline
     put:
-      summary: Modify HTTP-specific settings for a telemetry data exporter
+      operationId: updateObservabilityPipeline
+      summary: Replace the configuration of a telemetry export pipeline
+      description: |-
+        This is a full replacement, not a patch: fields left out of the body are cleared, except `enabled`, which keeps its stored value when omitted. For example, leaving out `selector` selects every node, and leaving out `constants` removes them. `kind` cannot be changed. The `uid` in the path selects the pipeline; a `uid` in the body is ignored. Use `enableObservabilityPipeline` or `disableObservabilityPipeline` to only enable or disable a pipeline.
+
+        No string or object key in the body may contain `${`, and no object key may be `__proto__`, `constructor` or `prototype`.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityPipelineUid'
+      requestBody:
+        $ref: '#/components/requestBodies/ObservabilityPipelineUpdate'
+      responses:
+        '200':
+          description: OK. The stored pipeline after normalization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityPipeline'
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+        '409':
+          description: A destination in `destinationUids` changed while the pipeline was being saved; try again. The body has no `references`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityConflict'
+              example:
+                error:
+                  - a destination changed while the pipeline was being saved; try again
+        '422':
+          description: Validation failed; `error` lists every broken rule, for example a missing body, a changed `kind`, a duplicate name, an unknown destination or one that does not accept `kind`, an unknown attribute, a reserved or colliding emitted name, no enabled logs source, a value over its size limit or a string containing `${`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              example:
+                error:
+                  - kind cannot be changed
+                  - enable at least one of events, changes or audits
+      tags:
+        - ObservabilityPipeline
+    delete:
+      operationId: deleteObservabilityPipeline
+      summary: Delete a telemetry export pipeline and stop its exports
       description: Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: The id of the observability exporter
-          schema:
-            type: string
-      requestBody:
-        $ref: '#/components/requestBodies/HTTPExporter'
+        - $ref: '#/components/parameters/observabilityPipelineUid'
       responses:
         '200':
           description: OK
-        '422':
-          description: Validation failed
           content:
             application/json:
               schema:
-                description: ValidationFailed
-                items:
-                  description: Validation failure
-                  type: string
-                title: ValidationFailed
-                type: array
+                $ref: '#/components/schemas/OK'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
         '404':
-          description: Observability exporter not found
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
       tags:
-        - ObservabilityExporter
-        - HTTPExporter
+        - ObservabilityPipeline
+  /v2/observability/pipelines/{uid}/check:
+    post:
+      operationId: checkObservabilityPipeline
+      summary: Check whether the collector would run a pipeline and deliver a sample record
+      description: |-
+        Evaluates the saved pipeline against the organization's saved destinations and the attribute catalog, and reports what the collector would do. Nothing is sent and nothing is saved. The result evaluates saved settings only. It is not proof that real telemetry reached a destination; use `testObservabilityDestination` to send test data.
+
+        Without `record`, only the pipeline is checked. `verdict` is `ok` when the collector would run the pipeline, and `skipped` when it would skip it.
+
+        With `record`, the check also follows one sample record through the pipeline. `verdict` is:
+        - `skipped`: the collector would skip the pipeline, so the record is not delivered;
+        - `dropped`: the checks show the record would not be delivered;
+        - `unknown`: delivery depends on node selection for a node you cannot read;
+        - `delivered`: the record would be delivered. An `info` check `record.timing` then notes that node tag and lifecycle changes usually reach telemetry within seconds, and at most five minutes.
+
+        Node data is read with your permissions. If you do not have `nodes::read` on `record.nodeId`, the request still succeeds: the node is treated as unreadable and the verdict can be `unknown`. A node that does not exist is treated as not found.
+
+        ---
+
+        Requires `observability::read` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityPipelineUid'
+      requestBody:
+        description: Optional. Leave out the body, or `record`, to check only the pipeline.
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservabilityPipelineCheckRequest'
+            examples:
+              pipelineOnly:
+                summary: Check only the pipeline
+                value: {}
+              nodeEvent:
+                summary: Check a node event against a logs pipeline
+                value:
+                  record:
+                    source: events
+                    nodeId: 3c9a1f0e-6b2d-4e7a-9c15-8d4f2a7b6e01
+                    eventType: Node Disconnect
+                    level: ERROR
+              nodeMetrics:
+                summary: Check node metrics against a metrics pipeline
+                value:
+                  record:
+                    source: metrics
+                    nodeId: 8e2b5d14-0f3a-4c69-b7d8-1a6e9c3f4b22
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityPipelineCheckResult'
+              examples:
+                delivered:
+                  summary: A record would be delivered (excerpt)
+                  description: Excerpt. A real response lists every pipeline and record check; only the `record.timing` check added to a `delivered` verdict is shown.
+                  value:
+                    verdict: delivered
+                    checks:
+                      - id: record.timing
+                        group: record
+                        label: Timing
+                        status: info
+                        detail: Node tag and lifecycle changes usually reach telemetry within seconds, and at most five minutes.
+                    destinations:
+                      total: 1
+                      usable: 1
+                unknown:
+                  summary: The caller cannot read the record's node (excerpt)
+                  description: Excerpt. The caller lacks `nodes::read` on `record.nodeId`, so node selection cannot be evaluated. The checks are left out.
+                  value:
+                    verdict: unknown
+                    checks: []
+                    destinations:
+                      total: 1
+                      usable: 1
+        '400':
+          $ref: '#/components/responses/ObservabilityMalformedJSON'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+        '422':
+          description: Validation of `record` failed; `error` lists every broken rule. The record is validated against the pipeline and its source.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityValidationFailed'
+              examples:
+                notAnObject:
+                  summary: record is not an object
+                  value:
+                    error:
+                      - record must be an object
+      tags:
+        - ObservabilityPipeline
+  /v2/observability/pipelines/{uid}/disable:
+    post:
+      operationId: disableObservabilityPipeline
+      summary: Disable a telemetry export pipeline
+      description: |-
+        Sets only `enabled` to false. The rest of the pipeline is not re-validated, so a pipeline can be disabled even after its destinations or the attribute catalog changed. No request body is needed.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityPipelineUid'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OK'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+      tags:
+        - ObservabilityPipeline
+  /v2/observability/pipelines/{uid}/enable:
+    post:
+      operationId: enableObservabilityPipeline
+      summary: Enable a telemetry export pipeline
+      description: |-
+        Sets only `enabled` to true. The rest of the pipeline is not re-validated. No request body is needed.
+
+        ---
+
+        Requires `observability::modify` permission and Organization `observability` feature needs to be enabled.
+      parameters:
+        - $ref: '#/components/parameters/observabilityPipelineUid'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OK'
+        '403':
+          $ref: '#/components/responses/ObservabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ObservabilityPipelineNotFound'
+      tags:
+        - ObservabilityPipeline
 security:
   - JWTAuthorizer: []
 servers:
@@ -11518,6 +12545,284 @@ components:
       required: true
       schema:
         type: string
+    observabilityDestinationUid:
+      description: The uid of the observability destination
+      in: path
+      name: uid
+      required: true
+      schema:
+        type: string
+    observabilityPipelineUid:
+      description: The uid of the observability pipeline
+      in: path
+      name: uid
+      required: true
+      schema:
+        type: string
+    ObservabilityActivitySources:
+      description: |-
+        Only return activity reported by these sources. Repeat the parameter for more than one value (`sources=portal&sources=ray`); a value matches if it equals any of them. Up to 100 values. Cannot be combined with `source`.
+
+        - `portal`: the Trustgrid Portal (for example destination tests)
+        - `collector`: the telemetry collector that exports to destinations
+        - `ray`: Trustgrid's telemetry processing service
+      in: query
+      name: sources
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/components/schemas/ObservabilityActivitySource'
+      example:
+        - collector
+        - ray
+    ObservabilityActivitySource:
+      description: Single-value alias of `sources`. Cannot be combined with `sources` and cannot be repeated.
+      in: query
+      name: source
+      required: false
+      schema:
+        $ref: '#/components/schemas/ObservabilityActivitySource'
+    ObservabilityActivitySeverities:
+      description: |-
+        Only return activity with one of these severities. Repeat the parameter for more than one value (`severities=warn&severities=error`). Up to 100 values. Cannot be combined with `severity`.
+      in: query
+      name: severities
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/components/schemas/ObservabilityActivitySeverity'
+      example:
+        - warn
+        - error
+    ObservabilityActivitySeverity:
+      description: Single-value alias of `severities`. Cannot be combined with `severities` and cannot be repeated.
+      in: query
+      name: severity
+      required: false
+      schema:
+        $ref: '#/components/schemas/ObservabilityActivitySeverity'
+    ObservabilityActivitySignals:
+      description: |-
+        Only return activity for one of these telemetry signals. Repeat the parameter for both (`signals=logs&signals=metrics`). Cannot be combined with `signal`.
+
+        - `metrics`: metrics export
+        - `logs`: logs & events export
+      in: query
+      name: signals
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/components/schemas/ObservabilityActivitySignal'
+      example:
+        - logs
+        - metrics
+    ObservabilityActivitySignal:
+      description: Single-value alias of `signals`. Cannot be combined with `signals` and cannot be repeated.
+      in: query
+      name: signal
+      required: false
+      schema:
+        $ref: '#/components/schemas/ObservabilityActivitySignal'
+    ObservabilityActivityCategories:
+      description: |-
+        Only return activity in one of these categories. Use the `id` values returned by the activity category catalog; the catalog can change, so do not hard-code a list. The Portal does not check the values against the catalog. Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `category`.
+      in: query
+      name: categories
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ObservabilityActivityCategory:
+      description: Single-value alias of `categories`. Cannot be combined with `categories` and cannot be repeated.
+      in: query
+      name: category
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 256
+    ObservabilityActivityDestinationIDs:
+      description: |-
+        Only return activity for one of these destination uids. Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `destinationID`. Activity keeps the uid of a destination that was later deleted, so you can still filter by it.
+      in: query
+      name: destinationIDs
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+      example:
+        - 0b9c6a6e-5d0e-4f0e-9a43-6f3b6a1b2c3d
+    ObservabilityActivityDestinationID:
+      description: Single-value alias of `destinationIDs`. Cannot be combined with `destinationIDs` and cannot be repeated.
+      in: query
+      name: destinationID
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+    ObservabilityActivityPipelineIDs:
+      description: |-
+        Only return activity for one of these pipeline uids. Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `pipelineID`. Activity keeps the uid of a pipeline that was later deleted, so you can still filter by it.
+      in: query
+      name: pipelineIDs
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+      example:
+        - 7d1f0c52-3a8e-4b8a-9c11-2e5f4a6b7c8d
+    ObservabilityActivityPipelineID:
+      description: Single-value alias of `pipelineIDs`. Cannot be combined with `pipelineIDs` and cannot be repeated.
+      in: query
+      name: pipelineID
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+    ObservabilityActivityComponents:
+      description: |-
+        Only return activity from one of these reporting components (the `component` field of an issue). Repeat the parameter for more than one value. Up to 100 nonempty values of at most 256 bytes each. Cannot be combined with `component`.
+      in: query
+      name: components
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ObservabilityActivityComponent:
+      description: Single-value alias of `components`. Cannot be combined with `components` and cannot be repeated.
+      in: query
+      name: component
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+    ObservabilityActivityText:
+      description: Search the safe activity `message` text. This does not search destination or pipeline names; use `destinationIDs` or `pipelineIDs` for that. At most 256 characters.
+      in: query
+      name: text
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+      example: timeout
+    ObservabilityActivityStart:
+      description: |-
+        Start of the search window, as an RFC3339 timestamp with a time zone (`Z` or `±hh:mm`), for example `2026-11-16T00:00:00Z`. Must not be later than `end`. When omitted, `start` is `end` minus `limits.defaultWindowSeconds`. A window longer than `limits.maxWindowDays` is rejected with 400, not shortened. Activity older than `limits.retentionDays` is no longer stored. The window that was searched is returned in `windowStart` and `windowEnd`.
+      in: query
+      name: start
+      required: false
+      schema:
+        type: string
+        format: date-time
+      example: '2026-11-16T00:00:00Z'
+    ObservabilityActivityEnd:
+      description: End of the search window, as an RFC3339 timestamp with a time zone (`Z` or `±hh:mm`). Must not be earlier than `start`. When omitted, the current time is used.
+      in: query
+      name: end
+      required: false
+      schema:
+        type: string
+        format: date-time
+      example: '2026-11-17T00:00:00Z'
+    ObservabilityActivityPageSize:
+      description: Number of issues per page. Must be a positive integer. When omitted, `limits.defaultPageSize` applies. A value above `limits.maxPageSize` is rejected with 400. A page can hold fewer issues than requested, for example when the response would be too large; use `hasMore`, not the page length, to decide whether to fetch another page.
+      in: query
+      name: pageSize
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      example: 50
+    ObservabilityActivityCursor:
+      description: Opaque cursor from `nextCursor` of the previous page. The cursor keeps the window of the first page. Send the same filters, `sort` and `order` as the request that returned it; you can leave out `start` and `end` or repeat the returned `windowStart` and `windowEnd`. A cursor that does not match the request is rejected with 400. Do not send a cursor with `fingerprint`. At most 4096 characters.
+      in: query
+      name: cursor
+      required: false
+      schema:
+        type: string
+        maxLength: 4096
+    ObservabilityActivityFingerprint:
+      description: |-
+        Return the detail and history of one issue, identified by its `fingerprint`. Combine it with `start` and `end` to choose the period (for example the `windowStart` and `windowEnd` of the list response). Only a fingerprint request returns `buckets` and `bucketSeconds`; they show when the issue occurred inside that window. There is no separate history endpoint.
+      in: query
+      name: fingerprint
+      required: false
+      schema:
+        type: string
+        pattern: '^sha256:[0-9a-f]{64}$'
+      example: sha256:3f5a0c9e7b1d2468ace0135792468ace0135792468ace0135792468ace013579
+    ObservabilityActivitySort:
+      description: |-
+        Sort field for issues. Default `lastSeen`. Issues with no value for the field (for example no destination) come last. Ties are broken by newest first.
+
+        - `lastSeen`: most recent occurrence
+        - `activity`: activity message
+        - `destination`: destination, by name where the Portal knows it, otherwise by uid
+        - `pipeline`: pipeline, by name where the Portal knows it, otherwise by uid
+        - `signal`: telemetry signal
+        - `category`: category, by catalog label where known
+        - `severity`: severity rank, `info` < `warn` < `error`
+        - `outcome`: outcome rank, `succeeded` < `unknown` < `retrying` < `dropped` < `rejected` < `error`
+      in: query
+      name: sort
+      required: false
+      schema:
+        type: string
+        enum:
+          - lastSeen
+          - activity
+          - destination
+          - pipeline
+          - signal
+          - category
+          - severity
+          - outcome
+    ObservabilityActivityOrder:
+      description: Sort direction. `asc` is ascending, `desc` is descending. Default `desc` for `sort=lastSeen` (newest first) and `asc` for the other sort fields.
+      in: query
+      name: order
+      required: false
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
   requestBodies:
     VpnDnsUpdateModel:
       content:
@@ -12370,24 +13675,234 @@ components:
             $ref: '#/components/schemas/PortForwarding'
       description: Port forwarding configuration
       required: true
-    ObservabilityExporter:
+    ObservabilityDestination:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ObservabilityExporter'
-      description: Observability Exporter
-    SplunkExporter:
+            $ref: '#/components/schemas/ObservabilityDestination'
+          examples:
+            splunk:
+              summary: Splunk HEC destination for logs & events
+              value:
+                name: Splunk Prod
+                type: splunk
+                accepts:
+                  - logs
+                endpoint: https://splunk.example.com:8088/services/collector
+                splunk:
+                  token: example-hec-token
+                  logs:
+                    index: trustgrid_logs
+                    sourcetype: trustgrid:otel
+            http:
+              summary: OTLP/HTTP destination with a caller-chosen uid
+              value:
+                uid: 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                name: OTLP Collector
+                type: http
+                accepts:
+                  - metrics
+                  - logs
+                endpoint: https://otel.example.com:4318
+                auth:
+                  type: bearer
+                  token: example-bearer-token
+                headers:
+                  X-Scope-OrgID: tenant-a
+                encoding: proto
+                compression: gzip
+                timeoutSeconds: 30
+      description: Observability destination to create
+      required: true
+    ObservabilityDestinationUpdate:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/SplunkExporter'
-      description: Splunk Exporter
-    HTTPExporter:
+            $ref: '#/components/schemas/ObservabilityDestination'
+          examples:
+            keepSecrets:
+              summary: Full replacement that keeps the stored secrets
+              description: The body is the whole destination as read by GET, with `timeoutSeconds` changed. The redacted bearer token and header value are sent back as `""`, so the stored values are kept. The endpoint origin is unchanged, so no secret has to be re-entered.
+              value:
+                name: OTLP Collector
+                type: http
+                accepts:
+                  - metrics
+                  - logs
+                endpoint: https://otel.example.com:4318
+                auth:
+                  type: bearer
+                  token: ''
+                headers:
+                  X-Scope-OrgID: ''
+                encoding: proto
+                compression: gzip
+                timeoutSeconds: 60
+            newEndpoint:
+              summary: Full replacement that moves the endpoint
+              description: The endpoint host changes, so the bearer token and every header value must be sent with their real values. Sending `""` here returns 422.
+              value:
+                name: OTLP Collector
+                type: http
+                accepts:
+                  - metrics
+                  - logs
+                endpoint: https://otel-eu.example.com:4318
+                auth:
+                  type: bearer
+                  token: example-bearer-token
+                headers:
+                  X-Scope-OrgID: tenant-a
+                encoding: proto
+                compression: gzip
+                timeoutSeconds: 30
+      description: The complete replacement destination. Fields left out are cleared.
+      required: true
+    ObservabilityPipeline:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/HTTPExporter'
-      description: HTTP Exporter
+            $ref: '#/components/schemas/ObservabilityPipeline'
+          examples:
+            metrics:
+              summary: Metrics pipeline for tagged production nodes
+              value:
+                name: Prod metrics
+                kind: metrics
+                destinationUids:
+                  - 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                selector:
+                  lifecycleStates:
+                    - production
+                  tagMatches:
+                    region:
+                      - us-east
+                      - us-west
+                  matchMode: all
+                attributes:
+                  - id: tag.region
+                    promoteToMetricLabel: true
+                constants:
+                  environment: prod
+            logs:
+              summary: Logs & events pipeline that excludes org-level records
+              value:
+                name: Prod logs
+                kind: logs
+                destinationUids:
+                  - 0d6e3b52-7c1a-4e8f-b2d4-5a9c8e1f3b77
+                selector:
+                  lifecycleStates:
+                    - production
+                    - unset
+                logs:
+                  includeOrgLevel: false
+                  events:
+                    enabled: true
+                    minimumSeverity: WARNING
+                  changes:
+                    enabled: true
+                  audits:
+                    enabled: false
+      description: Observability pipeline to create
+      required: true
+    ObservabilityPipelineUpdate:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityPipeline'
+          examples:
+            fullReplace:
+              summary: Full replacement of a metrics pipeline
+              description: The body is the whole pipeline. It adds a destination and a second tag value. `constants` is left out, so the stored constants are removed. `enabled` is left out, so the stored value is kept.
+              value:
+                name: Prod metrics
+                kind: metrics
+                destinationUids:
+                  - 4f0c2a7e-8a52-4d0b-9a3b-6f1d2c9e7b10
+                  - 9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b
+                selector:
+                  lifecycleStates:
+                    - production
+                  tagMatches:
+                    region:
+                      - us-east
+                      - eu-west
+                attributes:
+                  - id: tag.region
+                    promoteToMetricLabel: true
+      description: The complete replacement pipeline. Fields left out are cleared, except `enabled`.
+      required: true
+  responses:
+    ObservabilityForbidden:
+      description: |-
+        Forbidden. The caller lacks the required permission, the organization does not have the `observability` feature enabled, or the user or source IP is not allowed. The body is plain text, not JSON, and no `Content-Type` header is set.
+      content:
+        text/plain:
+          schema:
+            $ref: '#/components/schemas/ObservabilityForbidden'
+          examples:
+            permission:
+              summary: Missing permission
+              value: Permission denied
+            feature:
+              summary: Feature not enabled
+              value: Feature not enabled
+    ObservabilityDestinationNotFound:
+      description: Observability destination not found in the organization
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityNotFound'
+    ObservabilityPipelineNotFound:
+      description: Observability pipeline not found in the organization
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityNotFound'
+    ObservabilityMalformedJSON:
+      description: The request body is not valid JSON. The JSON parser rejects it before validation, and the portal returns its generic HTML error page, not a JSON body.
+      content:
+        text/html:
+          schema:
+            type: string
+    ObservabilityTestTooManyRequests:
+      description: |-
+        Too many destination tests for the organization. Nothing was sent. `error` has one message:
+        - `another test for this org is still running; try again when it finishes`: the organization already has 2 tests running on the Portal instance that took the request. No `Retry-After` header is sent; try again when a test finishes.
+        - `too many test requests, try again in a minute`: the organization has used its 10 test requests in the current 60-second window. The window starts with the first test request after the previous window ended. `Retry-After` gives the seconds until the window ends.
+
+        The concurrency limit is checked first, then the rate limit. Each request counts once, whatever the number of signals. Requests rejected with 400, 404 or 422 are not counted.
+      headers:
+        Retry-After:
+          description: Whole seconds, at least 1, until the organization's test window ends. Sent only with the `too many test requests` message, not with the concurrency message.
+          schema:
+            minimum: 1
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityErrors'
+          examples:
+            rateLimit:
+              summary: 10 tests in the current window (Retry-After is set)
+              value:
+                error:
+                  - too many test requests, try again in a minute
+            concurrency:
+              summary: 2 tests are already running (no Retry-After)
+              value:
+                error:
+                  - another test for this org is still running; try again when it finishes
+    ObservabilityTestUnavailable:
+      description: The portal could not check the test rate limit, so it did not run the test. Nothing was sent. Try again shortly.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ObservabilityErrors'
+          example:
+            error:
+              - tests are unavailable right now, try again shortly
   securitySchemes:
     JWTAuthorizer:
       description: >-
@@ -16832,6 +18347,17 @@ components:
           nullable: true
       title: UserModel
       type: object
+    OK:
+      description: Acknowledgement sent by a successful mutation that has nothing else to return
+      properties:
+        ok:
+          description: Always true
+          example: true
+          type: boolean
+      required:
+        - ok
+      title: OK
+      type: object
     ValidationFailed:
       description: ValidationFailed
       items:
@@ -17262,92 +18788,980 @@ components:
         orgId:
           description: Organization ID
           type: string
-    ObservabilityExporter:
+    ObservabilityActivitySource:
+      description: |-
+        The service that reported the activity.
+
+        - `portal`: the Trustgrid Portal (for example destination tests)
+        - `collector`: the telemetry collector that exports to destinations
+        - `ray`: Trustgrid's telemetry processing service
+      enum:
+        - portal
+        - collector
+        - ray
+      type: string
+    ObservabilityActivitySeverity:
+      description: |-
+        Severity of the activity.
+
+        - `info`: informational
+        - `warn`: a problem that may resolve itself, such as retries
+        - `error`: a failure
+      enum:
+        - info
+        - warn
+        - error
+      type: string
+    ObservabilityActivitySignal:
+      description: |-
+        Telemetry signal filter value.
+
+        - `metrics`: metrics export
+        - `logs`: logs & events export
+      enum:
+        - metrics
+        - logs
+      type: string
+    ObservabilityActivityOutcome:
+      description: |-
+        What happened to the telemetry in the recorded activity. It describes the recorded event, not current health or later recovery.
+
+        - `succeeded`: a destination test succeeded
+        - `retrying`: delivery failed and is being retried
+        - `rejected`: the destination rejected the telemetry
+        - `dropped`: the telemetry was dropped
+        - `error`: an export error, or a failed destination test
+        - `unknown`: the activity has no recognised outcome; show it as is
+      enum:
+        - retrying
+        - rejected
+        - dropped
+        - succeeded
+        - error
+        - unknown
+      type: string
+    ObservabilityActivityCategory:
+      description: An activity category catalog entry
+      properties:
+        id:
+          description: Category id. Use it as a `categories` value in activity search.
+          pattern: '^[a-z][a-z0-9_]{0,63}$'
+          type: string
+          example: export
+        label:
+          description: Display name, at most 128 bytes
+          minLength: 1
+          type: string
+        description:
+          description: Explanation of the category, at most 512 bytes
+          minLength: 1
+          type: string
+        sources:
+          description: Sources that report activity in this category
+          items:
+            $ref: '#/components/schemas/ObservabilityActivitySource'
+          maxItems: 3
+          minItems: 1
+          type: array
+          uniqueItems: true
+      required:
+        - id
+        - label
+        - description
+        - sources
+      title: ObservabilityActivityCategory
+      type: object
+    ObservabilityActivityBucket:
+      description: Activity of one issue inside one time bucket of `bucketSeconds`
+      properties:
+        bucketStart:
+          description: Start of the bucket, aligned to `bucketSeconds` in UTC
+          format: date-time
+          type: string
+        firstSeen:
+          description: First occurrence in the bucket
+          format: date-time
+          type: string
+        lastSeen:
+          description: Last occurrence in the bucket
+          format: date-time
+          type: string
+        documentCount:
+          description: Stored activity documents in the bucket
+          minimum: 0
+          type: integer
+        observedCount:
+          description: Occurrences reported by those documents
+          minimum: 0
+          type: integer
+      required:
+        - bucketStart
+        - firstSeen
+        - lastSeen
+        - documentCount
+        - observedCount
+      title: ObservabilityActivityBucket
+      type: object
+    ObservabilityActivityIssue:
+      description: Activity grouped by fingerprint. Each stored document summarizes the occurrences one reporter saw in one time bucket.
+      properties:
+        fingerprint:
+          description: Stable id of the issue. Send it as `fingerprint` to get its detail and history.
+          pattern: '^sha256:[0-9a-f]{64}$'
+          type: string
+        operatorOnly:
+          description: Present and `true` on operator activity search results. Not set on tenant results.
+          type: boolean
+        orgID:
+          description: Organization of the activity. Can be present on tenant results, where it is always the caller's organization. Never present on operator results.
+          type: string
+        outcome:
+          $ref: '#/components/schemas/ObservabilityActivityOutcome'
+        source:
+          $ref: '#/components/schemas/ObservabilityActivitySource'
+        component:
+          description: Part of the source that reported the activity. Filter with `components`.
+          type: string
+          example: destination
+        objectType:
+          description: Type of the object the activity is about, when known
+          type: string
+        objectID:
+          description: Id of the object the activity is about, when known
+          type: string
+        signal:
+          description: Telemetry signal of the activity, usually `metrics` or `logs`
+          type: string
+        severity:
+          $ref: '#/components/schemas/ObservabilityActivitySeverity'
+        category:
+          description: Category id from the activity category catalog
+          type: string
+        reasonCode:
+          description: Machine-readable reason. Safe to show; it contains no secrets or telemetry payload.
+          type: string
+          example: exporter_retrying
+        message:
+          description: Human-readable message. Safe to show; it contains no secrets or telemetry payload.
+          type: string
+        destinationID:
+          description: Uid of the destination, when the activity concerns one. The destination can since have been deleted.
+          type: string
+        pipelineID:
+          description: Uid of the pipeline, when the activity concerns one. The pipeline can since have been deleted.
+          type: string
+        firstSeen:
+          description: First occurrence in the window
+          format: date-time
+          type: string
+        lastSeen:
+          description: Last occurrence in the window
+          format: date-time
+          type: string
+        documentCount:
+          description: Number of stored activity documents grouped into this issue. One document can summarize many occurrences.
+          minimum: 0
+          type: integer
+        observedCount:
+          description: Total occurrences reported by those documents. Compare with `documentCount`, which counts documents, not occurrences.
+          minimum: 0
+          type: integer
+        buckets:
+          description: Per-bucket history. Empty in list results; filled only when the request sets `fingerprint`.
+          items:
+            $ref: '#/components/schemas/ObservabilityActivityBucket'
+          type: array
+      required:
+        - fingerprint
+        - outcome
+        - source
+        - component
+        - signal
+        - severity
+        - category
+        - reasonCode
+        - message
+        - firstSeen
+        - lastSeen
+        - documentCount
+        - observedCount
+        - buckets
+      title: ObservabilityActivityIssue
+      type: object
+    ObservabilityActivityLimits:
+      description: Configured activity search limits in effect. Operators can change them; read them from each response instead of assuming fixed values.
+      properties:
+        retentionDays:
+          description: Days of activity that are kept
+          minimum: 1
+          type: integer
+        defaultWindowSeconds:
+          description: Window length used when `start` is omitted
+          minimum: 1
+          type: integer
+        maxWindowDays:
+          description: Longest allowed search window. Never more than `retentionDays`.
+          minimum: 1
+          type: integer
+        defaultPageSize:
+          description: Page size used when `pageSize` is omitted
+          minimum: 1
+          type: integer
+        maxPageSize:
+          description: Largest allowed `pageSize`
+          minimum: 1
+          type: integer
+      required:
+        - retentionDays
+        - defaultWindowSeconds
+        - maxWindowDays
+        - defaultPageSize
+        - maxPageSize
+      title: ObservabilityActivityLimits
+      type: object
+    ObservabilityActivitySearchResponse:
+      description: One page of activity issues
+      properties:
+        limits:
+          $ref: '#/components/schemas/ObservabilityActivityLimits'
+        windowStart:
+          description: Start of the window that was searched
+          format: date-time
+          type: string
+        windowEnd:
+          description: End of the window that was searched
+          format: date-time
+          type: string
+        issues:
+          description: Issues on this page, in `sort` and `order` order
+          items:
+            $ref: '#/components/schemas/ObservabilityActivityIssue'
+          type: array
+        matchingDocuments:
+          description: Stored documents behind the issues on this page. This is not a total for the whole search.
+          minimum: 0
+          type: integer
+        documentCountIsLowerBound:
+          description: When `true`, `matchingDocuments` is a lower bound, not an exact count. This alone does not mean results are missing.
+          type: boolean
+        hasMore:
+          description: '`true` when more issues follow. Then `nextCursor` is set.'
+          type: boolean
+        nextCursor:
+          description: Opaque cursor for the next page. Present when `hasMore` is `true`.
+          type: string
+        incomplete:
+          description: '`true` when the search timed out or could not read all stored activity, or too many issues matched to order them all. The page can be missing issues; narrow the filters or window and retry.'
+          type: boolean
+        bucketSeconds:
+          description: Width of each `buckets` entry in seconds. Set on fingerprint requests.
+          minimum: 1
+          type: integer
+      required:
+        - issues
+        - matchingDocuments
+        - documentCountIsLowerBound
+        - hasMore
+        - incomplete
+      title: ObservabilityActivitySearchResponse
+      type: object
+    ObservabilitySignal:
+      description: A telemetry signal. `logs` covers logs & events (node events, config changes and audits).
+      enum:
+        - metrics
+        - logs
+      type: string
+    ObservabilityDestination:
+      description: |-
+        A Splunk HEC (`splunk`) or OTLP/HTTP (`http`) endpoint that pipelines export telemetry to. The same fields are used for create, full-replace update and read.
+
+        Secrets (`splunk.token`, `auth.token`, `auth.password`, `tls.keyPem` and every `headers` value) are write-only. Reads return a stored secret as `""` and leave out a secret that is not stored, so `""` means "set but hidden", not "empty". A redacted secret cannot be recovered through the API.
+
+        An update replaces the whole destination. Send a stored secret back as `""` (or leave the secret field out) to keep the stored value, but keep sending the object that holds it: a header name left out of `headers` is removed, leaving out `auth` resets it to `none`, leaving out `tls` removes the TLS settings and leaving out `tls.certPem` drops the client key. Every secret must be re-entered with its real value when the endpoint origin (scheme, host or port) changes, and `tls.keyPem` must be re-entered when `tls.certPem` changes.
+
+        No string or object key, secrets and PEMs included, may contain `${`.
       properties:
         uid:
+          description: Destination uid. Optional on create, where it must be a UUID; when it is omitted or `""`, a UUID is generated. Uids are scoped to the organization, and creating a destination with a uid the organization already uses returns 409. On update the path selects the destination and this field is ignored.
+          type: string
+        orgId:
+          description: Organization ID, set by the server
+          readOnly: true
           type: string
         name:
+          description: Unique name within the organization (case-insensitive), 1-100 characters after trimming. Must start with a letter or digit and contain only letters, digits, spaces and `_ . & -`.
+          maxLength: 100
+          minLength: 1
+          pattern: ^[A-Za-z0-9][A-Za-z0-9 _.&-]*$
           type: string
-        enabled:
-          type: boolean
-        exporterType:
-          type: string
+        type:
+          description: |-
+            Destination transport. Cannot be changed after creation.
+            - `http`: OTLP/HTTP. Uses `auth`, `readBufferSize` and `writeBufferSize`.
+            - `splunk`: Splunk HEC. Uses `splunk`; `auth`, `readBufferSize` and `writeBufferSize` are ignored and not stored.
           enum:
             - splunk
             - http
-        collectionTypes:
+          type: string
+        accepts:
+          description: Signals this destination accepts, at least one and without duplicates. A signal cannot be removed while a pipeline of that kind sends to this destination (409 with `references`).
           items:
-            type: string
-            enum:
-              - metrics
-              - node_audits
-              - node_events
-              - changes
+            $ref: '#/components/schemas/ObservabilitySignal'
+          maxItems: 2
+          minItems: 1
           type: array
-        description:
-          type: string
-      required:
-        - name
-        - enabled
-        - exporterType
-      title: ObservabilityExporter
-      type: object
-    SplunkExporter:
-      properties:
-        uid:
-          type: string
-        token:
-          type: string
+          uniqueItems: true
         endpoint:
+          description: Absolute `https://` URL with a hostname and without credentials. Saving checks only the form of the URL; it does not resolve or contact the host. Changing its origin (scheme, host or port) requires re-entering every secret.
+          example: https://otel.example.com:4318
           type: string
-        source:
-          type: string
-        sourcetype:
-          type: string
-        index:
-          type: string
-        cacert:
-          type: string
-        enableLogData:
-          type: boolean
-        insecureTLS:
-          type: boolean
-      required:
-        - token
-        - endpoint
-      title: SplunkExporter
-      type: object
-    HTTPExporter:
-      properties:
-        uid:
-          type: string
-        endpoint:
-          type: string
-        metricsEndpoint:
-          type: string
-        logsEndpoint:
-          type: string
+        auth:
+          $ref: '#/components/schemas/ObservabilityDestinationAuth'
+        headers:
+          description: Extra HTTP headers sent with every export, for both types, at most 50, keyed by header name (RFC 7230 token characters). Values must not contain line breaks and are write-only. On create every value is required. On update send `""` to keep a stored value of the same header name; a header name left out is removed.
+          additionalProperties:
+            type: string
+          maxProperties: 50
+          type: object
+        tls:
+          $ref: '#/components/schemas/ObservabilityDestinationTLS'
         encoding:
-          type: string
+          description: OTLP payload encoding. Leave it out to use the collector default; `null` is rejected.
           enum:
-            - json
             - proto
-        compression:
+            - json
           type: string
+        compression:
+          description: Payload compression. Leave it out to use the collector default; `null` is rejected.
           enum:
             - gzip
             - zstd
             - zlib
             - none
-        timeout:
-          type: number
-        readBufferSize:
-          type: number
-        writeBufferSize:
-          type: number
-        cacert:
           type: string
-        insecureTLS:
+        timeoutSeconds:
+          description: Export request timeout in seconds, an integer from 1 to 2147483647. Leave it out to use the collector default; `null` is rejected.
+          maximum: 2147483647
+          minimum: 1
+          type: integer
+        readBufferSize:
+          description: HTTP client read buffer size in bytes for `http` destinations, an integer from 0 to 2147483647. Leave it out to use the collector default; `null` is rejected. Ignored and not stored for `splunk` destinations.
+          maximum: 2147483647
+          minimum: 0
+          type: integer
+        writeBufferSize:
+          description: HTTP client write buffer size in bytes for `http` destinations, an integer from 0 to 2147483647. Leave it out to use the collector default; `null` is rejected. Ignored and not stored for `splunk` destinations.
+          maximum: 2147483647
+          minimum: 0
+          type: integer
+        splunk:
+          $ref: '#/components/schemas/ObservabilitySplunkDestination'
+      required:
+        - name
+        - type
+        - accepts
+        - endpoint
+      title: ObservabilityDestination
+      type: object
+    ObservabilityDestinationAuth:
+      description: Authentication for `http` destinations; ignored and not stored for `splunk` destinations. When `auth` is left out of an `http` destination, `type` is `none`, so leaving it out of an update drops the stored token and password.
+      properties:
+        type:
+          description: |-
+            Authentication type. Defaults to `none` when `auth` is left out; required when `auth` is sent.
+            - `none`: no authentication
+            - `bearer`: sends `token` as a bearer token
+            - `basic`: sends `username` and `password` as HTTP basic auth
+          enum:
+            - none
+            - bearer
+            - basic
+          type: string
+        token:
+          description: Bearer token, required for `bearer`. On update, `""` or leaving it out keeps the stored token unless the endpoint origin changes. Write-only.
+          type: string
+        username:
+          description: Username, required for `basic`. Leading and trailing spaces are trimmed. Not a secret; reads return it.
+          type: string
+        password:
+          description: Password, required for `basic`. On update, `""` or leaving it out keeps the stored password unless the endpoint origin changes. Write-only.
+          type: string
+      type: object
+    ObservabilityDestinationTLS:
+      description: TLS settings for the destination connection. Leaving `tls` out of an update removes all of them, including the client certificate and key.
+      properties:
+        insecureSkipVerify:
+          description: Skip verification of the server certificate. `caPem` is not validated when this is true.
+          nullable: true
           type: boolean
-      title: HTTPExporter
+        caPem:
+          description: PEM CA certificate chain used to verify the server. Must not contain a private key. Not a secret; reads return it.
+          nullable: true
+          type: string
+        certPem:
+          description: PEM client certificate. Must be sent together with `keyPem`, must not contain a private key and must match `keyPem`. Not a secret; reads return it. Leaving it out of an update drops the stored client key.
+          nullable: true
+          type: string
+        keyPem:
+          description: PEM private key matching `certPem`. On update, `""` or leaving it out keeps the stored key only while `certPem` and the endpoint origin are unchanged; otherwise it must be re-entered. Write-only.
+          nullable: true
+          type: string
+      type: object
+    ObservabilitySplunkDestination:
+      description: Splunk HEC settings, required for `splunk` destinations and ignored and not stored for `http` destinations.
+      properties:
+        token:
+          description: Splunk HEC token, required. On update, `""` or leaving it out keeps the stored token unless the endpoint origin changes. Write-only; reads return `""`.
+          type: string
+        metrics:
+          $ref: '#/components/schemas/ObservabilitySplunkSignal'
+        logs:
+          $ref: '#/components/schemas/ObservabilitySplunkSignal'
+      type: object
+    ObservabilitySplunkSignal:
+      description: Splunk index and metadata for one signal. `index` is required when the destination accepts the signal. Values are trimmed, and blank values are not stored, so reads can return `{}`.
+      properties:
+        index:
+          description: Splunk index that receives the signal
+          type: string
+        source:
+          description: Splunk `source` set on exported data
+          type: string
+        sourcetype:
+          description: Splunk `sourcetype` set on exported data
+          type: string
+      type: object
+    ObservabilityPipeline:
+      description: |-
+        Exports one signal (`kind`, which cannot be changed after creation) from the selected nodes to one or more destinations. The same fields are used for create, full-replace update and read.
+
+        The server normalizes what it stores and returns: `name` is trimmed, `selector` and `attributes` are always returned (as `{}` and `[]` when empty), empty selector lists and maps are dropped, an `emitAs` equal to the catalog default is dropped, `promoteToMetricLabel` is kept only when true, empty `constants` are dropped and `logs` sources always carry `enabled`.
+
+        No string or object key may contain `${`.
+      properties:
+        uid:
+          description: Pipeline uid. Optional on create, where it must be a UUID; when it is omitted or `""`, a UUID is generated. Uids are scoped to the organization, and creating a pipeline with a uid the organization already uses returns 409. On update the path selects the pipeline and this field is ignored.
+          type: string
+        orgId:
+          description: Organization ID, set by the server
+          readOnly: true
+          type: string
+        name:
+          description: Unique name within the organization (case-insensitive), 1-100 characters after trimming. Must start with a letter or digit and contain only letters, digits, spaces and `_ . & -`.
+          maxLength: 100
+          minLength: 1
+          pattern: ^[A-Za-z0-9][A-Za-z0-9 _.&-]*$
+          type: string
+        enabled:
+          description: Whether the pipeline exports telemetry. Defaults to true on create; keeps the stored value when omitted on update. `enableObservabilityPipeline` and `disableObservabilityPipeline` change only this field.
+          type: boolean
+        kind:
+          $ref: '#/components/schemas/ObservabilitySignal'
+        destinationUids:
+          description: Uids of the destinations to export to, 1-50 without duplicates. Each must exist in the organization and accept `kind`.
+          items:
+            type: string
+          maxItems: 50
+          minItems: 1
+          type: array
+          uniqueItems: true
+        selector:
+          $ref: '#/components/schemas/ObservabilitySelector'
+        attributes:
+          description: Catalog attributes attached to every exported item, at most 200, each id at most once.
+          items:
+            $ref: '#/components/schemas/ObservabilityAttributeSelection'
+          maxItems: 200
+          type: array
+        constants:
+          description: |-
+            Constant attributes attached to every exported item, at most 50, keyed by emitted name. Values are 1-256 characters. Keys are 1-128 characters, start with a letter, contain only letters, digits, `_` and `.`, and must not be reserved or collide with another emitted name.
+
+            Reserved names: `nodeID`, `nodeName`, `orgID`, `dataType`, `host.name`, `timestamp`, `eventType`, `state`, `category`, `itemType`, `itemID`, `auditType`, `ip`, `userName`, `interface`, `network`, `service.name`, `service.version`, `tg.lifecycle`, `routeKey`, and any name starting with `tg.internal.`. Names are compared after every `.` and `-` becomes `_`, so `host_name` is reserved too, and two emitted names (attributes or constants) that differ only in `.`, `-` and `_` collide.
+          additionalProperties:
+            maxLength: 256
+            minLength: 1
+            type: string
+          maxProperties: 50
+          type: object
+        logs:
+          $ref: '#/components/schemas/ObservabilityLogSources'
+      required:
+        - name
+        - kind
+        - destinationUids
+      title: ObservabilityPipeline
+      type: object
+    ObservabilitySelector:
+      description: |-
+        Which nodes the pipeline exports from. An empty or omitted selector selects every node. Org-level logs records are not tied to a node, so the selector never applies to them; see `logs.includeOrgLevel`.
+      properties:
+        lifecycleStates:
+          description: Node lifecycle states to select, without duplicates. Empty or omitted selects every lifecycle state. `unset` selects nodes that have no lifecycle state.
+          items:
+            enum:
+              - pre-production
+              - production
+              - maintenance
+              - decommissioned
+              - unset
+            type: string
+          type: array
+          uniqueItems: true
+        tagMatches:
+          description: Tag name to a list of accepted values, at most 50 tags. Tag names contain only letters, digits, `_` and `-`. Each tag lists 1-100 non-empty values of at most 256 characters; a node matches a tag when it has the tag and its value is one of the listed values. Each value must be a list, even for one value. Empty or omitted selects every tag.
+          additionalProperties:
+            items:
+              maxLength: 256
+              minLength: 1
+              type: string
+            maxItems: 100
+            minItems: 1
+            type: array
+          example:
+            region:
+              - us-east
+              - us-west
+            role:
+              - edge
+          maxProperties: 50
+          type: object
+        matchMode:
+          description: |-
+            Whether a node must match all selector conditions or any of them. Defaults to `all`.
+            - `all`: the node must match every condition.
+            - `any`: the node must match at least one condition.
+          enum:
+            - all
+            - any
+          type: string
+      type: object
+    ObservabilityAttributeSelection:
+      description: A catalog attribute attached to exported telemetry.
+      properties:
+        id:
+          description: Entry id from `listObservabilityAttributeCatalog`, for example `tag.region`. `tag.<name>` is accepted for any tag name of letters, digits, `_` and `-`, even one the organization does not use yet.
+          type: string
+        emitAs:
+          description: |-
+            Emitted attribute name overriding the catalog default (`tg.tag.<name>` for tags). 1-128 characters, starts with a letter and contains only letters, digits, `_` and `.`. Must not be reserved or collide with another emitted name. A value equal to the catalog default is not stored, so reads leave it out.
+
+            Reserved names: `nodeID`, `nodeName`, `orgID`, `dataType`, `host.name`, `timestamp`, `eventType`, `state`, `category`, `itemType`, `itemID`, `auditType`, `ip`, `userName`, `interface`, `network`, `service.name`, `service.version`, `tg.lifecycle`, `routeKey`, and any name starting with `tg.internal.`. Names are compared after every `.` and `-` becomes `_`, so `host_name` is reserved too, and two emitted names (attributes or constants) that differ only in `.`, `-` and `_` collide.
+          maxLength: 128
+          minLength: 1
+          pattern: ^[A-Za-z][A-Za-z0-9_.]*$
+          type: string
+        promoteToMetricLabel:
+          description: Also attach the attribute as a metric label. Rejected on `logs` pipelines, and on `metrics` pipelines for built-in entries whose `promotable` is false; tag entries are always promotable. Only `true` is stored, so reads leave out `false`.
+          type: boolean
+      required:
+        - id
+      type: object
+    ObservabilityLogSources:
+      description: Logs & events sources. Required on `logs` pipelines, where at least one of `events`, `changes` and `audits` must be enabled. Must be left out (or `null`) on `metrics` pipelines. `events` are node and org events such as connectivity and cluster changes, `changes` are configuration changes made in the portal, and `audits` are node audit records such as package upgrades, OS updates and commands run on a node.
+      properties:
+        includeOrgLevel:
+          description: Include org-level records, which are not tied to a node, for example events whose subject is not a node and changes or audits without a node. The selector never applies to them. Only `false` excludes them; omitted means true.
+          type: boolean
+        events:
+          $ref: '#/components/schemas/ObservabilityEventSource'
+        changes:
+          $ref: '#/components/schemas/ObservabilityLogSource'
+        audits:
+          $ref: '#/components/schemas/ObservabilityLogSource'
+      type: object
+    ObservabilityLogSource:
+      description: The `changes` or `audits` logs & events source. Change and node audit records are always INFO, so these sources have no minimum severity.
+      properties:
+        enabled:
+          description: Whether this source is exported. Omitted means false; reads always include it.
+          type: boolean
+      type: object
+    ObservabilityEventSource:
+      description: The node events source
+      properties:
+        enabled:
+          description: Whether node events are exported. Omitted means false; reads always include it.
+          type: boolean
+        minimumSeverity:
+          $ref: '#/components/schemas/ObservabilitySeverity'
+        eventTypes:
+          description: Only export these event types, at most 100 names of 1-256 characters. They are the portal's event type names, for example `Node Connect`. Empty or omitted exports every type.
+          items:
+            maxLength: 256
+            minLength: 1
+            type: string
+          maxItems: 100
+          type: array
+      type: object
+    ObservabilitySeverity:
+      description: Lowest severity exported. Omitted exports every severity.
+      enum:
+        - INFO
+        - WARNING
+        - ERROR
+        - CRITICAL
+      type: string
+    ObservabilityCatalogEntry:
+      description: A node attribute or organization tag that pipelines can attach to exported telemetry.
+      properties:
+        id:
+          description: Entry id used in `attributes[].id`, for example `tag.region` for the `region` tag
+          type: string
+        label:
+          description: Human-readable name shown in the portal. For a tag entry, the tag name.
+          type: string
+        emitAs:
+          description: Emitted attribute name used when a pipeline does not set `emitAs`. Never empty. For a tag entry, `tg.tag.<name>`.
+          type: string
+        type:
+          description: Value type of the attribute, for example `string`
+          type: string
+        promotable:
+          description: Whether `promoteToMetricLabel` is allowed for this entry on `metrics` pipelines. Always true for tag entries.
+          type: boolean
+      required:
+        - id
+        - label
+        - emitAs
+        - type
+        - promotable
+      type: object
+    ObservabilityConflict:
+      description: |-
+        409 body for observability requests that conflict with stored state. `error` is a list of messages. `references` is present only when other objects block the operation; for destination conflicts these are the pipelines that use the destination or still send the signal being removed.
+      properties:
+        error:
+          description: Conflict messages
+          items:
+            type: string
+          type: array
+        references:
+          description: Objects that block the operation. Left out when nothing else blocks it, for example on a uid collision or a concurrent change.
+          items:
+            $ref: '#/components/schemas/ObservabilityConflictReference'
+          type: array
+      required:
+        - error
+      example:
+        error:
+          - destination is used by one or more pipelines
+        references:
+          - uid: 7a3f9e21-5b6c-4d8e-9f01-2c3b4a5d6e7f
+            name: Prod logs
+      title: ObservabilityConflict
+      type: object
+    ObservabilityConflictReference:
+      description: An object that blocks a conflicting operation, such as a pipeline that uses a destination.
+      properties:
+        uid:
+          description: Uid of the blocking object
+          type: string
+        name:
+          description: Name of the blocking object
+          type: string
+      required:
+        - uid
+        - name
+      title: ObservabilityConflictReference
+      type: object
+    ObservabilityErrors:
+      description: Generic observability JSON error body whose `error` is a list of messages. The portal uses this shape for 400 (bad request parameters), 429 (rate or concurrency limit) and some 503 responses. The 409 and 422 bodies have the same `error` list; see `ObservabilityConflict` and `ObservabilityValidationFailed`.
+      properties:
+        error:
+          description: Error messages
+          items:
+            type: string
+          type: array
+      required:
+        - error
+      example:
+        error:
+          - too many test requests, try again in a minute
+      title: ObservabilityErrors
+      type: object
+    ObservabilityValidationFailed:
+      description: 422 body. `error` lists every broken rule, ordered by the field it concerns.
+      properties:
+        error:
+          $ref: '#/components/schemas/ValidationFailed'
+      required:
+        - error
+      title: ObservabilityValidationFailed
+      type: object
+    ObservabilityNotFound:
+      description: 404 body. The resource does not exist in the organization. Unlike the 409 and 422 bodies, `error` is a single string.
+      properties:
+        error:
+          description: Always `Not found`
+          enum:
+            - Not found
+          type: string
+      required:
+        - error
+      example:
+        error: Not found
+      title: ObservabilityNotFound
+      type: object
+    ObservabilityMessageError:
+      description: JSON error body whose `message` is a single string. The portal sends it when a supporting catalog is unavailable (503).
+      properties:
+        message:
+          description: Error message
+          type: string
+      required:
+        - message
+      title: ObservabilityMessageError
+      type: object
+    ObservabilityForbidden:
+      description: |-
+        Plain-text 403 body. The portal ends the response with the message and sets no `Content-Type` header. Possible values:
+        - `Permission denied`: the caller lacks the required permission.
+        - `Feature not enabled`: the organization does not have the `observability` feature.
+        - `Disabled user; access denied`: the user is inactive.
+        - `Disallowed IP`: the request comes from an IP address the organization does not allow.
+      enum:
+        - Permission denied
+        - Feature not enabled
+        - Disabled user; access denied
+        - Disallowed IP
+      example: Permission denied
+      title: ObservabilityForbidden
+      type: string
+    ObservabilityDestinationTestSignals:
+      description: Signals to test, at least one. Each must be in the destination's `accepts`; duplicates are ignored. Leave it out or send `null` to test every signal the destination accepts.
+      items:
+        $ref: '#/components/schemas/ObservabilitySignal'
+      minItems: 1
+      nullable: true
+      type: array
+    ObservabilityDestinationTestOptions:
+      description: Options for a destination test.
+      properties:
+        signals:
+          $ref: '#/components/schemas/ObservabilityDestinationTestSignals'
+      title: ObservabilityDestinationTestOptions
+      type: object
+    ObservabilityDestinationTestDraft:
+      description: |-
+        Unsaved destination settings to test, plus the signals to test. The destination fields are the same as for create and update, and `orgId` is ignored.
+
+        `uid` is optional. Without it, every secret must be sent with its real value. With it, it names a saved destination whose stored secrets are reused when a secret is sent as `""` or left out, under the same re-entry rules as an update.
+      allOf:
+        - $ref: '#/components/schemas/ObservabilityDestination'
+        - $ref: '#/components/schemas/ObservabilityDestinationTestOptions'
+      title: ObservabilityDestinationTestDraft
+    ObservabilityDestinationTestActivityStatus:
+      description: |-
+        What happened to the destination-test activity for this result. The activity has category `destination_test`, code `destination_test_succeeded` (severity `info`), `destination_test_retrying` (`warn`) or `destination_test_failed` (`error`), and is attributed to the tested destination's uid.
+        - `recorded`: the activity was handed to the activity queue. Publication was accepted; this does not mean the activity is searchable yet or was indexed downstream.
+        - `pending`: the activity was kept and will be published later, because an identical result was published recently or the publish rate limit was reached.
+        - `disabled`: activity publishing is turned off.
+        - `unavailable`: the activity was not published. Draft tests without `uid` always get this. Other causes are a publisher at capacity, a publisher error or a publish that took longer than 1 second.
+      enum:
+        - recorded
+        - pending
+        - disabled
+        - unavailable
+      type: string
+    ObservabilityDestinationTestResult:
+      description: The result of sending test data for one signal.
+      properties:
+        signal:
+          $ref: '#/components/schemas/ObservabilitySignal'
+        ok:
+          description: Whether the destination accepted the test record.
+          type: boolean
+        status:
+          description: HTTP status the destination returned. Left out when no response was received, for example when the endpoint was refused or the connection failed.
+          example: 200
+          type: integer
+        durationMs:
+          description: Time spent testing this signal, in milliseconds.
+          example: 412
+          minimum: 0
+          type: integer
+        message:
+          description: |-
+            What happened, in plain English, with secrets removed. Examples:
+            - `The destination accepted the test log record (HTTP 200).`
+            - `The destination rejected the credentials (HTTP 401). Check the authentication settings and headers.`
+            - `The destination redirected the request (HTTP 301). Redirects are not followed; enter the final URL.`
+            - `The portal will not send to this endpoint: <reason>.`, where the reason is for example `the collector only sends to https:// endpoints`, `hostname "localhost" is not allowed`, `endpoint IP address 10.0.0.5 is not allowed` or `endpoint resolves to a private, loopback, link-local or reserved address`.
+            - `DNS lookups are busy; try again shortly.` (with `retryable`)
+            - `The test did not finish within N seconds.`
+          type: string
+        response:
+          description: The start of the destination's response body, at most 300 characters, with secrets redacted. Left out when the body is empty or binary, or no response was received.
+          maxLength: 300
+          type: string
+        retryable:
+          description: Present, and true, only when the test failed for a temporary reason on the portal side, such as busy DNS lookups. Try again shortly.
+          enum:
+            - true
+          type: boolean
+        activityStatus:
+          $ref: '#/components/schemas/ObservabilityDestinationTestActivityStatus'
+      required:
+        - signal
+        - ok
+        - durationMs
+        - message
+        - activityStatus
+      title: ObservabilityDestinationTestResult
+      type: object
+    ObservabilityDestinationTestResponse:
+      description: Destination test results, one per tested signal, in the order of the destination's `accepts`.
+      properties:
+        results:
+          items:
+            $ref: '#/components/schemas/ObservabilityDestinationTestResult'
+          minItems: 1
+          type: array
+      required:
+        - results
+      title: ObservabilityDestinationTestResponse
+      type: object
+    ObservabilityPipelineCheckRequest:
+      description: Options for a pipeline check.
+      properties:
+        record:
+          $ref: '#/components/schemas/ObservabilityPipelineCheckRecord'
+      title: ObservabilityPipelineCheckRequest
+      type: object
+    ObservabilityPipelineCheckRecord:
+      description: |-
+        A sample record to follow through the pipeline. Leave it out or send `null` to check only the pipeline. The record is validated against the pipeline and its source; a record that does not fit is rejected with 422.
+
+        Org-level records are `changes` and `audits` records without `nodeId`, and `events` records whose `eventType` is not a node event. As with `logs.includeOrgLevel`, node selection does not apply to them.
+      nullable: true
+      properties:
+        source:
+          description: |-
+            Where the record comes from.
+            - `metrics`: node metrics
+            - `events`: node and org events
+            - `changes`: configuration changes made in the portal
+            - `audits`: node audit records
+          enum:
+            - metrics
+            - events
+            - changes
+            - audits
+          type: string
+        nodeId:
+          description: Uid of the node the record comes from. You need `nodes::read` on the node for node selection to be evaluated; otherwise the node is treated as unreadable and the verdict can be `unknown`.
+          example: 3c9a1f0e-6b2d-4e7a-9c15-8d4f2a7b6e01
+          type: string
+        eventType:
+          description: The portal's event type name, for example `Node Disconnect`, for `events` records
+          example: Node Disconnect
+          type: string
+        level:
+          description: Event severity, for `events` records
+          enum:
+            - INFO
+            - WARNING
+            - ERROR
+            - CRITICAL
+          type: string
+      required:
+        - source
+      title: ObservabilityPipelineCheckRecord
+      type: object
+    ObservabilityPipelineCheckResult:
+      description: |-
+        What the collector would do with a saved pipeline and, when a record was sent, with that record. This evaluates saved settings. It is not proof that real telemetry reached a destination.
+      properties:
+        verdict:
+          description: |-
+            The overall result.
+            - `ok`: no record was sent, and the collector would run the pipeline.
+            - `skipped`: the collector would skip the pipeline.
+            - `delivered`: the record would be delivered.
+            - `dropped`: the record would not be delivered.
+            - `unknown`: delivery depends on node selection for a node the caller cannot read.
+          enum:
+            - ok
+            - skipped
+            - delivered
+            - dropped
+            - unknown
+          type: string
+        checks:
+          description: Pipeline checks, then record checks.
+          items:
+            $ref: '#/components/schemas/ObservabilityPipelineCheckItem'
+          type: array
+        destinations:
+          description: Destination counts for the pipeline.
+          properties:
+            total:
+              description: Destinations checked
+              minimum: 0
+              type: integer
+            usable:
+              description: Checked destinations the collector can use
+              minimum: 0
+              type: integer
+          required:
+            - total
+            - usable
+          type: object
+      required:
+        - verdict
+        - checks
+        - destinations
+      title: ObservabilityPipelineCheckResult
+      type: object
+    ObservabilityPipelineCheckItem:
+      description: One check in a pipeline check result.
+      properties:
+        id:
+          description: |-
+            Check id, for example `destinations` for a pipeline check, or `record.source`, `record.node`, `record.lifecycle`, `record.selection`, `record.orgLevel`, `record.subject`, `record.eventType`, `record.severity` or `record.timing` for a record check.
+          example: record.lifecycle
+          type: string
+        group:
+          description: |-
+            - `pipeline`: a check of the saved pipeline and its destinations
+            - `record`: a check of the sample record
+          enum:
+            - pipeline
+            - record
+          type: string
+        label:
+          description: Short human-readable name of the check
+          example: Lifecycle
+          type: string
+        status:
+          description: |-
+            - `pass`: the check passed.
+            - `fail`: the check failed.
+            - `warning`: the check found a possible problem.
+            - `skipped`: the check was not evaluated.
+            - `info`: information only, for example `record.timing`.
+          enum:
+            - pass
+            - fail
+            - warning
+            - skipped
+            - info
+          type: string
+        detail:
+          description: What was found, in plain English
+          type: string
+        destinationUid:
+          description: Destination uid, on checks of one destination
+          type: string
+        attributeId:
+          description: Catalog attribute id, on attribute checks
+          type: string
+      required:
+        - id
+        - group
+        - label
+        - status
+        - detail
+      title: ObservabilityPipelineCheckItem
       type: object
