@@ -12657,6 +12657,7 @@ components:
       required: false
       schema:
         type: string
+        minLength: 1
         maxLength: 256
     ObservabilityActivityDestinationIDs:
       description: |-
@@ -18849,12 +18850,10 @@ components:
           example: export
         label:
           description: Display name, at most 128 bytes
-          maxLength: 128
           minLength: 1
           type: string
         description:
           description: Explanation of the category, at most 512 bytes
-          maxLength: 512
           minLength: 1
           type: string
         sources:
